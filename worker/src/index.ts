@@ -33,10 +33,11 @@ app.get('/v1/version', (c) => c.json({ name: 'nodrix', version: '0.0.0' }));
 // Better Auth: signup/login/logout/OAuth callbacks. Public — no session gate.
 // Runs migrations on first call so a fresh deploy can bootstrap directly into
 // signup without a separate provisioning step.
-// NOTE: `/v1/auth/*` was unreliable in Hono's RegExpRouter — multi-segment
-// callback paths like /v1/auth/callback/google fell through to the SPA
-// fallback. The explicit named-param + regex catches everything under /v1/auth/.
-app.all('/v1/auth/:rest{.+}', async (c) => {
+// Better Auth handler mounted as a sub-app at /v1/auth. Sub-router routing
+// in Hono handles arbitrary nested paths reliably — bare wildcard patterns
+// have had quirks with multi-segment callback URLs in past versions.
+const authApp = new Hono<{ Bindings: Env }>();
+authApp.all('*', async (c) => {
   if (!(await isBootstrapped(c.env.DB))) {
     await runMigrations(c.env.DB);
   }
@@ -76,7 +77,6 @@ app.all('/v1/auth/:rest{.+}', async (c) => {
 
   console.log(`[auth] ${c.req.method} ${path} -> ${res.status}`);
   if (res.status >= 400 && res.status < 600) {
-    // Body is consumed once — clone to log without breaking the response.
     try {
       const body = await res.clone().text();
       console.error(`[auth] error body: ${body.slice(0, 500)}`);
@@ -98,6 +98,7 @@ app.all('/v1/auth/:rest{.+}', async (c) => {
   }
   return res;
 });
+app.route('/v1/auth', authApp);
 
 // Public list of enabled OAuth providers (so the login page can render buttons).
 app.route('/v1/public/auth-providers', publicAuthProviders);
