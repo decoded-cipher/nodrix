@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id             TEXT PRIMARY KEY,
   email          TEXT NOT NULL UNIQUE,
-  email_verified INTEGER NOT NULL DEFAULT 0,
+  email_verified INTEGER NOT NULL DEFAULT 1,    -- nodrix has no email-verify flow; column kept only because Better Auth requires it
   name           TEXT,                                      -- Better Auth required
   image          TEXT,
   role           TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),

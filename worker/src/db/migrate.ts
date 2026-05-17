@@ -10,7 +10,7 @@ const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS users (
     id             TEXT PRIMARY KEY,
     email          TEXT NOT NULL UNIQUE,
-    email_verified INTEGER NOT NULL DEFAULT 0,
+    email_verified INTEGER NOT NULL DEFAULT 1,
     name           TEXT,
     image          TEXT,
     role           TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),

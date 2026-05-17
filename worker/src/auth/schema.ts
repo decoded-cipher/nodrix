@@ -12,7 +12,7 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
-  email_verified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+  email_verified: integer('email_verified', { mode: 'boolean' }).notNull().default(true),
   name: text('name'),
   image: text('image'),
   role: text('role').notNull().default('viewer'),
