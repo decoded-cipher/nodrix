@@ -1,0 +1,26 @@
+{
+  "name": "nodrix",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "worker",
+    "web",
+    "promo"
+  ],
+  "scripts": {
+    "dev": "bun run --filter @nodrix/worker dev",
+    "dev:web": "bun run --filter @nodrix/web dev",
+    "dev:promo": "bun run --filter @nodrix/promo dev",
+    "build": "bun run --filter @nodrix/web build && bun run --filter @nodrix/worker build",
+    "build:promo": "bun run --filter @nodrix/promo build",
+    "deploy:platform": "bun run build && bun run --filter @nodrix/worker deploy",
+    "deploy:promo": "bun run --filter @nodrix/promo deploy",
+    "typecheck": "bun run --filter '*' typecheck",
+    "smoke": "bun run worker/test/smoke.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "bun@1.1.40"
+}

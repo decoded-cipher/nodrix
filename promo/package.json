@@ -1,0 +1,23 @@
+{
+  "name": "@nodrix/promo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler pages deploy dist --project-name nodrix-promo",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "astro": "6.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.9",
+    "@tailwindcss/vite": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.28.1"
+  }
+}

@@ -1,0 +1,67 @@
+---
+import Site from '../layouts/Site.astro';
+import DeployButton from '../components/DeployButton.astro';
+
+const repoUrl = 'https://github.com/decoded-cipher/nodrix';
+---
+
+<Site
+  title="nodrix — your own IoT cloud, on Cloudflare"
+  description="Open-source IoT platform that deploys to your Cloudflare account in one click. Devices over HTTPS, realtime dashboards, drag-and-drop widgets."
+>
+  <main class="mx-auto max-w-6xl px-6 py-20">
+    <section class="text-center">
+      <h1 class="text-5xl font-semibold tracking-tight sm:text-6xl">
+        Your own IoT cloud.<br />
+        <span class="text-neutral-500">Running on your Cloudflare account.</span>
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-neutral-600">
+        Devices POST telemetry over HTTPS. The platform stores it, streams it to a drag-and-drop
+        dashboard, and exposes a clean read API for any external app. One click to deploy.
+      </p>
+      <div class="mt-10 flex items-center justify-center gap-4">
+        <DeployButton repo={repoUrl} />
+        <a
+          href={repoUrl}
+          class="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-5 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-100"
+        >View source</a>
+      </div>
+      <p class="mt-3 text-xs text-neutral-500">
+        Single-tenant: deploys land in your account. Marketing site never touches your data.
+      </p>
+    </section>
+
+    <section class="mt-24 grid gap-8 md:grid-cols-3">
+      <div>
+        <h3 class="font-semibold">Stateless devices</h3>
+        <p class="mt-2 text-sm text-neutral-600">
+          Three HTTPS endpoints. Any ESP32 / Pi / Arduino can talk to it without MQTT, sockets, or
+          SDKs.
+        </p>
+      </div>
+      <div>
+        <h3 class="font-semibold">Drag-and-drop dashboards</h3>
+        <p class="mt-2 text-sm text-neutral-600">
+          Compose a dashboard per project, place widgets, bind to device metrics, and watch data
+          flow in realtime.
+        </p>
+      </div>
+      <div>
+        <h3 class="font-semibold">Public read API</h3>
+        <p class="mt-2 text-sm text-neutral-600">
+          Edge-cached REST. Plug Grafana, a custom React app, or a Pi screen into the same data.
+        </p>
+      </div>
+    </section>
+
+    <section class="mt-24 rounded-xl border border-neutral-200 bg-white p-8">
+      <h2 class="text-2xl font-semibold tracking-tight">How it works</h2>
+      <ol class="mt-6 space-y-4 text-sm text-neutral-700">
+        <li><span class="font-semibold">1.</span> Click <em>Deploy to Cloudflare</em>. Cloudflare provisions D1, R2, KV, and the Worker in your account.</li>
+        <li><span class="font-semibold">2.</span> Add the Worker hostname to Cloudflare Access with a policy you control. First login becomes the owner.</li>
+        <li><span class="font-semibold">3.</span> Create a project, register a device, point its HTTPS client at the worker URL with its token.</li>
+        <li><span class="font-semibold">4.</span> Build a dashboard, bind widgets to device metrics, watch the live feed. Issue commands back to the device with a click.</li>
+      </ol>
+    </section>
+  </main>
+</Site>

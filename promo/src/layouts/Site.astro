@@ -1,0 +1,39 @@
+---
+import '../styles/global.css';
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const repoUrl = 'https://github.com/decoded-cipher/nodrix';
+---
+
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+  </head>
+  <body class="min-h-full bg-neutral-50 text-neutral-900 antialiased">
+    <header class="border-b border-neutral-200 bg-white">
+      <nav class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <a href="/" class="font-semibold tracking-tight">nodrix</a>
+        <div class="flex items-center gap-6 text-sm text-neutral-600">
+          <a href="/widgets" class="hover:text-neutral-900">Widgets</a>
+          <a href="/docs" class="hover:text-neutral-900">Docs</a>
+          <a href={repoUrl} class="hover:text-neutral-900">GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <slot />
+
+    <footer class="border-t border-neutral-200 py-8 text-center text-xs text-neutral-500">
+      Built on Cloudflare Workers, Durable Objects, D1, and R2.
+    </footer>
+  </body>
+</html>

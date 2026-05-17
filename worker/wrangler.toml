@@ -1,0 +1,55 @@
+name = "nodrix"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Vue SPA built by `web/` workspace is served as static assets.
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# D1 — metadata only (users, projects, devices, dashboards, tokens).
+# NEVER any telemetry point. See plan §3.
+[[d1_databases]]
+binding = "DB"
+database_name = "nodrix"
+database_id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
+migrations_dir = "src/db/migrations"
+
+# R2 — cold telemetry history, NDJSON partitioned by device + hour.
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "nodrix-telemetry"
+
+# KV — short-TTL read cache for /state + cached Access JWKS.
+[[kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
+
+# Durable Objects.
+[[durable_objects.bindings]]
+name = "DEVICE_DO"
+class_name = "DeviceDO"
+
+[[durable_objects.bindings]]
+name = "DASHBOARD_DO"
+class_name = "DashboardDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeviceDO", "DashboardDO"]
+
+# Workflows — provisioning only. Never on the hot path. See plan §10.
+[[workflows]]
+name = "nodrix-provision"
+binding = "PROVISION"
+class_name = "Provision"
+
+[vars]
+# Set these after deploy via `wrangler secret put` or the Cloudflare Dashboard.
+# CF_ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
+# CF_ACCESS_AUD = "<your-app-aud-tag>"
+
+[observability]
+enabled = true

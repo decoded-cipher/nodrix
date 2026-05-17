@@ -1,0 +1,33 @@
+---
+import Site from '../layouts/Site.astro';
+---
+
+<Site title="Widgets — nodrix" description="The built-in widget set.">
+  <main class="mx-auto max-w-3xl px-6 py-16">
+    <h1 class="text-3xl font-semibold tracking-tight">Built-in widgets</h1>
+    <p class="mt-2 text-sm text-neutral-700">
+      All four ship as framework-agnostic native Web Components. They receive data via properties
+      and emit DOM events for command intents — they don't know about Cloudflare, WebSockets, or
+      any specific frontend stack. Embed them outside this platform if you like.
+    </p>
+
+    <ul class="mt-8 grid gap-6 md:grid-cols-2">
+      <li class="rounded-lg border border-neutral-200 bg-white p-4">
+        <h3 class="font-semibold">iot-value</h3>
+        <p class="mt-1 text-sm text-neutral-600">Latest reading of a single metric.</p>
+      </li>
+      <li class="rounded-lg border border-neutral-200 bg-white p-4">
+        <h3 class="font-semibold">iot-gauge</h3>
+        <p class="mt-1 text-sm text-neutral-600">Arc gauge with min/max bounds.</p>
+      </li>
+      <li class="rounded-lg border border-neutral-200 bg-white p-4">
+        <h3 class="font-semibold">iot-chart</h3>
+        <p class="mt-1 text-sm text-neutral-600">Multi-series line chart over a recent window.</p>
+      </li>
+      <li class="rounded-lg border border-neutral-200 bg-white p-4">
+        <h3 class="font-semibold">iot-toggle</h3>
+        <p class="mt-1 text-sm text-neutral-600">Button that sends a command back to the device.</p>
+      </li>
+    </ul>
+  </main>
+</Site>

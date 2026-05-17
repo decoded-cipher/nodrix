@@ -1,0 +1,57 @@
+---
+import Site from '../layouts/Site.astro';
+import DeployButton from '../components/DeployButton.astro';
+---
+
+<Site title="Docs — nodrix" description="Post-deploy setup, device protocol, and read API reference.">
+  <main class="mx-auto max-w-3xl px-6 py-16">
+    <h1 class="text-3xl font-semibold tracking-tight">Setup</h1>
+
+    <section class="mt-8 space-y-4">
+      <p class="text-sm text-neutral-700">
+        Deploy the platform to your Cloudflare account, then gate it with Cloudflare Access.
+      </p>
+      <DeployButton />
+    </section>
+
+    <h2 class="mt-12 text-xl font-semibold tracking-tight">1. Cloudflare Access</h2>
+    <ol class="mt-3 list-decimal space-y-2 pl-6 text-sm text-neutral-700">
+      <li>Cloudflare Dashboard → <strong>Zero Trust</strong> → <strong>Access</strong> → <strong>Applications</strong> → <strong>Add an application</strong>.</li>
+      <li>Type: <strong>Self-hosted</strong>. Domain: your worker hostname (e.g. <code class="font-mono">nodrix.workers.dev</code>).</li>
+      <li>Add a policy: e.g. <em>Emails ending in @your-domain.com</em>.</li>
+      <li>Copy the <strong>Application Audience (AUD) tag</strong> and your <strong>team domain</strong>.</li>
+      <li>Set the worker's env vars: <code class="font-mono">CF_ACCESS_TEAM_DOMAIN</code> and <code class="font-mono">CF_ACCESS_AUD</code>.</li>
+      <li>Visit the worker URL — first login provisions you as the owner and creates a default project.</li>
+    </ol>
+
+    <h2 class="mt-12 text-xl font-semibold tracking-tight">2. Register a device</h2>
+    <p class="mt-2 text-sm text-neutral-700">
+      In the admin UI → <strong>Devices</strong> → <strong>Create</strong>. The token is shown
+      once — copy it into your device firmware now.
+    </p>
+
+    <h2 class="mt-12 text-xl font-semibold tracking-tight">3. Device protocol</h2>
+    <p class="mt-2 text-sm text-neutral-700">
+      Three HTTPS endpoints. Auth: <code class="font-mono">Authorization: Bearer &lt;device_token&gt;</code>.
+    </p>
+    <pre class="mt-4 overflow-x-auto rounded-md bg-neutral-900 p-4 text-xs text-neutral-100"><code>POST /v1/telemetry
+{`{ "ts": 1715900000, "metrics": { "temperature": 23.4, "humidity": 61 } }`}
+&rarr; 204 No Content
+
+GET /v1/commands
+&rarr; {`{ "commands": [ { "id": "cmd_x", "name": "relay", "value": "on" } ] }`}
+
+POST /v1/commands/ack
+{`{ "ids": ["cmd_x"] }`}
+&rarr; {`{ "acked": 1 }`}</code></pre>
+
+    <h2 class="mt-12 text-xl font-semibold tracking-tight">4. Read API</h2>
+    <p class="mt-2 text-sm text-neutral-700">
+      For external apps. Mint a token in the admin UI → <strong>API tokens</strong>.
+      Auth: <code class="font-mono">Authorization: Bearer &lt;user_token&gt;</code>.
+    </p>
+    <pre class="mt-4 overflow-x-auto rounded-md bg-neutral-900 p-4 text-xs text-neutral-100"><code>GET /v1/projects/:proj/devices
+GET /v1/projects/:proj/devices/:id/state          (edge-cached, ~1s)
+GET /v1/projects/:proj/devices/:id/series?metric=temperature&window=1h</code></pre>
+  </main>
+</Site>
