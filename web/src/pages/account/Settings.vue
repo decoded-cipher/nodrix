@@ -89,6 +89,19 @@ async function signOut() {
 
 const callbackUrl = (kind: 'google' | 'github') =>
   `${location.origin}/v1/auth/callback/${kind}`;
+
+// Brand metadata for the provider rows. Names use the providers' own casing
+// (capital "G" in GitHub); the underlying `kind` stays lowercase for routing.
+const PROVIDER_META = {
+  google: {
+    name: 'Google',
+    docsUrl: 'https://console.cloud.google.com/apis/credentials',
+  },
+  github: {
+    name: 'GitHub',
+    docsUrl: 'https://github.com/settings/developers',
+  },
+} as const;
 </script>
 
 <template>
@@ -131,21 +144,44 @@ const callbackUrl = (kind: 'google' | 'github') =>
       <ul class="divide-y divide-neutral-100 text-sm">
         <li v-for="kind in (['google', 'github'] as const)" :key="kind" class="px-4 py-3">
           <template v-if="editing !== kind">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm font-medium capitalize">{{ kind }}</div>
-                <div
-                  v-if="providers.find((p) => p.kind === kind)"
-                  class="mt-0.5 text-xs text-neutral-500"
-                >
-                  Client ID: <span class="font-mono">{{ providers.find((p) => p.kind === kind)?.client_id }}</span>
-                  <span class="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700">
-                    {{ providers.find((p) => p.kind === kind)?.enabled ? 'Enabled' : 'Disabled' }}
-                  </span>
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex min-w-0 items-center gap-3">
+                <!-- Brand logo -->
+                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-neutral-50 ring-1 ring-neutral-200">
+                  <!-- Google: official 4-color "G" mark -->
+                  <svg v-if="kind === 'google'" viewBox="0 0 48 48" class="h-5 w-5" aria-label="Google">
+                    <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8a12 12 0 1 1 7.9-21.1l5.7-5.7A20 20 0 1 0 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                    <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 24 12c3.1 0 6 1.2 8.1 3.1l5.7-5.7A20 20 0 0 0 6.3 14.7z"/>
+                    <path fill="#4CAF50" d="M24 44a20 20 0 0 0 13.5-5.2l-6.2-5.2A12 12 0 0 1 12.7 28l-6.5 5A20 20 0 0 0 24 44z"/>
+                    <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4 5.6l6.2 5.2A20 20 0 0 0 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                  </svg>
+                  <!-- GitHub: Octocat mark -->
+                  <svg v-else viewBox="0 0 24 24" class="h-5 w-5 text-neutral-900" fill="currentColor" aria-label="GitHub">
+                    <path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.6-3.9-1.6-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/>
+                  </svg>
                 </div>
-                <div v-else class="mt-0.5 text-xs text-neutral-500">Not configured</div>
+
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium">{{ PROVIDER_META[kind].name }}</span>
+                    <span
+                      v-if="providers.find((p) => p.kind === kind)"
+                      class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700"
+                    >
+                      {{ providers.find((p) => p.kind === kind)?.enabled ? 'Enabled' : 'Disabled' }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="providers.find((p) => p.kind === kind)"
+                    class="mt-0.5 truncate text-xs text-neutral-500"
+                  >
+                    Client ID: <span class="font-mono">{{ providers.find((p) => p.kind === kind)?.client_id }}</span>
+                  </div>
+                  <div v-else class="mt-0.5 text-xs text-neutral-500">Not configured</div>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
+
+              <div class="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
@@ -162,7 +198,28 @@ const callbackUrl = (kind: 'google' | 'github') =>
           </template>
 
           <form v-else class="space-y-3" @submit.prevent="save">
-            <div class="text-sm font-medium capitalize">{{ kind }} OAuth</div>
+            <div class="flex items-center gap-3">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-neutral-50 ring-1 ring-neutral-200">
+                <svg v-if="kind === 'google'" viewBox="0 0 48 48" class="h-5 w-5" aria-label="Google">
+                  <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8a12 12 0 1 1 7.9-21.1l5.7-5.7A20 20 0 1 0 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                  <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 24 12c3.1 0 6 1.2 8.1 3.1l5.7-5.7A20 20 0 0 0 6.3 14.7z"/>
+                  <path fill="#4CAF50" d="M24 44a20 20 0 0 0 13.5-5.2l-6.2-5.2A12 12 0 0 1 12.7 28l-6.5 5A20 20 0 0 0 24 44z"/>
+                  <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4 5.6l6.2 5.2A20 20 0 0 0 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                </svg>
+                <svg v-else viewBox="0 0 24 24" class="h-5 w-5 text-neutral-900" fill="currentColor" aria-label="GitHub">
+                  <path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.6-3.9-1.6-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="text-sm font-medium">{{ PROVIDER_META[kind].name }} OAuth</div>
+                <a
+                  :href="PROVIDER_META[kind].docsUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-[11px] text-orange-700 hover:underline"
+                >Open {{ PROVIDER_META[kind].name }} OAuth console →</a>
+              </div>
+            </div>
             <p class="rounded-md bg-neutral-50 px-3 py-2 text-[11px] text-neutral-600">
               Register a callback URL at the provider's OAuth console:
               <span class="font-mono">{{ callbackUrl(kind) }}</span>
