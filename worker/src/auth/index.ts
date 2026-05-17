@@ -62,6 +62,23 @@ export async function buildAuth(env: Env, request?: Request) {
     trustedOrigins: request ? [new URL(request.url).origin] : undefined,
     database: drizzleAdapter(db, { provider: 'sqlite' }),
 
+    // Without these, Better Auth scopes the session cookie to `Path=/v1/auth`
+    // (matching basePath), so the browser doesn't send it on /v1/admin/* or
+    // /v1/projects/* and every authenticated API call 401s. Path=/ makes it
+    // apply across the whole worker. ipAddressHeaders silences the rate-limit
+    // warning Cloudflare Workers triggers since req.ip is undefined.
+    advanced: {
+      defaultCookieAttributes: {
+        path: '/',
+        sameSite: 'lax',
+        secure: true,
+        httpOnly: true,
+      },
+      ipAddress: {
+        ipAddressHeaders: ['cf-connecting-ip'],
+      },
+    },
+
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
