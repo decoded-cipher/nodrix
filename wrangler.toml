@@ -10,10 +10,16 @@ compatibility_flags = ["nodejs_compat"]
 command = "bun install && bun run --filter @nodrix/web build"
 
 # Vue SPA built by `web/` workspace is served as static assets.
+# `run_worker_first = true` is REQUIRED: without it, Cloudflare's edge serves
+# index.html for any unmatched GET (SPA fallback) before the Worker runs, which
+# silently intercepts OAuth callbacks like /v1/auth/callback/google. With this
+# flag, the Worker runs for every method and falls back to ASSETS.fetch() only
+# for paths it doesn't handle.
 [assets]
 directory = "web/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = true
 
 # D1 — metadata only (users, projects, devices, dashboards, tokens).
 # NEVER any telemetry point. See plan §3.
