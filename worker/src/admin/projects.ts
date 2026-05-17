@@ -1,15 +1,13 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
+import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import type { DeviceDO } from '../do/device-do';
 
 const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
-projects.use('*', requireAccess);
-projects.use('*', resolveUser);
+projects.use('*', requireSession);
 
 projects.get('/', async (c) => {
   const user = c.get('user');

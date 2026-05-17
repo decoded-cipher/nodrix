@@ -1,12 +1,10 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess, type AccessContextVars } from '../middleware/require-access';
-import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
+import { requireSession, type UserContextVars } from '../middleware/require-session';
 
-const ws = new Hono<{ Bindings: Env; Variables: UserContextVars & AccessContextVars }>();
+const ws = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
-ws.use('*', requireAccess);
-ws.use('*', resolveUser);
+ws.use('*', requireSession);
 
 // GET /ws/:dashboard
 // Upgrades to a WebSocket and forwards to the per-dashboard DO.

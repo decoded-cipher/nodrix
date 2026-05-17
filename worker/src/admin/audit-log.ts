@@ -1,12 +1,10 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
+import { requireSession, type UserContextVars } from '../middleware/require-session';
 
 const auditLog = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
-auditLog.use('*', requireAccess);
-auditLog.use('*', resolveUser);
+auditLog.use('*', requireSession);
 
 // GET /v1/admin/audit-log?limit=50&before=<id>
 // Account-wide log: returns entries from every project the caller is a member

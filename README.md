@@ -16,9 +16,21 @@ A Cloudflare-native IoT platform. Devices POST telemetry over HTTPS, poll for co
 |---|---|
 | Device DO (SQLite) | Latest state, recent ring buffer, pending commands, flush cursor |
 | R2 | Cold telemetry history (NDJSON, partitioned by device + hour) |
-| D1 | Users, projects, devices, dashboards, tokens, automations, integrations, audit log (metadata only — never any telemetry point) |
-| KV | Cached `/state` responses; cached Access JWKS |
+| D1 | Users, sessions, accounts, projects, devices, dashboards, tokens, automations, integrations, audit log, OAuth provider config (metadata only — never any telemetry point) |
+| KV | Cached `/state` responses |
 | Dashboard DO | Per-dashboard subscription set + hibernated WebSockets |
+
+## Authentication
+
+[Better Auth](https://www.better-auth.com) handles sign-in. Email + password is
+on by default; Google and GitHub OAuth can be enabled at runtime from
+**Settings → Sign-in providers** (the owner enters a client ID + secret per
+provider; the login page shows the corresponding buttons immediately).
+
+First-time deployments hit a "Create owner account" page on first visit — the
+first signup becomes role `owner`. After that, registration is closed (RBAC
+invites land later). Sessions are cookie-based and persist 30 days; each
+device is a separate session row, listed and revokable from **Users**.
 
 ## Local dev
 
@@ -38,8 +50,10 @@ bun run dev:web
 bun run dev:promo
 ```
 
-In local dev the worker has no CF Access — sign-in uses an `X-Dev-Email` header.
-The SPA picks it up from `localStorage` (set via the `/setup` page).
+On first visit, the app sends you to `/login` to create the owner account.
+Sessions are stored as cookies in D1; no env config is needed for local dev.
+
+Set `BETTER_AUTH_SECRET` for production (`wrangler secret put BETTER_AUTH_SECRET`).
 
 ## Smoke test
 
@@ -76,11 +90,10 @@ bun run deploy:promo  # deploys the promo site to Cloudflare Pages
 
 ## Post-deploy setup
 
-After the Deploy button finishes, you need to gate the Worker behind Cloudflare Access:
-
-1. Cloudflare Dashboard → **Zero Trust** → **Access** → **Applications** → **Add application**.
-2. Type: **Self-hosted**. Domain: your worker's hostname.
-3. Policy: whoever you want to grant access to (email, IdP, etc.).
-4. Copy the **Application Audience (AUD) tag** into the Worker's `CF_ACCESS_AUD` env var.
-5. Set `CF_ACCESS_TEAM_DOMAIN` to your team domain (e.g. `your-team.cloudflareaccess.com`).
-6. Visit your worker URL — first login provisions you as the owner and creates a default project.
+1. Set the auth secret: `wrangler secret put BETTER_AUTH_SECRET` (32+ random bytes).
+2. Set `APP_URL` in `wrangler.toml` to your public origin — needed for OAuth callbacks.
+3. Visit your worker URL → create the owner account.
+4. (Optional) **Settings → Sign-in providers** to add Google/GitHub OAuth.
+   - Register the callback URL the form displays
+     (`<APP_URL>/v1/auth/callback/google` and `<APP_URL>/v1/auth/callback/github`)
+     on the respective OAuth consoles before saving.

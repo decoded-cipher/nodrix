@@ -1,15 +1,13 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser } from '../middleware/resolve-user';
+import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 
 const automations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
-automations.use('*', requireAccess);
-automations.use('*', resolveUser);
+automations.use('*', requireSession);
 automations.use('*', resolveProject);
 
 const TRIGGER_TYPES = ['schedule', 'device_state', 'sunset_sunrise', 'event', 'scene'] as const;

@@ -4,9 +4,34 @@ import { useSessionStore } from '../../stores/session';
 
 const session = useSessionStore();
 
-onMounted(() => {
-  if (!session.user) session.load();
+onMounted(async () => {
+  if (!session.user) await session.load();
+  try { await session.loadSessions(); } catch { /* ignore */ }
 });
+
+function fmtAgent(ua: string | null): string {
+  if (!ua) return 'Unknown device';
+  // Crude UA → friendly summary. Good enough for the device list.
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) && !/Chrome\//.test(ua) ? 'Safari' :
+    'Browser';
+  const os =
+    /Windows/.test(ua) ? 'Windows' :
+    /Mac OS X/.test(ua) ? 'macOS' :
+    /Android/.test(ua) ? 'Android' :
+    /iPhone|iPad/.test(ua) ? 'iOS' :
+    /Linux/.test(ua) ? 'Linux' :
+    '';
+  return os ? `${browser} on ${os}` : browser;
+}
+
+async function revoke(id: string) {
+  if (!confirm('Sign out this device? It will need to log in again.')) return;
+  await session.revokeSession(id);
+}
 
 const editing = ref(false);
 const form = ref({ first_name: '', last_name: '' });
@@ -169,11 +194,47 @@ async function save() {
       </form>
     </section>
 
+    <!-- Active sessions -->
+    <section class="mt-6 rounded-lg border border-neutral-200 bg-white">
+      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold">Active sessions</div>
+      <ul class="divide-y divide-neutral-100">
+        <li
+          v-for="s in session.activeSessions"
+          :key="s.id"
+          class="flex items-center justify-between px-4 py-3 text-sm"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">{{ fmtAgent(s.user_agent) }}</span>
+              <span
+                v-if="s.current"
+                class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700"
+              >This device</span>
+            </div>
+            <div class="mt-0.5 text-xs text-neutral-500">
+              <span v-if="s.ip_address" class="font-mono">{{ s.ip_address }}</span>
+              <span v-if="s.ip_address"> · </span>
+              <span>last seen {{ fmt(s.last_seen_at) }}</span>
+            </div>
+          </div>
+          <button
+            v-if="!s.current"
+            type="button"
+            class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+            @click="revoke(s.id)"
+          >Sign out</button>
+        </li>
+        <li v-if="session.activeSessions.length === 0" class="px-4 py-6 text-sm text-neutral-500">
+          No active sessions.
+        </li>
+      </ul>
+    </section>
+
     <section class="mt-6 rounded-lg border border-dashed border-neutral-300 bg-white p-6">
       <h3 class="text-sm font-semibold">Multi-user management is on the roadmap</h3>
       <p class="mt-2 text-xs text-neutral-600">
-        For now, anyone who satisfies your Cloudflare Access policy can sign in. Per-user roles,
-        per-project access, and invitations land in a future release.
+        For now, the owner is the only account. Per-user roles, per-project access, and
+        invitations land in a future release.
       </p>
     </section>
   </div>

@@ -6,14 +6,74 @@
 -- aligned. Existing deployments diff via migrations/0002_schema_v2.sql; fresh
 -- deployments boot directly into this state.
 
--- Users: forward-compat for RBAC. v1 has exactly one row, role='owner'.
+-- Users: identity record. Bootstrap user is role='owner'. Authentication
+-- credentials live in `accounts` (Better Auth); this table only holds profile.
 CREATE TABLE IF NOT EXISTS users (
-  id            TEXT PRIMARY KEY,
-  email         TEXT NOT NULL UNIQUE,
-  role          TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),
-  first_name    TEXT,
-  last_name     TEXT,
-  last_login_at INTEGER,
+  id             TEXT PRIMARY KEY,
+  email          TEXT NOT NULL UNIQUE,
+  email_verified INTEGER NOT NULL DEFAULT 0,
+  name           TEXT,                                      -- Better Auth required
+  image          TEXT,
+  role           TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),
+  first_name     TEXT,
+  last_name      TEXT,
+  last_login_at  INTEGER,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+
+-- accounts: Better Auth credential store. provider_id='credential' for
+-- email/password (password column has the hash); 'google'/'github' for OAuth.
+CREATE TABLE IF NOT EXISTS accounts (
+  id                       TEXT PRIMARY KEY,
+  account_id               TEXT NOT NULL,
+  provider_id              TEXT NOT NULL,
+  user_id                  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  access_token             TEXT,
+  refresh_token            TEXT,
+  id_token                 TEXT,
+  access_token_expires_at  INTEGER,
+  refresh_token_expires_at INTEGER,
+  scope                    TEXT,
+  password                 TEXT,                            -- hashed; email/password only
+  created_at               INTEGER NOT NULL,
+  updated_at               INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_accounts_user     ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_provider ON accounts(provider_id, account_id);
+
+-- sessions: one row per signed-in device.
+CREATE TABLE IF NOT EXISTS sessions (
+  id          TEXT PRIMARY KEY,
+  token       TEXT NOT NULL UNIQUE,                         -- cookie value
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at  INTEGER NOT NULL,
+  ip_address  TEXT,
+  user_agent  TEXT,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user  ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+
+-- verifications: short-lived tokens for password reset / email verify.
+CREATE TABLE IF NOT EXISTS verifications (
+  id          TEXT PRIMARY KEY,
+  identifier  TEXT NOT NULL,
+  value       TEXT NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_verifications_identifier ON verifications(identifier);
+
+-- auth_providers: runtime OAuth config. Editable from the Settings page; the
+-- worker reads these rows when building the Better Auth instance per request.
+CREATE TABLE IF NOT EXISTS auth_providers (
+  kind          TEXT PRIMARY KEY CHECK (kind IN ('google','github')),
+  client_id     TEXT NOT NULL,
+  client_secret TEXT NOT NULL,
+  enabled       INTEGER NOT NULL DEFAULT 1,
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );

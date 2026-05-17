@@ -1,14 +1,12 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
+import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { newId, newToken, sha256Hex } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 
 const tokens = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
-tokens.use('*', requireAccess);
-tokens.use('*', resolveUser);
+tokens.use('*', requireSession);
 
 // GET /v1/admin/tokens
 tokens.get('/', async (c) => {

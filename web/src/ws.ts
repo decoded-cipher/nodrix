@@ -1,12 +1,8 @@
 // Dashboard WebSocket client. ONE per browser tab — owned by DashboardView /
-// DashboardEdit. Reconnects with backoff. Auth: CF Access cookie in prod;
-// in dev, append ?dev_email=... so the worker's dev bypass can pick it up.
-//
-// Important: this file is imported by the dashboard pages, NOT by widgets.
-// Widgets stay framework-agnostic and have no transport knowledge (plan §9).
+// DashboardEdit. Reconnects with backoff. Auth: session cookie set by Better
+// Auth — the browser sends it automatically on the WebSocket upgrade.
 
 import type { WsClientMsg, WsServerMsg } from './types';
-import { getDevEmail } from './api';
 
 export type WsHandler = (msg: WsServerMsg) => void;
 
@@ -19,9 +15,7 @@ export class DashboardWs {
 
   constructor(dashboardId: string, handler: WsHandler) {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const dev = getDevEmail();
-    const qs = dev ? `?dev_email=${encodeURIComponent(dev)}` : '';
-    this.url = `${proto}//${location.host}/ws/${dashboardId}${qs}`;
+    this.url = `${proto}//${location.host}/ws/${dashboardId}`;
     this.handler = handler;
   }
 
@@ -43,12 +37,6 @@ export class DashboardWs {
   }
 
   private connect(): void {
-    const dev = getDevEmail();
-    // The browser can't set custom headers on WebSocket; the dev bypass arrives via the
-    // query string. The worker's verifyAccessJwt reads request headers, so we set up
-    // the dev-mode bypass via a small middleware tweak in the worker.
-    void dev;
-
     const ws = new WebSocket(this.url);
     this.socket = ws;
 

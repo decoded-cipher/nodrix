@@ -53,9 +53,11 @@ binding = "PROVISION"
 class_name = "Provision"
 
 [vars]
-# Set these after deploy via `wrangler secret put` or the Cloudflare Dashboard.
-# CF_ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
-# CF_ACCESS_AUD = "<your-app-aud-tag>"
+# Public origin used to build OAuth callback URLs. Override per environment.
+APP_URL = "http://localhost:8787"
+
+# Secrets (set via `wrangler secret put`, never commit):
+#   BETTER_AUTH_SECRET   — random 32+ bytes; used to sign session cookies.
 
 [observability]
 enabled = true

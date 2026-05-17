@@ -1,47 +1,26 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess, type AccessContextVars } from '../middleware/require-access';
-import { runMigrations, isBootstrapped } from '../db/migrate';
-import { newId } from '../lib/ids';
+import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { recordAudit } from '../lib/audit';
 
-const me = new Hono<{ Bindings: Env; Variables: AccessContextVars }>();
+const me = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
-me.use('*', requireAccess);
+me.use('*', requireSession);
 
+// GET /v1/admin/me  — return the signed-in user + their projects.
 me.get('/', async (c) => {
-  const access = c.get('access');
+  const user = c.get('user');
 
-  // First-run: schema may not exist + users table may be empty.
-  // Both conditions handled idempotently here. See plan §10 — this is the
-  // ONLY hot-path code that touches provisioning, and it short-circuits on
-  // subsequent calls via isBootstrapped().
-  const bootstrapped = await isBootstrapped(c.env.DB);
-  if (!bootstrapped) {
-    await runMigrations(c.env.DB);
-    await seedOwner(c.env.DB, access.email);
-  } else {
-    // Ensure this caller exists as a user; if a new email comes in post-bootstrap
-    // it's currently rejected (RBAC invites come later).
-    const existing = await c.env.DB
-      .prepare('SELECT id FROM users WHERE email = ?')
-      .bind(access.email)
-      .first<{ id: string }>();
-    if (!existing) {
-      return c.json({ error: 'forbidden', reason: 'no_account_for_email' }, 403);
-    }
-  }
-
-  const user = await c.env.DB
+  const fullUser = await c.env.DB
     .prepare(
       `SELECT id, email, role, first_name, last_name, last_login_at, created_at, updated_at
-         FROM users WHERE email = ?`
+         FROM users WHERE id = ?`
     )
-    .bind(access.email)
+    .bind(user.id)
     .first<{
       id: string;
       email: string;
-      role: string;
+      role: 'owner' | 'admin' | 'viewer';
       first_name: string | null;
       last_name: string | null;
       last_login_at: number | null;
@@ -58,7 +37,7 @@ me.get('/', async (c) => {
         WHERE pm.user_id = ?
         ORDER BY p.created_at ASC`
     )
-    .bind(user!.id)
+    .bind(user.id)
     .all<{
       id: string;
       name: string;
@@ -70,43 +49,39 @@ me.get('/', async (c) => {
       archived_at: number | null;
     }>();
 
-  return c.json({
-    user,
-    projects: projects.results,
-  });
+  return c.json({ user: fullUser, projects: projects.results });
 });
 
 // PATCH /v1/admin/me  body: { first_name?, last_name? }
-// Self-service profile edit. Email/role are not editable here — email comes
-// from CF Access, role changes need RBAC (not built yet).
 me.patch('/', async (c) => {
-  const access = c.get('access');
+  const user = c.get('user');
   const body = await c.req.json<{
     first_name?: string | null;
     last_name?: string | null;
   }>();
 
-  const existing = await c.env.DB
-    .prepare(`SELECT id FROM users WHERE email = ?`)
-    .bind(access.email)
-    .first<{ id: string }>();
-  if (!existing) return c.json({ error: 'forbidden', reason: 'no_account_for_email' }, 403);
-
   const sets: string[] = [];
   const vals: unknown[] = [];
+  let nextFirst: string | null = user.first_name;
+  let nextLast: string | null = user.last_name;
   if ('first_name' in body) {
-    const v = typeof body.first_name === 'string' ? body.first_name.trim() : null;
-    sets.push('first_name = ?'); vals.push(v && v.length > 0 ? v : null);
+    nextFirst = typeof body.first_name === 'string' && body.first_name.trim() ? body.first_name.trim() : null;
+    sets.push('first_name = ?'); vals.push(nextFirst);
   }
   if ('last_name' in body) {
-    const v = typeof body.last_name === 'string' ? body.last_name.trim() : null;
-    sets.push('last_name = ?'); vals.push(v && v.length > 0 ? v : null);
+    nextLast = typeof body.last_name === 'string' && body.last_name.trim() ? body.last_name.trim() : null;
+    sets.push('last_name = ?'); vals.push(nextLast);
   }
   if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
 
+  // Keep Better Auth's `name` column in sync with first+last so OAuth flows
+  // that read `name` see the user's preferred display value.
+  const combined = [nextFirst, nextLast].filter((s): s is string => !!s && !!s.trim()).join(' ');
+  sets.push('name = ?'); vals.push(combined || null);
+
   const now = Math.floor(Date.now() / 1000);
   sets.push('updated_at = ?'); vals.push(now);
-  vals.push(existing.id);
+  vals.push(user.id);
 
   await c.env.DB
     .prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`)
@@ -116,10 +91,10 @@ me.patch('/', async (c) => {
   c.executionCtx.waitUntil(
     recordAudit(c.env, {
       projectId: null,
-      userId: existing.id,
+      userId: user.id,
       action: 'user.update',
       targetType: 'user',
-      targetId: existing.id,
+      targetId: user.id,
       metadata: { fields: Object.keys(body) },
     })
   );
@@ -129,36 +104,9 @@ me.patch('/', async (c) => {
       `SELECT id, email, role, first_name, last_name, last_login_at, created_at, updated_at
          FROM users WHERE id = ?`
     )
-    .bind(existing.id)
+    .bind(user.id)
     .first();
   return c.json(updated);
 });
-
-async function seedOwner(db: Env['DB'], email: string): Promise<void> {
-  const userId = newId('user');
-  const projectId = newId('project');
-  const now = Math.floor(Date.now() / 1000);
-
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO users (id, email, role, created_at, updated_at, last_login_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      )
-      .bind(userId, email, 'owner', now, now, now),
-    db
-      .prepare(
-        `INSERT INTO projects (id, name, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`
-      )
-      .bind(projectId, 'Default', userId, now, now),
-    db
-      .prepare(
-        `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
-         VALUES (?, ?, ?, ?, ?)`
-      )
-      .bind(userId, projectId, 'owner', now, userId),
-  ]);
-}
 
 export default me;

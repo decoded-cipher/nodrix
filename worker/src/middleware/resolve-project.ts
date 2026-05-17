@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import type { Env } from '../env';
-import type { UserContextVars } from './resolve-user';
+import type { UserContextVars } from './require-session';
 
 export type ProjectContextVars = UserContextVars & {
   project: { id: string; name: string };

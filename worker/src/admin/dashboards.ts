@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser } from '../middleware/resolve-user';
+import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
@@ -9,8 +8,7 @@ import { validateLayout, devicesFromLayout } from '../lib/layout';
 
 const dashboards = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
-dashboards.use('*', requireAccess);
-dashboards.use('*', resolveUser);
+dashboards.use('*', requireSession);
 dashboards.use('*', resolveProject);
 
 // GET /v1/admin/projects/:proj/dashboards

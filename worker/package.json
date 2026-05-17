@@ -11,8 +11,9 @@
     "types": "wrangler types --config ../wrangler.toml"
   },
   "dependencies": {
+    "better-auth": "^1.6.11",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.12",
-    "jose": "^6.2.3",
     "nanoid": "^5.1.11"
   },
   "devDependencies": {

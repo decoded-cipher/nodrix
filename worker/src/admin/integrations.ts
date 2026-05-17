@@ -1,15 +1,13 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser } from '../middleware/resolve-user';
+import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 
 const integrations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
-integrations.use('*', requireAccess);
-integrations.use('*', resolveUser);
+integrations.use('*', requireSession);
 integrations.use('*', resolveProject);
 
 const KINDS = ['webhook', 'code_block', 'slack', 'email', 'mqtt', 'http_service'] as const;

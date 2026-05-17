@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
-import { requireAccess } from '../middleware/require-access';
-import { resolveUser } from '../middleware/resolve-user';
+import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId, newToken, sha256Hex } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
@@ -9,8 +8,7 @@ import type { DeviceDO } from '../do/device-do';
 
 const devices = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
-devices.use('*', requireAccess);
-devices.use('*', resolveUser);
+devices.use('*', requireSession);
 devices.use('*', resolveProject);
 
 // GET /v1/admin/projects/:proj/devices

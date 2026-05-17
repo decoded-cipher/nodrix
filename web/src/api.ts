@@ -1,19 +1,7 @@
-// Thin fetch wrapper. Sends CF Access JWT automatically via cookies in prod;
-// in dev (no CF Access), uses the X-Dev-Email header from localStorage.
-
-const DEV_EMAIL_KEY = 'nodrix:dev-email';
-
-export function getDevEmail(): string | null {
-  return localStorage.getItem(DEV_EMAIL_KEY);
-}
-
-export function setDevEmail(email: string): void {
-  localStorage.setItem(DEV_EMAIL_KEY, email);
-}
-
-export function clearDevEmail(): void {
-  localStorage.removeItem(DEV_EMAIL_KEY);
-}
+// Thin fetch wrapper. Auth is handled via session cookies set by Better Auth
+// (worker mounted at /v1/auth/*). Cookies travel automatically thanks to
+// credentials: 'include'. A 401 from any admin endpoint means the session
+// is gone — the app subscribes via onUnauthorized() to redirect to /login.
 
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown) {
@@ -21,19 +9,24 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  const dev = getDevEmail();
-  if (dev) headers['x-dev-email'] = dev;
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
 
+export function onUnauthorized(fn: UnauthorizedHandler) {
+  unauthorizedHandler = fn;
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers,
+    headers: { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: 'include',
   });
 
+  if (res.status === 401) unauthorizedHandler?.();
   if (res.status === 204) return undefined as T;
+
   const payload = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, payload);
   return payload as T;

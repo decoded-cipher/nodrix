@@ -27,11 +27,12 @@ onMounted(async () => {
   }
 });
 
-// Redirect to setup if unauthenticated.
+// Redirect to login if unauthenticated. (The api.ts onUnauthorized hook
+// catches most 401s, but watching session.error covers the initial load case.)
 watch(
   () => session.error,
   (err) => {
-    if (err && err.status === 401) router.replace('/setup');
+    if (err && err.status === 401) router.replace('/login');
   }
 );
 

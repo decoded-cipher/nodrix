@@ -1,8 +1,10 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
-  // Setup lives outside the app shell.
-  { path: '/setup', name: 'setup', component: () => import('./pages/Setup.vue') },
+  // Login lives outside the app shell.
+  { path: '/login', name: 'login', component: () => import('./pages/Login.vue') },
+  // Back-compat redirect for any bookmarks that still point at /setup.
+  { path: '/setup', redirect: '/login' },
 
   // Everything else is wrapped in the authenticated app shell.
   {
