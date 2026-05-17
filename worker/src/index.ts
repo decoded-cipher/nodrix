@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from './env';
 import { buildAuth } from './auth';
 import { isBootstrapped, runMigrations } from './db/migrate';
+import { recordAudit } from './lib/audit';
 import me from './admin/me';
 import projects from './admin/projects';
 import devices from './admin/devices';
@@ -36,7 +37,37 @@ app.on(['GET', 'POST'], '/v1/auth/*', async (c) => {
     await runMigrations(c.env.DB);
   }
   const auth = await buildAuth(c.env, c.req.raw);
-  return auth.handler(c.req.raw);
+
+  // Capture the user BEFORE sign-out invalidates the session, so we can
+  // emit a user.logout audit entry with the right user_id.
+  const path = new URL(c.req.url).pathname;
+  const isSignOut = path.endsWith('/sign-out');
+  let logoutUserId: string | null = null;
+  let logoutSessionId: string | null = null;
+  if (isSignOut) {
+    try {
+      const s = await auth.api.getSession({ headers: c.req.raw.headers });
+      if (s?.user?.id) {
+        logoutUserId = s.user.id;
+        logoutSessionId = s.session?.id ?? null;
+      }
+    } catch { /* no session — nothing to log */ }
+  }
+
+  const res = await auth.handler(c.req.raw);
+
+  if (logoutUserId && res.status < 400) {
+    c.executionCtx.waitUntil(
+      recordAudit(c.env, {
+        projectId: null,
+        userId: logoutUserId,
+        action: 'user.logout',
+        targetType: 'session',
+        targetId: logoutSessionId,
+      })
+    );
+  }
+  return res;
 });
 
 // Public list of enabled OAuth providers (so the login page can render buttons).

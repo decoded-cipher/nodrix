@@ -108,6 +108,7 @@ dashboards.post('/', async (c) => {
 // PUT /v1/admin/projects/:proj/dashboards/:id  body: { name?, layout?, if_updated_at? }
 dashboards.put('/:id', async (c) => {
   const project = c.get('project');
+  const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json<{ name?: string; layout?: unknown; if_updated_at?: number }>();
 
@@ -139,6 +140,20 @@ dashboards.put('/:id', async (c) => {
     )
     .bind(nextName, nextLayoutJson, now, id, project.id)
     .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'dashboard.update',
+      targetType: 'dashboard',
+      targetId: id,
+      metadata: {
+        renamed: typeof body.name === 'string' && body.name.trim() !== current.name,
+        layout_changed: body.layout !== undefined,
+      },
+    })
+  );
 
   return c.json({ id, name: nextName, layout: JSON.parse(nextLayoutJson), updated_at: now });
 });

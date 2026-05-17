@@ -22,6 +22,9 @@ function fmt(ts: number): string {
 }
 
 function actionTone(action: string): string {
+  if (action === 'user.register') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+  if (action === 'user.login')    return 'bg-sky-50 text-sky-700 ring-sky-200';
+  if (action === 'user.logout')   return 'bg-neutral-100 text-neutral-700 ring-neutral-200';
   if (action.endsWith('.delete')) return 'bg-red-50 text-red-700 ring-red-200';
   if (action.endsWith('.create')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
   if (action.endsWith('.enable') || action.endsWith('.disable'))

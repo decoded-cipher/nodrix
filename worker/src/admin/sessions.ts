@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
+import { recordAudit } from '../lib/audit';
 
 const sessions = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -52,6 +53,16 @@ sessions.delete('/:id', async (c) => {
     .bind(sessionId, user.id)
     .run();
   if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: null,
+      userId: user.id,
+      action: 'session.revoke',
+      targetType: 'session',
+      targetId: sessionId,
+    })
+  );
   return c.body(null, 204);
 });
 

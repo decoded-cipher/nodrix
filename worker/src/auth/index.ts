@@ -13,6 +13,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { drizzle } from 'drizzle-orm/d1';
 import type { Env } from '../env';
 import * as schema from './schema';
+import { recordAudit } from '../lib/audit';
 
 type ProviderRow = {
   kind: 'google' | 'github';
@@ -128,12 +129,10 @@ export async function buildAuth(env: Env, request?: Request) {
       },
     },
 
-    // Bootstrap + profile shaping:
-    //   • before: flip role='owner' for the very first signup; let everyone
-    //     else default to 'viewer'. role is in additionalFields so this lands
-    //     in the INSERT itself, not a follow-up UPDATE.
-    //   • after: split the provider-supplied `name` into first_name/last_name
-    //     via raw D1 (those columns aren't part of Better Auth's schema view).
+    // Auth lifecycle hooks. Three responsibilities:
+    //   • Bootstrap role: first user becomes 'owner', everyone else 'viewer'.
+    //   • Profile shape: split `name` → first_name / last_name.
+    //   • Audit trail: user.register, user.login (per session create).
     databaseHooks: {
       user: {
         create: {
@@ -145,14 +144,53 @@ export async function buildAuth(env: Env, request?: Request) {
           },
           after: async (user) => {
             const name = (user.name ?? '').trim();
-            if (!name) return;
-            const parts = name.split(/\s+/);
-            const firstName = parts[0] ?? null;
-            const lastName = parts.length > 1 ? parts.slice(1).join(' ') : null;
-            await env.DB
-              .prepare(`UPDATE users SET first_name = ?, last_name = ? WHERE id = ?`)
-              .bind(firstName, lastName, user.id)
-              .run();
+            if (name) {
+              const parts = name.split(/\s+/);
+              const firstName = parts[0] ?? null;
+              const lastName = parts.length > 1 ? parts.slice(1).join(' ') : null;
+              await env.DB
+                .prepare(`UPDATE users SET first_name = ?, last_name = ? WHERE id = ?`)
+                .bind(firstName, lastName, user.id)
+                .run();
+            }
+            await recordAudit(env, {
+              projectId: null,
+              userId: user.id,
+              action: 'user.register',
+              targetType: 'user',
+              targetId: user.id,
+              metadata: { email: user.email },
+            });
+          },
+        },
+      },
+      session: {
+        create: {
+          after: async (session) => {
+            // Fires for every new session (email/password + OAuth, every
+            // device). user_agent / ip are useful for security review.
+            const s = session as unknown as {
+              id: string;
+              userId?: string;
+              user_id?: string;
+              userAgent?: string | null;
+              user_agent?: string | null;
+              ipAddress?: string | null;
+              ip_address?: string | null;
+            };
+            const userId = s.userId ?? s.user_id ?? null;
+            if (!userId) return;
+            await recordAudit(env, {
+              projectId: null,
+              userId,
+              action: 'user.login',
+              targetType: 'session',
+              targetId: s.id,
+              metadata: {
+                user_agent: s.userAgent ?? s.user_agent ?? null,
+                ip_address: s.ipAddress ?? s.ip_address ?? null,
+              },
+            });
           },
         },
       },
