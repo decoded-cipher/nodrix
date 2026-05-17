@@ -101,6 +101,14 @@ async function signOut() {
 const callbackUrl = (kind: 'google' | 'github') =>
   `${location.origin}/v1/auth/callback/${kind}`;
 
+// Display the client ID with the middle masked. Avoids casual screen-grabs;
+// Client ID isn't strictly secret, but there's no reason to show it whole.
+function maskedClientId(id: string | undefined | null): string {
+  if (!id) return '';
+  if (id.length <= 6) return 'xxxxxxxxxx';
+  return id.slice(0, 6) + 'xxxxxxxxxxxx';
+}
+
 // Brand metadata for the provider rows. Names use the providers' own casing
 // (capital "G" in GitHub); the underlying `kind` stays lowercase for routing.
 const PROVIDER_META = {
@@ -186,7 +194,7 @@ const PROVIDER_META = {
                     v-if="providers.find((p) => p.kind === kind)"
                     class="mt-0.5 truncate text-xs text-neutral-500"
                   >
-                    Client ID: <span class="font-mono">{{ providers.find((p) => p.kind === kind)?.client_id }}</span>
+                    Client ID: <span class="font-mono">{{ maskedClientId(providers.find((p) => p.kind === kind)?.client_id) }}</span>
                   </div>
                   <div v-else class="mt-0.5 text-xs text-neutral-500">Not configured</div>
                 </div>
