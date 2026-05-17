@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "hono": "^4.6.12",
-    "jose": "^6.2.3"
+    "jose": "^6.2.3",
+    "nanoid": "^5.1.11"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241224.0",

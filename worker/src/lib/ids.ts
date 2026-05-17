@@ -1,10 +1,11 @@
-// Prefixed UUID-based ids. Cheap, sortable enough for v1, easy to eyeball in logs.
+import { nanoid } from 'nanoid';
+
+// Prefixed nanoid-based ids. URL-safe, easy to eyeball in logs.
 //
-// usr_xxx  user
-// prj_xxx  project
-// dev_xxx  device
-// dsh_xxx  dashboard
-// tok_xxx  token (device or user)
+// usr_xxx  user        prj_xxx  project
+// dev_xxx  device      dsh_xxx  dashboard
+// tok_xxx  token       cmd_xxx  command
+// aut_xxx  automation  itg_xxx  integration
 
 const PREFIXES = {
   user: 'usr',
@@ -19,9 +20,12 @@ const PREFIXES = {
 
 export type IdKind = keyof typeof PREFIXES;
 
+// 12 chars from nanoid's default alphabet (A-Za-z0-9_-) gives ~72 bits of
+// entropy — safe well past 10^10 IDs per kind, and short enough to eyeball.
+const ID_LEN = 12;
+
 export function newId(kind: IdKind): string {
-  // 22 chars of base32-ish entropy is plenty; collisions vanishingly unlikely.
-  return `${PREFIXES[kind]}_${crypto.randomUUID().replace(/-/g, '').slice(0, 22)}`;
+  return `${PREFIXES[kind]}_${nanoid(ID_LEN)}`;
 }
 
 // Token generation: 32 random bytes, base64url. Plaintext returned to the user
