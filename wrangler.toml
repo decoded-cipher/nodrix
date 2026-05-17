@@ -52,12 +52,12 @@ name = "nodrix-provision"
 binding = "PROVISION"
 class_name = "Provision"
 
-[vars]
-# Public origin used to build OAuth callback URLs. Override per environment.
-APP_URL = "http://localhost:8787"
-
-# Secrets (set via `wrangler secret put`, never commit):
-#   BETTER_AUTH_SECRET   — random 32+ bytes; used to sign session cookies.
+# Secrets (KMS-encrypted). The Deploy to Cloudflare wizard reads this list
+# and prompts for each one during setup; `wrangler deploy` also fails if
+# they're missing locally. OAuth callback URLs and Better Auth's baseURL are
+# derived from each request's origin, so no APP_URL env var is needed.
+[secrets]
+required = ["BETTER_AUTH_SECRET"]
 
 [observability]
 enabled = true

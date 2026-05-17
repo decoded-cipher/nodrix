@@ -51,9 +51,8 @@ bun run dev:promo
 ```
 
 On first visit, the app sends you to `/login` to create the owner account.
-Sessions are stored as cookies in D1; no env config is needed for local dev.
-
-Set `BETTER_AUTH_SECRET` for production (`wrangler secret put BETTER_AUTH_SECRET`).
+Sessions are cookie-based and signed with `BETTER_AUTH_SECRET` (a Workers
+Secret — KMS-encrypted, separate from your D1 data).
 
 ## Smoke test
 
@@ -90,10 +89,15 @@ bun run deploy:promo  # deploys the promo site to Cloudflare Pages
 
 ## Post-deploy setup
 
-1. Set the auth secret: `wrangler secret put BETTER_AUTH_SECRET` (32+ random bytes).
-2. Set `APP_URL` in `wrangler.toml` to your public origin — needed for OAuth callbacks.
-3. Visit your worker URL → create the owner account.
-4. (Optional) **Settings → Sign-in providers** to add Google/GitHub OAuth.
-   - Register the callback URL the form displays
-     (`<APP_URL>/v1/auth/callback/google` and `<APP_URL>/v1/auth/callback/github`)
-     on the respective OAuth consoles before saving.
+The Deploy to Cloudflare wizard prompts for one secret during setup:
+
+- **`BETTER_AUTH_SECRET`** — signs session cookies. Generate with
+  `openssl rand -base64 32` and paste it into the wizard field. Stored as a
+  KMS-encrypted Workers Secret, never plaintext.
+
+Then visit your worker URL → create the owner account. That's it.
+
+Optionally, **Settings → Sign-in providers** lets the owner enable Google or
+GitHub OAuth: paste a client ID + secret from the provider's console (the
+form displays the callback URL to register). The login page picks the buttons
+up immediately — no redeploy.

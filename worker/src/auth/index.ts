@@ -42,14 +42,23 @@ async function loadProviders(env: Env): Promise<SocialProviders> {
   }
 }
 
-export async function buildAuth(env: Env) {
+// baseURL is derived from the request origin so the same code works on
+// localhost, *.workers.dev, and custom domains with no env var to set.
+// The signing secret comes from a Workers Secret (KMS-encrypted) — see
+// README "Post-deploy setup".
+export async function buildAuth(env: Env, request?: Request) {
   const socialProviders = await loadProviders(env);
   const db = drizzle(env.DB, { schema });
 
+  const baseURL = request
+    ? new URL(request.url).origin
+    : 'http://localhost:8787';
+
   return betterAuth({
-    baseURL: env.APP_URL ?? 'http://localhost:8787',
+    baseURL,
     basePath: '/v1/auth',
     secret: env.BETTER_AUTH_SECRET,
+    trustedOrigins: request ? [new URL(request.url).origin] : undefined,
     database: drizzleAdapter(db, { provider: 'sqlite' }),
 
     emailAndPassword: {

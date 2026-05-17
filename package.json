@@ -22,5 +22,13 @@
   "devDependencies": {
     "typescript": "^5.6.3"
   },
-  "packageManager": "bun@1.1.40"
+  "packageManager": "bun@1.1.40",
+  "cloudflare": {
+    "label": "nodrix",
+    "bindings": {
+      "BETTER_AUTH_SECRET": {
+        "description": "Random 32+ byte string used to sign session cookies. Generate one with:\n\n`openssl rand -base64 32`\n\nThen paste the output here. **This value is stored as a KMS-encrypted Workers Secret** and cannot be changed without invalidating existing sessions."
+      }
+    }
+  }
 }

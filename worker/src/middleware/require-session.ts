@@ -30,7 +30,7 @@ export const requireSession = createMiddleware<{
   Bindings: Env;
   Variables: UserContextVars;
 }>(async (c, next) => {
-  const auth = await buildAuth(c.env);
+  const auth = await buildAuth(c.env, c.req.raw);
   const result = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!result || !result.user || !result.session) {
     return c.json({ error: 'unauthorized' }, 401);

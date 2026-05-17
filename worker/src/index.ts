@@ -35,7 +35,7 @@ app.on(['GET', 'POST'], '/v1/auth/*', async (c) => {
   if (!(await isBootstrapped(c.env.DB))) {
     await runMigrations(c.env.DB);
   }
-  const auth = await buildAuth(c.env);
+  const auth = await buildAuth(c.env, c.req.raw);
   return auth.handler(c.req.raw);
 });
 
