@@ -20,7 +20,10 @@ export const useSessionStore = defineStore('session', () => {
   const loading = ref(false);
   const error = ref<{ status: number; reason?: string } | null>(null);
   const auditLog = ref<AuditLogEntry[]>([]);
-  const auditLogNextBefore = ref<number | null>(null);
+  const auditLogPage = ref(1);
+  const auditLogPageSize = ref(15);
+  const auditLogPageCount = ref(1);
+  const auditLogTotal = ref(0);
   const activeSessions = ref<ActiveSession[]>([]);
   const oauthProviders = ref<('google' | 'github')[]>([]);
 
@@ -96,20 +99,24 @@ export const useSessionStore = defineStore('session', () => {
     oauthProviders.value = data.providers;
   }
 
-  async function loadAuditLog(reset = true): Promise<void> {
-    const q = !reset && auditLogNextBefore.value !== null
-      ? `?before=${auditLogNextBefore.value}`
-      : '';
-    const data = await api.get<{ entries: AuditLogEntry[]; next_before: number | null }>(
-      `/v1/admin/audit-log${q}`
-    );
-    auditLog.value = reset ? data.entries : [...auditLog.value, ...data.entries];
-    auditLogNextBefore.value = data.next_before;
+  async function loadAuditLog(page = 1): Promise<void> {
+    const data = await api.get<{
+      entries: AuditLogEntry[];
+      total: number;
+      page: number;
+      page_size: number;
+      page_count: number;
+    }>(`/v1/admin/audit-log?page=${page}&limit=${auditLogPageSize.value}`);
+    auditLog.value = data.entries;
+    auditLogPage.value = data.page;
+    auditLogPageSize.value = data.page_size;
+    auditLogPageCount.value = data.page_count;
+    auditLogTotal.value = data.total;
   }
 
   return {
     user, projects, loading, error,
-    auditLog, auditLogNextBefore,
+    auditLog, auditLogPage, auditLogPageSize, auditLogPageCount, auditLogTotal,
     activeSessions, oauthProviders,
     load, createProject, deleteProject, updateProject, loadAuditLog, updateMe,
     signOut, loadSessions, revokeSession, loadProviders,

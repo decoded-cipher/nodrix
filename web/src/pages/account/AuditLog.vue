@@ -8,13 +8,13 @@ const filter = ref('');
 
 onMounted(async () => {
   loading.value = true;
-  try { await session.loadAuditLog(true); } finally { loading.value = false; }
+  try { await session.loadAuditLog(1); } finally { loading.value = false; }
 });
 
-async function loadMore() {
-  if (!session.auditLogNextBefore) return;
+async function goto(page: number) {
+  if (page < 1 || page > session.auditLogPageCount) return;
   loading.value = true;
-  try { await session.loadAuditLog(false); } finally { loading.value = false; }
+  try { await session.loadAuditLog(page); } finally { loading.value = false; }
 }
 
 function fmt(ts: number): string {
@@ -45,6 +45,28 @@ const filtered = computed(() => {
     (e.project_name ?? '').toLowerCase().includes(q)
   );
 });
+
+// Compact page-list with ellipsis: 1 … (cur-1) (cur) (cur+1) … N.
+const pageItems = computed<(number | '…')[]>(() => {
+  const total = session.auditLogPageCount;
+  const cur = session.auditLogPage;
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const items: (number | '…')[] = [1];
+  const start = Math.max(2, cur - 1);
+  const end = Math.min(total - 1, cur + 1);
+  if (start > 2) items.push('…');
+  for (let i = start; i <= end; i++) items.push(i);
+  if (end < total - 1) items.push('…');
+  items.push(total);
+  return items;
+});
+
+const rangeStart = computed(() =>
+  session.auditLogTotal === 0 ? 0 : (session.auditLogPage - 1) * session.auditLogPageSize + 1
+);
+const rangeEnd = computed(() =>
+  Math.min(session.auditLogTotal, session.auditLogPage * session.auditLogPageSize)
+);
 </script>
 
 <template>
@@ -60,7 +82,7 @@ const filtered = computed(() => {
       <input
         v-model="filter"
         type="text"
-        placeholder="Filter by action, project, target, user…"
+        placeholder="Filter the current page by action, project, target, user…"
         class="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
       />
     </div>
@@ -112,13 +134,48 @@ const filtered = computed(() => {
       </table>
     </div>
 
-    <div v-if="session.auditLogNextBefore" class="mt-4 text-center">
-      <button
-        type="button"
-        :disabled="loading"
-        class="rounded-md border border-neutral-300 px-4 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-50"
-        @click="loadMore"
-      >{{ loading ? 'Loading…' : 'Load more' }}</button>
+    <!-- Pagination -->
+    <div
+      v-if="session.auditLogTotal > 0"
+      class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-600"
+    >
+      <div>
+        Showing <span class="font-medium text-neutral-900">{{ rangeStart }}–{{ rangeEnd }}</span>
+        of <span class="font-medium text-neutral-900">{{ session.auditLogTotal }}</span>
+      </div>
+
+      <nav class="flex items-center gap-1">
+        <button
+          type="button"
+          class="rounded-md border border-neutral-300 px-2 py-1 hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          :disabled="loading || session.auditLogPage <= 1"
+          @click="goto(session.auditLogPage - 1)"
+        >‹ Prev</button>
+
+        <template v-for="(p, i) in pageItems" :key="i">
+          <span
+            v-if="p === '…'"
+            class="px-2 py-1 text-neutral-400"
+          >…</span>
+          <button
+            v-else
+            type="button"
+            class="min-w-[2rem] rounded-md px-2 py-1"
+            :class="p === session.auditLogPage
+              ? 'bg-orange-600 text-white font-semibold'
+              : 'border border-neutral-300 hover:bg-neutral-100'"
+            :disabled="loading || p === session.auditLogPage"
+            @click="goto(p)"
+          >{{ p }}</button>
+        </template>
+
+        <button
+          type="button"
+          class="rounded-md border border-neutral-300 px-2 py-1 hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          :disabled="loading || session.auditLogPage >= session.auditLogPageCount"
+          @click="goto(session.auditLogPage + 1)"
+        >Next ›</button>
+      </nav>
     </div>
   </main>
 </template>

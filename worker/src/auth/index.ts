@@ -118,6 +118,13 @@ export async function buildAuth(env: Env, request?: Request) {
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
+      // Auto-link OAuth signins to an existing user with the same verified
+      // email. Without this, sign-in via Google for an email/password user
+      // would fail silently because Better Auth refuses to merge identities.
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ['google', 'github'],
+      },
     },
 
     verification: {
