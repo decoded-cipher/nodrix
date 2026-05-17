@@ -162,6 +162,14 @@ function applyUpdate(u: UpdateMsg) {
 function addWidget(type: WidgetType) {
   const spec = specFor(type);
   const id = `w_${Math.random().toString(36).slice(2, 10)}`;
+  // Place new widget below the lowest existing one. y: 999 used to rely on
+  // grid-layout-plus auto-compacting, but compaction only updates the model
+  // when the user drags — saving immediately persisted y=999 to D1, which
+  // pushed widgets ~90k px below the viewport in view mode.
+  let nextY = 0;
+  for (const it of layout.value.items) {
+    nextY = Math.max(nextY, it.y + it.h);
+  }
   layout.value = {
     ...layout.value,
     items: [
@@ -169,7 +177,7 @@ function addWidget(type: WidgetType) {
       {
         id,
         x: 0,
-        y: 999, // grid-layout-plus auto-compacts
+        y: nextY,
         w: spec.defaultSize.w,
         h: spec.defaultSize.h,
         type,

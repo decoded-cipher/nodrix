@@ -62,17 +62,33 @@ function mountGrid(layout: Layout) {
   root.style.gridAutoRows = '90px';
   root.style.gap = '12px';
 
+  // Compact y positions: legacy dashboards may have y=999 (placeholder from
+  // the editor) which would render off-screen. Sort by (y, x), then drop each
+  // item into the lowest row where it doesn't overlap an already-placed one.
+  const placed: Array<{ x: number; y: number; w: number; h: number; src: typeof layout.items[number] }> = [];
+  const sorted = [...layout.items].sort((a, b) => a.y - b.y || a.x - b.x);
+  for (const item of sorted) {
+    let y = 0;
+    while (placed.some((p) =>
+      item.x < p.x + p.w && item.x + item.w > p.x &&
+      y < p.y + p.h && y + item.h > p.y
+    )) {
+      y++;
+    }
+    placed.push({ x: item.x, y, w: item.w, h: item.h, src: item });
+  }
+
   const m = new Map<string, HTMLElement>();
-  for (const item of layout.items) {
-    const widget = createWidgetElement(item);
+  for (const p of placed) {
+    const widget = createWidgetElement(p.src);
     const cell = document.createElement('div');
-    cell.style.gridColumnStart = String(item.x + 1);
-    cell.style.gridColumnEnd = `span ${item.w}`;
-    cell.style.gridRowStart = String(item.y + 1);
-    cell.style.gridRowEnd = `span ${item.h}`;
+    cell.style.gridColumnStart = String(p.x + 1);
+    cell.style.gridColumnEnd = `span ${p.w}`;
+    cell.style.gridRowStart = String(p.y + 1);
+    cell.style.gridRowEnd = `span ${p.h}`;
     cell.appendChild(widget);
     root.appendChild(cell);
-    m.set(item.id, widget);
+    m.set(p.src.id, widget);
   }
   els.value = m;
   idx.value = buildDataIndex(layout, m);
