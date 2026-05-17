@@ -51,14 +51,31 @@ devices.post('/', async (c) => {
 });
 
 // DELETE /v1/admin/projects/:proj/devices/:id
+// Cascade: DO storage (latest_state, ring buffer, pending commands) and R2
+// telemetry history are also removed. Best-effort — if the DO destroy throws,
+// the metadata is still deleted (orphaned data is wastage, not a security issue).
 devices.delete('/:id', async (c) => {
   const project = c.get('project');
   const deviceId = c.req.param('id');
-  const res = await c.env.DB
+
+  const dev = await c.env.DB
+    .prepare(`SELECT id FROM devices WHERE id = ? AND project_id = ?`)
+    .bind(deviceId, project.id)
+    .first<{ id: string }>();
+  if (!dev) return c.json({ error: 'not_found' }, 404);
+
+  try {
+    const stub = c.env.DEVICE_DO.get(c.env.DEVICE_DO.idFromName(deviceId)) as unknown as DeviceDO;
+    await stub.destroy();
+  } catch (e) {
+    console.error('device destroy failed', deviceId, e);
+  }
+
+  await c.env.DB
     .prepare(`DELETE FROM devices WHERE id = ? AND project_id = ?`)
     .bind(deviceId, project.id)
     .run();
-  if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
+
   return c.body(null, 204);
 });
 

@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { requireAccess } from '../middleware/require-access';
 import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
 import { newId } from '../lib/ids';
+import type { DeviceDO } from '../do/device-do';
 
 const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -47,18 +48,19 @@ projects.post('/', async (c) => {
   return c.json({ id, name, created_at: now }, 201);
 });
 
+// Cascade: destroys every Device DO (with R2 telemetry history) and Dashboard
+// DO in the project, then deletes the D1 row (which cascades dashboards,
+// devices, device_tokens, user_tokens, project_members via FK).
 projects.delete('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
 
-  // Membership check
   const member = await c.env.DB
     .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
     .bind(user.id, projId)
     .first<{ role: string }>();
   if (!member || member.role !== 'owner') return c.json({ error: 'forbidden' }, 403);
 
-  // Can't delete the last project.
   const count = await c.env.DB
     .prepare(
       `SELECT COUNT(*) AS n FROM projects p
@@ -70,6 +72,37 @@ projects.delete('/:proj', async (c) => {
   if ((count?.n ?? 0) <= 1) {
     return c.json({ error: 'conflict', reason: 'last_project' }, 409);
   }
+
+  // Gather DO IDs to destroy BEFORE the D1 delete cascades rows away.
+  const [deviceRows, dashboardRows] = await Promise.all([
+    c.env.DB
+      .prepare(`SELECT id FROM devices WHERE project_id = ?`)
+      .bind(projId)
+      .all<{ id: string }>(),
+    c.env.DB
+      .prepare(`SELECT id FROM dashboards WHERE project_id = ?`)
+      .bind(projId)
+      .all<{ id: string }>(),
+  ]);
+
+  await Promise.all([
+    ...deviceRows.results.map(async (d) => {
+      try {
+        const stub = c.env.DEVICE_DO.get(c.env.DEVICE_DO.idFromName(d.id)) as unknown as DeviceDO;
+        await stub.destroy();
+      } catch (e) {
+        console.error('device destroy failed', d.id, e);
+      }
+    }),
+    ...dashboardRows.results.map(async (d) => {
+      try {
+        const stub = c.env.DASHBOARD_DO.get(c.env.DASHBOARD_DO.idFromName(d.id));
+        await (stub as unknown as { destroy: () => Promise<void> }).destroy();
+      } catch (e) {
+        console.error('dashboard destroy failed', d.id, e);
+      }
+    }),
+  ]);
 
   await c.env.DB.prepare(`DELETE FROM projects WHERE id = ?`).bind(projId).run();
   return c.body(null, 204);

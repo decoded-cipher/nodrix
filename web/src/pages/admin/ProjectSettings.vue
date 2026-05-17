@@ -13,7 +13,17 @@ const canDelete = computed(() => session.projects.length > 1);
 
 async function deleteProject() {
   if (!current.value) return;
-  if (!confirm(`Permanently delete project "${current.value.name}" and everything in it?`)) return;
+  const deviceCount = project.devices.length;
+  const dashboardCount = project.dashboards.length;
+  const msg =
+    `Permanently delete project "${current.value.name}"?\n\n` +
+    `This removes:\n` +
+    `  • ${dashboardCount} dashboard${dashboardCount === 1 ? '' : 's'}\n` +
+    `  • ${deviceCount} device${deviceCount === 1 ? '' : 's'} (tokens stop working immediately)\n` +
+    `  • All telemetry history for those devices\n` +
+    `  • All API tokens scoped to this project\n\n` +
+    `This cannot be undone.`;
+  if (!confirm(msg)) return;
   await session.deleteProject(current.value.id);
   router.replace('/');
 }
@@ -32,8 +42,8 @@ async function deleteProject() {
     <section class="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
       <div class="text-sm font-medium text-red-900">Danger zone</div>
       <p class="mt-1 text-xs text-red-800">
-        Deletes all devices, dashboards, and tokens scoped to this project. Telemetry already
-        written to R2 is not removed.
+        Deletes all dashboards, devices, telemetry history (latest state, recent series,
+        and cold storage), and API tokens scoped to this project. Cannot be undone.
       </p>
       <button
         :disabled="!canDelete"

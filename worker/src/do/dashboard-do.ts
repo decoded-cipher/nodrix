@@ -73,6 +73,16 @@ export class DashboardDO extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
+  // ---- RPC: destroy ----------------------------------------------------------
+
+  // Called by the admin DELETE handlers. Tells subscribed Device DOs to stop
+  // pushing, then wipes our own storage. Open WebSockets get dropped on
+  // storage.deleteAll() — clients will reconnect and fail with 404.
+  async destroy(): Promise<void> {
+    await this.unsubscribeAll();
+    await this.ctx.storage.deleteAll();
+  }
+
   // ---- RPC from Device DOs --------------------------------------------------
 
   async notify(device: string, metric: string, value: unknown, ts: number): Promise<void> {

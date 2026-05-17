@@ -23,7 +23,14 @@ async function create() {
 }
 
 async function remove(id: string) {
-  if (!confirm('Delete this dashboard?')) return;
+  const dash = project.dashboards.find((d) => d.id === id);
+  const name = dash?.name ?? id;
+  const msg =
+    `Delete dashboard "${name}"?\n\n` +
+    `This removes the layout and disconnects any open viewers.\n` +
+    `Telemetry from the devices it referenced is not affected.\n\n` +
+    `This cannot be undone.`;
+  if (!confirm(msg)) return;
   await project.deleteDashboard(id);
 }
 </script>

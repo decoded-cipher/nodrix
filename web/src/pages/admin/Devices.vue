@@ -24,7 +24,16 @@ async function create() {
 }
 
 async function remove(id: string) {
-  if (!confirm('Delete this device? Its token will stop working immediately.')) return;
+  const dev = project.devices.find((d) => d.id === id);
+  const name = dev?.name ?? id;
+  const msg =
+    `Delete device "${name}"?\n\n` +
+    `This permanently removes:\n` +
+    `  • The device token (stops working immediately)\n` +
+    `  • All telemetry history in cold storage\n` +
+    `  • Latest state and recent ring buffer\n\n` +
+    `This cannot be undone.`;
+  if (!confirm(msg)) return;
   await project.deleteDevice(id);
 }
 

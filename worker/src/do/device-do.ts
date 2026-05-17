@@ -220,6 +220,32 @@ export class DeviceDO extends DurableObject<Env> {
     return this.runFlush();
   }
 
+  // ---- RPC: destroy ----------------------------------------------------------
+
+  // Wipes ALL data owned by this device — DO SQLite + R2 telemetry history.
+  // Called by the admin DELETE handlers before the metadata row is removed.
+  async destroy(): Promise<void> {
+    const deviceId = this.deviceId();
+
+    // Delete every R2 object under telemetry/{deviceId}/. Pagination handles
+    // long-lived devices with many hourly partitions.
+    let cursor: string | undefined;
+    do {
+      const list = await this.env.R2.list({
+        prefix: `telemetry/${deviceId}/`,
+        ...(cursor ? { cursor } : {}),
+      });
+      if (list.objects.length > 0) {
+        await this.env.R2.delete(list.objects.map((o) => o.key));
+      }
+      cursor = list.truncated ? list.cursor : undefined;
+    } while (cursor);
+
+    // Cancel any scheduled flush + wipe SQLite + KV storage entirely.
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+  }
+
   // ---- alarm: drive the hot -> cold copy -------------------------------------
 
   override async alarm(): Promise<void> {

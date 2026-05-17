@@ -107,14 +107,31 @@ dashboards.put('/:id', async (c) => {
 });
 
 // DELETE /v1/admin/projects/:proj/dashboards/:id
+// Also wipes the Dashboard DO (subscription set + hibernated sockets).
 dashboards.delete('/:id', async (c) => {
   const project = c.get('project');
   const id = c.req.param('id');
-  const res = await c.env.DB
+
+  const row = await c.env.DB
+    .prepare(`SELECT id FROM dashboards WHERE id = ? AND project_id = ?`)
+    .bind(id, project.id)
+    .first<{ id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  try {
+    const stub = c.env.DASHBOARD_DO.get(c.env.DASHBOARD_DO.idFromName(id));
+    // The DO class isn't imported as a type here (cycle avoidance); call via
+    // fetch-shaped RPC instead. Use a simple method invocation through any.
+    await (stub as unknown as { destroy: () => Promise<void> }).destroy();
+  } catch (e) {
+    console.error('dashboard destroy failed', id, e);
+  }
+
+  await c.env.DB
     .prepare(`DELETE FROM dashboards WHERE id = ? AND project_id = ?`)
     .bind(id, project.id)
     .run();
-  if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
+
   return c.body(null, 204);
 });
 
