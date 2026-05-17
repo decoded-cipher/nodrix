@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import RevealOnce from '../../components/RevealOnce.vue';
+import { confirm } from '../../lib/confirm';
 
 const project = useProjectStore();
 const scope = ref<'read' | 'admin'>('read');
@@ -26,7 +27,18 @@ async function create() {
 }
 
 async function revoke(id: string) {
-  if (!confirm('Revoke this token? It will stop working immediately.')) return;
+  const t = project.tokens.find((x) => x.id === id);
+  const label = t?.name ?? id;
+  const ok = await confirm({
+    title: `Revoke API token "${label}"?`,
+    message: 'The token stops working immediately. Any scripts or integrations using it will fail until you issue a new token.',
+    details: [
+      `Scope: ${t?.scope ?? 'unknown'}`,
+      t?.project_id ? `Project: ${t.project_id}` : 'Scope: all projects',
+    ],
+    confirmLabel: 'Revoke token',
+  });
+  if (!ok) return;
   await project.revokeToken(id);
 }
 

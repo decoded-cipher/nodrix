@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
+import { confirm } from '../lib/confirm';
 import type { Project } from '../types';
 
 const session = useSessionStore();
@@ -93,14 +94,17 @@ async function deleteFromModal() {
   if (!editing.value) return;
   const p = editing.value;
   if (!canDelete.value) return;
-  const msg =
-    `Permanently delete project "${p.name}"?\n\n` +
-    `This removes:\n` +
-    `  • All dashboards in this project\n` +
-    `  • All devices and their telemetry history\n` +
-    `  • All API tokens scoped to this project\n\n` +
-    `This cannot be undone.`;
-  if (!confirm(msg)) return;
+  const ok = await confirm({
+    title: `Delete project "${p.name}"?`,
+    message: 'This permanently removes everything in this project. It cannot be undone.',
+    details: [
+      'All dashboards in this project',
+      'All devices and their telemetry history',
+      'All API tokens scoped to this project',
+    ],
+    confirmLabel: 'Delete project',
+  });
+  if (!ok) return;
   await session.deleteProject(p.id);
   if (ui.currentProject?.id === p.id && session.projects[0]) {
     ui.setCurrentProject(session.projects[0].id);

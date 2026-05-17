@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, onMounted, ref, type FunctionalComponent } from 'vue';
 import { useProjectStore } from '../../stores/project';
+import { confirm } from '../../lib/confirm';
 import type { Automation, AutomationTriggerType } from '../../types';
 
 const project = useProjectStore();
@@ -88,7 +89,16 @@ async function toggle(a: Automation) {
 }
 
 async function remove(a: Automation) {
-  if (!confirm(`Delete automation "${a.name}"? This cannot be undone.`)) return;
+  const ok = await confirm({
+    title: `Delete automation "${a.name}"?`,
+    message: 'This action cannot be undone.',
+    details: [
+      `Trigger: ${triggerLabel(a.trigger_type)}`,
+      a.enabled ? 'Currently enabled — it will stop running' : 'Currently disabled',
+    ],
+    confirmLabel: 'Delete automation',
+  });
+  if (!ok) return;
   await project.deleteAutomation(a.id);
 }
 

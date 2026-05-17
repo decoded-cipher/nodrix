@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useSessionStore } from '../../stores/session';
+import { confirm } from '../../lib/confirm';
 
 const session = useSessionStore();
 
@@ -29,7 +30,18 @@ function fmtAgent(ua: string | null): string {
 }
 
 async function revoke(id: string) {
-  if (!confirm('Sign out this device? It will need to log in again.')) return;
+  const s = session.activeSessions.find((x) => x.id === id);
+  const ok = await confirm({
+    title: 'Sign out this device?',
+    message: 'Whoever is using this session will be signed out immediately and need to log in again.',
+    details: [
+      `Device: ${fmtAgent(s?.user_agent ?? null)}`,
+      s?.ip_address ? `IP: ${s.ip_address}` : 'IP: unknown',
+      s?.last_seen_at ? `Last seen: ${fmt(s.last_seen_at)}` : '',
+    ].filter(Boolean) as string[],
+    confirmLabel: 'Sign out device',
+  });
+  if (!ok) return;
   await session.revokeSession(id);
 }
 

@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '../../stores/project';
+import { confirm } from '../../lib/confirm';
 
 const project = useProjectStore();
 const router = useRouter();
@@ -25,12 +26,16 @@ async function create() {
 async function remove(id: string) {
   const dash = project.dashboards.find((d) => d.id === id);
   const name = dash?.name ?? id;
-  const msg =
-    `Delete dashboard "${name}"?\n\n` +
-    `This removes the layout and disconnects any open viewers.\n` +
-    `Telemetry from the devices it referenced is not affected.\n\n` +
-    `This cannot be undone.`;
-  if (!confirm(msg)) return;
+  const ok = await confirm({
+    title: `Delete dashboard "${name}"?`,
+    message: 'This action cannot be undone.',
+    details: [
+      'The layout is removed and open viewers are disconnected',
+      'Telemetry from the devices it referenced is not affected',
+    ],
+    confirmLabel: 'Delete dashboard',
+  });
+  if (!ok) return;
   await project.deleteDashboard(id);
 }
 </script>

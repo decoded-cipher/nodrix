@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
+import { confirm } from '../../lib/confirm';
 import type { Integration, IntegrationKind } from '../../types';
 
 const project = useProjectStore();
@@ -112,7 +113,16 @@ async function toggle(i: Integration) {
 }
 
 async function remove(i: Integration) {
-  if (!confirm(`Delete integration "${i.name}"?`)) return;
+  const ok = await confirm({
+    title: `Delete integration "${i.name}"?`,
+    message: 'This action cannot be undone.',
+    details: [
+      `Kind: ${KIND_LABEL[i.kind]}`,
+      'Any automations referencing it will stop working until reconfigured',
+    ],
+    confirmLabel: 'Delete integration',
+  });
+  if (!ok) return;
   await project.deleteIntegration(i.id);
 }
 

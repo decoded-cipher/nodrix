@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../../stores/session';
 import { api } from '../../api';
+import { confirm } from '../../lib/confirm';
 
 const session = useSessionStore();
 const router = useRouter();
@@ -77,7 +78,17 @@ async function save() {
 }
 
 async function remove(kind: 'google' | 'github') {
-  if (!confirm(`Remove ${kind} sign-in? Users will lose access to the OAuth button until reconfigured.`)) return;
+  const label = kind === 'google' ? 'Google' : 'GitHub';
+  const ok = await confirm({
+    title: `Remove ${label} sign-in?`,
+    message: 'The login page will stop showing the button until you configure it again.',
+    details: [
+      'Existing users who signed in via this provider keep their accounts',
+      'They just can’t use this button to log in until it’s reconfigured',
+    ],
+    confirmLabel: `Remove ${label}`,
+  });
+  if (!ok) return;
   await api.del<void>(`/v1/admin/auth-providers/${kind}`);
   providers.value = providers.value.filter((p) => p.kind !== kind);
 }

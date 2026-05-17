@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import RevealOnce from '../../components/RevealOnce.vue';
+import { confirm } from '../../lib/confirm';
 import type { DeviceWithToken } from '../../types';
 
 const project = useProjectStore();
@@ -26,14 +27,17 @@ async function create() {
 async function remove(id: string) {
   const dev = project.devices.find((d) => d.id === id);
   const name = dev?.name ?? id;
-  const msg =
-    `Delete device "${name}"?\n\n` +
-    `This permanently removes:\n` +
-    `  • The device token (stops working immediately)\n` +
-    `  • All telemetry history in cold storage\n` +
-    `  • Latest state and recent ring buffer\n\n` +
-    `This cannot be undone.`;
-  if (!confirm(msg)) return;
+  const ok = await confirm({
+    title: `Delete device "${name}"?`,
+    message: 'This action cannot be undone.',
+    details: [
+      'The device token stops working immediately',
+      'All telemetry history in cold storage is deleted',
+      'Latest state and recent ring buffer are wiped',
+    ],
+    confirmLabel: 'Delete device',
+  });
+  if (!ok) return;
   await project.deleteDevice(id);
 }
 
