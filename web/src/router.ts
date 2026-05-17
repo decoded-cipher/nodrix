@@ -26,6 +26,7 @@ const routes: RouteRecordRaw[] = [
           { path: 'devices', name: 'devices', component: () => import('./pages/project/Devices.vue') },
           { path: 'automations', name: 'automations', component: () => import('./pages/project/Automations.vue') },
           { path: 'integrations', name: 'integrations', component: () => import('./pages/project/Integrations.vue') },
+          { path: 'audit-log', name: 'audit-log', component: () => import('./pages/project/AuditLog.vue') },
           { path: 'settings', name: 'project-settings', component: () => import('./pages/project/Settings.vue') },
         ],
       },

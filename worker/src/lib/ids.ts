@@ -13,6 +13,8 @@ const PREFIXES = {
   dashboard: 'dsh',
   token: 'tok',
   command: 'cmd',
+  automation: 'aut',
+  integration: 'itg',
 } as const;
 
 export type IdKind = keyof typeof PREFIXES;

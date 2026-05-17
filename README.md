@@ -16,7 +16,7 @@ A Cloudflare-native IoT platform. Devices POST telemetry over HTTPS, poll for co
 |---|---|
 | Device DO (SQLite) | Latest state, recent ring buffer, pending commands, flush cursor |
 | R2 | Cold telemetry history (NDJSON, partitioned by device + hour) |
-| D1 | Users, projects, devices, dashboards, tokens (metadata only — never any telemetry point) |
+| D1 | Users, projects, devices, dashboards, tokens, automations, integrations, audit log (metadata only — never any telemetry point) |
 | KV | Cached `/state` responses; cached Access JWKS |
 | Dashboard DO | Per-dashboard subscription set + hibernated WebSockets |
 
@@ -25,7 +25,7 @@ A Cloudflare-native IoT platform. Devices POST telemetry over HTTPS, poll for co
 ```sh
 bun install
 
-# Build the SPA once so the Worker can serve it via ASSETS.
+# Build the SPA + worker bundle once so the Worker can serve it via ASSETS.
 bun run build
 
 # Start the Worker (wrangler dev creates local D1/R2/KV in .wrangler/).
@@ -53,6 +53,19 @@ bun run smoke       # terminal 2
 Drives bootstrap → project → device → telemetry → read API → dashboard →
 WebSocket snapshot + update → command round-trip → R2 flush. Exits non-zero
 on any failure.
+
+## Simulated devices
+
+`examples/sim-devices/` is a small Node script that mints a device token and
+pushes synthetic telemetry — useful for exercising dashboards without real
+hardware.
+
+```sh
+cd examples/sim-devices
+npm install
+cp .env.example .env   # set NODRIX_ENDPOINT + per-device tokens
+npm start
+```
 
 ## Deploy
 

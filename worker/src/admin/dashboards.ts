@@ -4,6 +4,7 @@ import { requireAccess } from '../middleware/require-access';
 import { resolveUser } from '../middleware/resolve-user';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
+import { recordAudit } from '../lib/audit';
 import { validateLayout, devicesFromLayout } from '../lib/layout';
 
 const dashboards = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
@@ -89,6 +90,17 @@ dashboards.post('/', async (c) => {
     .bind(id, project.id, name, JSON.stringify(v.value), user.id, now, now)
     .run();
 
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'dashboard.create',
+      targetType: 'dashboard',
+      targetId: id,
+      metadata: { name },
+    })
+  );
+
   return c.json(
     { id, name, layout: v.value, visibility: 'private', created_at: now, updated_at: now },
     201
@@ -137,6 +149,7 @@ dashboards.put('/:id', async (c) => {
 // Also wipes the Dashboard DO (subscription set + hibernated sockets).
 dashboards.delete('/:id', async (c) => {
   const project = c.get('project');
+  const user = c.get('user');
   const id = c.req.param('id');
 
   const row = await c.env.DB
@@ -158,6 +171,16 @@ dashboards.delete('/:id', async (c) => {
     .prepare(`DELETE FROM dashboards WHERE id = ? AND project_id = ?`)
     .bind(id, project.id)
     .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'dashboard.delete',
+      targetType: 'dashboard',
+      targetId: id,
+    })
+  );
 
   return c.body(null, 204);
 });

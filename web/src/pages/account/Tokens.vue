@@ -6,13 +6,23 @@ import RevealOnce from '../../components/RevealOnce.vue';
 const project = useProjectStore();
 const scope = ref<'read' | 'admin'>('read');
 const projectScoped = ref(true);
+const tokenName = ref('');
+const expiresInDays = ref<number | ''>('');
 const justCreatedToken = ref<string | null>(null);
 
 onMounted(() => project.loadTokens());
 
 async function create() {
-  const t = await project.createToken(scope.value, projectScoped.value);
+  const expiresAt = typeof expiresInDays.value === 'number' && expiresInDays.value > 0
+    ? Math.floor(Date.now() / 1000) + expiresInDays.value * 86400
+    : null;
+  const t = await project.createToken(scope.value, projectScoped.value, {
+    name: tokenName.value.trim() || null,
+    expires_at: expiresAt,
+  });
   justCreatedToken.value = t.token;
+  tokenName.value = '';
+  expiresInDays.value = '';
 }
 
 async function revoke(id: string) {
@@ -22,6 +32,13 @@ async function revoke(id: string) {
 
 function fmt(ts: number | null): string {
   return ts ? new Date(ts * 1000).toLocaleString() : '—';
+}
+
+function expiryLabel(ts: number | null | undefined): string {
+  if (!ts) return 'No expiry';
+  const now = Math.floor(Date.now() / 1000);
+  const when = new Date(ts * 1000).toLocaleDateString();
+  return ts < now ? `Expired ${when}` : `Expires ${when}`;
 }
 </script>
 
@@ -40,37 +57,59 @@ function fmt(ts: number | null): string {
     />
 
     <section class="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
-      <div class="flex flex-wrap items-end gap-4">
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label class="block">
+          <span class="block text-xs font-medium text-neutral-600">Name (optional)</span>
+          <input
+            v-model="tokenName"
+            type="text"
+            placeholder="e.g. Grafana — read-only"
+            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label class="block">
+          <span class="block text-xs font-medium text-neutral-600">Expires in (days)</span>
+          <input
+            v-model.number="expiresInDays"
+            type="number"
+            min="1"
+            placeholder="leave blank for no expiry"
+            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          />
+        </label>
         <label class="block">
           <span class="block text-xs font-medium text-neutral-600">Scope</span>
-          <select v-model="scope" class="mt-1 rounded-md border border-neutral-300 px-3 py-2 text-sm">
+          <select v-model="scope" class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm">
             <option value="read">read</option>
             <option value="admin">admin</option>
           </select>
         </label>
-        <label class="flex items-center gap-2 text-sm">
-          <input v-model="projectScoped" type="checkbox" />
-          <span>Limit to this project</span>
+        <label class="flex items-end gap-2 text-sm">
+          <input v-model="projectScoped" type="checkbox" class="mb-2.5" />
+          <span class="mb-2.5">Limit to this project</span>
         </label>
+      </div>
+      <div class="mt-3 flex justify-end">
         <button
-          class="ml-auto rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+          class="rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
           @click="create"
         >Create token</button>
       </div>
     </section>
 
     <ul class="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-      <li v-for="t in project.tokens" :key="t.id" class="flex items-center justify-between px-4 py-3 text-sm">
-        <div>
-          <div>
-            <span class="font-mono text-xs">{{ t.id }}</span>
-            <span class="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs">{{ t.scope }}</span>
-            <span v-if="t.project_id" class="ml-2 rounded bg-blue-50 px-2 py-0.5 text-xs">{{ t.project_id }}</span>
-            <span v-else class="ml-2 rounded bg-amber-50 px-2 py-0.5 text-xs">all projects</span>
-            <span v-if="t.revoked_at" class="ml-2 rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">revoked</span>
+      <li v-for="t in project.tokens" :key="t.id" class="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-medium">{{ t.name ?? 'Unnamed token' }}</span>
+            <span class="rounded bg-neutral-100 px-2 py-0.5 text-xs">{{ t.scope }}</span>
+            <span v-if="t.project_id" class="rounded bg-blue-50 px-2 py-0.5 text-xs">{{ t.project_id }}</span>
+            <span v-else class="rounded bg-amber-50 px-2 py-0.5 text-xs">all projects</span>
+            <span v-if="t.revoked_at" class="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">revoked</span>
           </div>
+          <div class="mt-1 font-mono text-[11px] text-neutral-500">{{ t.id }}</div>
           <div class="mt-1 text-xs text-neutral-500">
-            created {{ fmt(t.created_at) }} · last used {{ fmt(t.last_used_at) }}
+            created {{ fmt(t.created_at) }} · last used {{ fmt(t.last_used_at) }} · {{ expiryLabel(t.expires_at) }}
           </div>
         </div>
         <button

@@ -68,10 +68,11 @@ function fmt(ts: number | null): string {
     </form>
 
     <ul class="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-      <li v-for="d in project.devices" :key="d.id" class="flex items-center justify-between px-4 py-3">
-        <div>
+      <li v-for="d in project.devices" :key="d.id" class="flex items-start justify-between gap-4 px-4 py-3">
+        <div class="min-w-0 flex-1">
           <div class="text-sm font-medium">{{ d.name }}</div>
-          <div class="font-mono text-xs text-neutral-500">{{ d.id }}</div>
+          <div v-if="d.description" class="mt-0.5 truncate text-xs text-neutral-600">{{ d.description }}</div>
+          <div class="mt-0.5 font-mono text-xs text-neutral-500">{{ d.id }}</div>
         </div>
         <div class="flex items-center gap-3 text-xs text-neutral-500">
           <span>last seen: {{ fmt(d.last_seen) }}</span>

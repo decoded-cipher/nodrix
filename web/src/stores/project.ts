@@ -2,10 +2,15 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api } from '../api';
 import type {
+  Automation,
+  AutomationTriggerType,
+  AuditLogEntry,
   Dashboard,
   DashboardMeta,
   Device,
   DeviceWithToken,
+  Integration,
+  IntegrationKind,
   Layout,
   UserToken,
 } from '../types';
@@ -15,6 +20,10 @@ export const useProjectStore = defineStore('project', () => {
   const devices = ref<Device[]>([]);
   const dashboards = ref<DashboardMeta[]>([]);
   const tokens = ref<UserToken[]>([]);
+  const automations = ref<Automation[]>([]);
+  const integrations = ref<Integration[]>([]);
+  const auditLog = ref<AuditLogEntry[]>([]);
+  const auditLogNextBefore = ref<number | null>(null);
 
   async function switchTo(projectId: string): Promise<void> {
     if (currentProjectId.value === projectId && devices.value.length + dashboards.value.length > 0) {
@@ -104,10 +113,18 @@ export const useProjectStore = defineStore('project', () => {
 
   async function createToken(
     scope: 'read' | 'admin',
-    projectScoped: boolean
+    projectScoped: boolean,
+    extras: { name?: string | null; expires_at?: number | null } = {}
   ): Promise<UserToken & { token: string }> {
-    const body: { scope: 'read' | 'admin'; project_id?: string } = { scope };
+    const body: {
+      scope: 'read' | 'admin';
+      project_id?: string;
+      name?: string | null;
+      expires_at?: number | null;
+    } = { scope };
     if (projectScoped && currentProjectId.value) body.project_id = currentProjectId.value;
+    if (extras.name) body.name = extras.name;
+    if (extras.expires_at) body.expires_at = extras.expires_at;
     const t = await api.post<UserToken & { token: string }>('/v1/admin/tokens', body);
     tokens.value = [t, ...tokens.value];
     return t;
@@ -120,11 +137,130 @@ export const useProjectStore = defineStore('project', () => {
     );
   }
 
+  // ─── Automations ────────────────────────────────────────────────────────────
+
+  async function loadAutomations(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ automations: Automation[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/automations`
+    );
+    automations.value = data.automations;
+  }
+
+  async function createAutomation(input: {
+    name: string;
+    trigger_type: AutomationTriggerType;
+    description?: string | null;
+    trigger_config?: unknown;
+    actions?: unknown[];
+  }): Promise<Automation> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const a = await api.post<Automation>(
+      `/v1/admin/projects/${currentProjectId.value}/automations`,
+      input
+    );
+    automations.value = [a, ...automations.value];
+    return a;
+  }
+
+  async function updateAutomation(
+    id: string,
+    patch: Partial<Pick<Automation, 'name' | 'description' | 'enabled' | 'trigger_config' | 'actions'>>
+  ): Promise<Automation> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const a = await api.patch<Automation>(
+      `/v1/admin/projects/${currentProjectId.value}/automations/${id}`,
+      patch
+    );
+    automations.value = automations.value.map((x) => (x.id === id ? a : x));
+    return a;
+  }
+
+  async function deleteAutomation(id: string): Promise<void> {
+    if (!currentProjectId.value) return;
+    await api.del<void>(`/v1/admin/projects/${currentProjectId.value}/automations/${id}`);
+    automations.value = automations.value.filter((a) => a.id !== id);
+  }
+
+  // ─── Integrations ───────────────────────────────────────────────────────────
+
+  async function loadIntegrations(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ integrations: Integration[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/integrations`
+    );
+    integrations.value = data.integrations;
+  }
+
+  async function createIntegration(input: {
+    name: string;
+    kind: IntegrationKind;
+    config?: unknown;
+    enabled?: boolean;
+  }): Promise<Integration> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const i = await api.post<Integration>(
+      `/v1/admin/projects/${currentProjectId.value}/integrations`,
+      input
+    );
+    integrations.value = [i, ...integrations.value];
+    return i;
+  }
+
+  async function updateIntegration(
+    id: string,
+    patch: Partial<Pick<Integration, 'name' | 'config' | 'enabled'>>
+  ): Promise<Integration> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const i = await api.patch<Integration>(
+      `/v1/admin/projects/${currentProjectId.value}/integrations/${id}`,
+      patch
+    );
+    integrations.value = integrations.value.map((x) => (x.id === id ? i : x));
+    return i;
+  }
+
+  async function deleteIntegration(id: string): Promise<void> {
+    if (!currentProjectId.value) return;
+    await api.del<void>(`/v1/admin/projects/${currentProjectId.value}/integrations/${id}`);
+    integrations.value = integrations.value.filter((i) => i.id !== id);
+  }
+
+  // ─── Audit log ──────────────────────────────────────────────────────────────
+
+  async function loadAuditLog(reset = true): Promise<void> {
+    if (!currentProjectId.value) return;
+    const q = !reset && auditLogNextBefore.value !== null
+      ? `?before=${auditLogNextBefore.value}`
+      : '';
+    const data = await api.get<{ entries: AuditLogEntry[]; next_before: number | null }>(
+      `/v1/admin/projects/${currentProjectId.value}/audit-log${q}`
+    );
+    auditLog.value = reset ? data.entries : [...auditLog.value, ...data.entries];
+    auditLogNextBefore.value = data.next_before;
+  }
+
+  // ─── Project update ─────────────────────────────────────────────────────────
+
+  async function updateProject(patch: {
+    name?: string;
+    description?: string | null;
+    icon?: string | null;
+    color?: string | null;
+  }): Promise<void> {
+    if (!currentProjectId.value) return;
+    await api.patch<unknown>(`/v1/admin/projects/${currentProjectId.value}`, patch);
+  }
+
   return {
     currentProjectId,
     devices,
     dashboards,
     tokens,
+    automations,
+    integrations,
+    auditLog,
+    auditLogNextBefore,
     switchTo,
     loadDevices,
     createDevice,
@@ -137,5 +273,15 @@ export const useProjectStore = defineStore('project', () => {
     loadTokens,
     createToken,
     revokeToken,
+    loadAutomations,
+    createAutomation,
+    updateAutomation,
+    deleteAutomation,
+    loadIntegrations,
+    createIntegration,
+    updateIntegration,
+    deleteIntegration,
+    loadAuditLog,
+    updateProject,
   };
 });

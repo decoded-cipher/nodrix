@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { requireAccess } from '../middleware/require-access';
 import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
 import { newId, newToken, sha256Hex } from '../lib/ids';
+import { recordAudit } from '../lib/audit';
 
 const tokens = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -71,6 +72,17 @@ tokens.post('/', async (c) => {
     .bind(id, body.project_id ?? null, scope, tokenName, hash, user.id, now, expiresAt)
     .run();
 
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: body.project_id ?? null,
+      userId: user.id,
+      action: 'token.create',
+      targetType: 'token',
+      targetId: id,
+      metadata: { scope, name: tokenName },
+    })
+  );
+
   return c.json(
     {
       id,
@@ -98,6 +110,17 @@ tokens.post('/:id/revoke', async (c) => {
     .bind(now, tokenId, user.id)
     .run();
   if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: null,
+      userId: user.id,
+      action: 'token.revoke',
+      targetType: 'token',
+      targetId: tokenId,
+    })
+  );
+
   return c.json({ id: tokenId, revoked_at: now });
 });
 

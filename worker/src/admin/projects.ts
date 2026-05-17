@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { requireAccess } from '../middleware/require-access';
 import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
 import { newId } from '../lib/ids';
+import { recordAudit } from '../lib/audit';
 import type { DeviceDO } from '../do/device-do';
 
 const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
@@ -59,7 +60,76 @@ projects.post('/', async (c) => {
       .bind(user.id, id, now, user.id),
   ]);
 
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: id,
+      userId: user.id,
+      action: 'project.create',
+      targetType: 'project',
+      targetId: id,
+      metadata: { name },
+    })
+  );
+
   return c.json({ id, name, created_at: now, updated_at: now }, 201);
+});
+
+// PATCH /v1/admin/projects/:proj  body: { name?, description?, icon?, color? }
+projects.patch('/:proj', async (c) => {
+  const projId = c.req.param('proj');
+  const user = c.get('user');
+
+  const member = await c.env.DB
+    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
+    .bind(user.id, projId)
+    .first<{ role: string }>();
+  if (!member) return c.json({ error: 'forbidden' }, 403);
+
+  const body = await c.req.json<{
+    name?: string;
+    description?: string | null;
+    icon?: string | null;
+    color?: string | null;
+  }>();
+
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (typeof body.name === 'string' && body.name.trim()) {
+    sets.push('name = ?'); vals.push(body.name.trim());
+  }
+  if ('description' in body) { sets.push('description = ?'); vals.push(body.description ?? null); }
+  if ('icon' in body)        { sets.push('icon = ?');        vals.push(body.icon ?? null); }
+  if ('color' in body)       { sets.push('color = ?');       vals.push(body.color ?? null); }
+  if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
+
+  const now = Math.floor(Date.now() / 1000);
+  sets.push('updated_at = ?'); vals.push(now);
+  vals.push(projId);
+
+  await c.env.DB
+    .prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`)
+    .bind(...vals)
+    .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: projId,
+      userId: user.id,
+      action: 'project.update',
+      targetType: 'project',
+      targetId: projId,
+      metadata: { fields: Object.keys(body) },
+    })
+  );
+
+  const row = await c.env.DB
+    .prepare(
+      `SELECT id, name, description, icon, color, created_at, updated_at, archived_at
+         FROM projects WHERE id = ?`
+    )
+    .bind(projId)
+    .first();
+  return c.json(row);
 });
 
 // Cascade: destroys every Device DO (with R2 telemetry history) and Dashboard
@@ -119,6 +189,17 @@ projects.delete('/:proj', async (c) => {
   ]);
 
   await c.env.DB.prepare(`DELETE FROM projects WHERE id = ?`).bind(projId).run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: null,
+      userId: user.id,
+      action: 'project.delete',
+      targetType: 'project',
+      targetId: projId,
+    })
+  );
+
   return c.body(null, 204);
 });
 

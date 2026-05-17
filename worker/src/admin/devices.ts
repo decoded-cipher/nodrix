@@ -4,6 +4,7 @@ import { requireAccess } from '../middleware/require-access';
 import { resolveUser } from '../middleware/resolve-user';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId, newToken, sha256Hex } from '../lib/ids';
+import { recordAudit } from '../lib/audit';
 import type { DeviceDO } from '../do/device-do';
 
 const devices = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
@@ -63,6 +64,17 @@ devices.post('/', async (c) => {
       .bind(tokenId, deviceId, hash, user.id, now),
   ]);
 
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'device.create',
+      targetType: 'device',
+      targetId: deviceId,
+      metadata: { name },
+    })
+  );
+
   return c.json({ id: deviceId, name, created_at: now, updated_at: now, token }, 201);
 });
 
@@ -72,6 +84,7 @@ devices.post('/', async (c) => {
 // the metadata is still deleted (orphaned data is wastage, not a security issue).
 devices.delete('/:id', async (c) => {
   const project = c.get('project');
+  const user = c.get('user');
   const deviceId = c.req.param('id');
 
   const dev = await c.env.DB
@@ -91,6 +104,16 @@ devices.delete('/:id', async (c) => {
     .prepare(`DELETE FROM devices WHERE id = ? AND project_id = ?`)
     .bind(deviceId, project.id)
     .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'device.delete',
+      targetType: 'device',
+      targetId: deviceId,
+    })
+  );
 
   return c.body(null, 204);
 });
