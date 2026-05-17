@@ -106,18 +106,23 @@ const initials = computed(() => {
   >
     <!-- Brand -->
     <div
-      class="flex h-14 items-center gap-2 border-b border-neutral-200"
+      class="flex h-14 items-center border-b border-neutral-200"
       :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'px-4'"
     >
-      <div class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-neutral-900 text-white">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
-          <path d="M4 6v12M4 6l8 12M12 6v12M12 6l8 12M20 6v12" />
-        </svg>
+      <!-- Collapsed: white logo on a dark square -->
+      <div
+        v-if="ui.sidebarCollapsed"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-neutral-900"
+      >
+        <img src="/white_logo.png" alt="nodrix" class="h-6 w-6 object-contain" />
       </div>
-      <span
-        v-if="!ui.sidebarCollapsed"
-        class="text-sm font-semibold tracking-tight"
-      >nodrix</span>
+      <!-- Expanded: full dark logo on the white sidebar -->
+      <img
+        v-else
+        src="/dark_logo.png"
+        alt="nodrix"
+        class="h-7 w-auto"
+      />
     </div>
 
     <!-- Project switcher -->
