@@ -70,7 +70,9 @@ const route = useRoute();
       <div class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
         <div class="mx-auto grid h-10 w-10 place-items-center rounded-full bg-neutral-100 text-neutral-500">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-            <path d="M9 16.5a4.5 4.5 0 1 1 6.364-6.364l1.06-1.06a4.5 4.5 0 1 1 1.061 1.06l-7.07 7.071a4.5 4.5 0 0 1-1.415-7.778M12 12.75v6.75" />
+            <path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2" />
+            <path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06" />
+            <path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8" />
           </svg>
         </div>
         <h3 class="mt-4 text-sm font-semibold">No webhooks yet</h3>
