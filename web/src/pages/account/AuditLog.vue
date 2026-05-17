@@ -1,27 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useProjectStore } from '../../stores/project';
+import { useSessionStore } from '../../stores/session';
 
-const project = useProjectStore();
+const session = useSessionStore();
 const loading = ref(false);
 const filter = ref('');
 
 onMounted(async () => {
   loading.value = true;
-  try { await project.loadAuditLog(true); } finally { loading.value = false; }
+  try { await session.loadAuditLog(true); } finally { loading.value = false; }
 });
 
 async function loadMore() {
-  if (!project.auditLogNextBefore) return;
+  if (!session.auditLogNextBefore) return;
   loading.value = true;
-  try { await project.loadAuditLog(false); } finally { loading.value = false; }
+  try { await session.loadAuditLog(false); } finally { loading.value = false; }
 }
 
 function fmt(ts: number): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
-// Map action prefix → color band. Keeps the list scannable.
 function actionTone(action: string): string {
   if (action.endsWith('.delete')) return 'bg-red-50 text-red-700 ring-red-200';
   if (action.endsWith('.create')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
@@ -34,12 +33,13 @@ function actionTone(action: string): string {
 
 const filtered = computed(() => {
   const q = filter.value.trim().toLowerCase();
-  if (!q) return project.auditLog;
-  return project.auditLog.filter((e) =>
+  if (!q) return session.auditLog;
+  return session.auditLog.filter((e) =>
     e.action.toLowerCase().includes(q) ||
     (e.target_id ?? '').toLowerCase().includes(q) ||
     (e.target_type ?? '').toLowerCase().includes(q) ||
-    (e.user_email ?? '').toLowerCase().includes(q)
+    (e.user_email ?? '').toLowerCase().includes(q) ||
+    (e.project_name ?? '').toLowerCase().includes(q)
   );
 });
 </script>
@@ -49,7 +49,7 @@ const filtered = computed(() => {
     <header class="mb-5">
       <h1 class="text-xl font-semibold tracking-tight">Audit log</h1>
       <p class="mt-1 text-sm text-neutral-600">
-        Append-only record of changes in this project. Newest first.
+        Append-only record of changes across every project you have access to. Newest first.
       </p>
     </header>
 
@@ -57,7 +57,7 @@ const filtered = computed(() => {
       <input
         v-model="filter"
         type="text"
-        placeholder="Filter by action, target, user…"
+        placeholder="Filter by action, project, target, user…"
         class="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
       />
     </div>
@@ -68,6 +68,7 @@ const filtered = computed(() => {
           <tr>
             <th class="px-4 py-2 font-medium">When</th>
             <th class="px-4 py-2 font-medium">Action</th>
+            <th class="px-4 py-2 font-medium">Project</th>
             <th class="px-4 py-2 font-medium">Target</th>
             <th class="px-4 py-2 font-medium">By</th>
           </tr>
@@ -82,6 +83,10 @@ const filtered = computed(() => {
               >{{ e.action }}</span>
             </td>
             <td class="px-4 py-2 text-xs">
+              <span v-if="e.project_name" class="text-neutral-700">{{ e.project_name }}</span>
+              <span v-else class="text-neutral-400">—</span>
+            </td>
+            <td class="px-4 py-2 text-xs">
               <span v-if="e.target_type" class="text-neutral-500">{{ e.target_type }}</span>
               <span v-if="e.target_id" class="ml-1 font-mono text-neutral-700">{{ e.target_id }}</span>
               <span v-if="!e.target_type && !e.target_id" class="text-neutral-400">—</span>
@@ -91,12 +96,12 @@ const filtered = computed(() => {
             </td>
           </tr>
           <tr v-if="!loading && filtered.length === 0">
-            <td colspan="4" class="px-4 py-10 text-center text-sm text-neutral-500">
+            <td colspan="5" class="px-4 py-10 text-center text-sm text-neutral-500">
               No entries.
             </td>
           </tr>
-          <tr v-if="loading && project.auditLog.length === 0">
-            <td colspan="4" class="px-4 py-10 text-center text-sm text-neutral-500">
+          <tr v-if="loading && session.auditLog.length === 0">
+            <td colspan="5" class="px-4 py-10 text-center text-sm text-neutral-500">
               Loading…
             </td>
           </tr>
@@ -104,7 +109,7 @@ const filtered = computed(() => {
       </table>
     </div>
 
-    <div v-if="project.auditLogNextBefore" class="mt-4 text-center">
+    <div v-if="session.auditLogNextBefore" class="mt-4 text-center">
       <button
         type="button"
         :disabled="loading"

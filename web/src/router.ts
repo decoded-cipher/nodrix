@@ -13,6 +13,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'projects', name: 'projects', component: () => import('./pages/Projects.vue') },
       { path: 'users', name: 'users', component: () => import('./pages/account/Users.vue') },
       { path: 'tokens', name: 'tokens', component: () => import('./pages/account/Tokens.vue') },
+      { path: 'audit-log', name: 'audit-log', component: () => import('./pages/account/AuditLog.vue') },
       { path: 'settings', name: 'settings', component: () => import('./pages/account/Settings.vue') },
 
       // Project-scoped routes.
@@ -26,8 +27,6 @@ const routes: RouteRecordRaw[] = [
           { path: 'devices', name: 'devices', component: () => import('./pages/project/Devices.vue') },
           { path: 'automations', name: 'automations', component: () => import('./pages/project/Automations.vue') },
           { path: 'integrations', name: 'integrations', component: () => import('./pages/project/Integrations.vue') },
-          { path: 'audit-log', name: 'audit-log', component: () => import('./pages/project/AuditLog.vue') },
-          { path: 'settings', name: 'project-settings', component: () => import('./pages/project/Settings.vue') },
         ],
       },
     ],

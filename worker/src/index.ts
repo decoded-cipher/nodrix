@@ -30,8 +30,8 @@ app.route('/v1/admin/projects/:proj/devices', devices);
 app.route('/v1/admin/projects/:proj/dashboards', dashboards);
 app.route('/v1/admin/projects/:proj/automations', automations);
 app.route('/v1/admin/projects/:proj/integrations', integrations);
-app.route('/v1/admin/projects/:proj/audit-log', auditLog);
 app.route('/v1/admin/tokens', tokens);
+app.route('/v1/admin/audit-log', auditLog);
 app.route('/v1/telemetry', telemetry);
 app.route('/v1/commands', commands);
 

@@ -120,6 +120,19 @@ function webhookUrl(i: Integration): string {
   const cfg = i.config as { url?: string } | null;
   return cfg?.url ?? '';
 }
+
+const copiedId = ref<string | null>(null);
+async function copyUrl(i: Integration) {
+  const url = webhookUrl(i);
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    copiedId.value = i.id;
+    setTimeout(() => { if (copiedId.value === i.id) copiedId.value = null; }, 1200);
+  } catch {
+    // Clipboard API can fail in insecure contexts; fall back silently.
+  }
+}
 </script>
 
 <template>
@@ -230,20 +243,36 @@ function webhookUrl(i: Integration): string {
       </div>
 
       <ul v-if="byTab.webhooks.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        <li v-for="i in byTab.webhooks" :key="i.id" class="flex items-center justify-between px-4 py-3 text-sm">
-          <div>
+        <li v-for="i in byTab.webhooks" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+          <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <span class="font-medium">{{ i.name }}</span>
+              <span class="truncate font-medium">{{ i.name }}</span>
               <span
                 v-if="!i.enabled"
-                class="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
+                class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
               >disabled</span>
             </div>
-            <div class="mt-0.5 font-mono text-xs text-neutral-500">
-              {{ webhookUrl(i) }}
+            <div class="mt-0.5 flex min-w-0 items-center gap-1.5">
+              <span
+                class="min-w-0 flex-1 truncate font-mono text-xs text-neutral-500"
+                :title="webhookUrl(i)"
+              >{{ webhookUrl(i) }}</span>
+              <button
+                type="button"
+                class="shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                :title="copiedId === i.id ? 'Copied' : 'Copy URL'"
+                @click="copyUrl(i)"
+              >
+                <svg v-if="copiedId !== i.id" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
+                  <path d="M9 4h7a2 2 0 0 1 2 2v10M8 7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H8Z" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 text-emerald-600">
+                  <path d="M5 12l5 5L20 7" />
+                </svg>
+              </button>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
               class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
@@ -279,12 +308,12 @@ function webhookUrl(i: Integration): string {
       </div>
 
       <ul v-if="byTab.code.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        <li v-for="i in byTab.code" :key="i.id" class="flex items-center justify-between px-4 py-3 text-sm">
-          <div>
-            <div class="font-medium">{{ i.name }}</div>
-            <div class="mt-0.5 font-mono text-[11px] text-neutral-500">{{ i.id }}</div>
+        <li v-for="i in byTab.code" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+          <div class="min-w-0 flex-1">
+            <div class="truncate font-medium">{{ i.name }}</div>
+            <div class="mt-0.5 truncate font-mono text-[11px] text-neutral-500">{{ i.id }}</div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
               class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
@@ -313,20 +342,20 @@ function webhookUrl(i: Integration): string {
       </div>
 
       <ul v-if="byTab.services.length > 0" class="mb-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        <li v-for="i in byTab.services" :key="i.id" class="flex items-center justify-between px-4 py-3 text-sm">
-          <div>
+        <li v-for="i in byTab.services" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+          <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <span class="font-medium">{{ i.name }}</span>
-              <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600">
+              <span class="truncate font-medium">{{ i.name }}</span>
+              <span class="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600">
                 {{ KIND_LABEL[i.kind] }}
               </span>
               <span
                 v-if="!i.enabled"
-                class="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
+                class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
               >disabled</span>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
               class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"

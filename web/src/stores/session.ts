@@ -1,13 +1,15 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api, ApiError } from '../api';
-import type { Project, User } from '../types';
+import type { AuditLogEntry, Project, User } from '../types';
 
 export const useSessionStore = defineStore('session', () => {
   const user = ref<User | null>(null);
   const projects = ref<Project[]>([]);
   const loading = ref(false);
   const error = ref<{ status: number; reason?: string } | null>(null);
+  const auditLog = ref<AuditLogEntry[]>([]);
+  const auditLogNextBefore = ref<number | null>(null);
 
   async function load(): Promise<void> {
     loading.value = true;
@@ -41,5 +43,36 @@ export const useSessionStore = defineStore('session', () => {
     projects.value = projects.value.filter((p) => p.id !== id);
   }
 
-  return { user, projects, loading, error, load, createProject, deleteProject };
+  async function updateProject(
+    id: string,
+    patch: { name?: string; description?: string | null; icon?: string | null; color?: string | null }
+  ): Promise<void> {
+    const updated = await api.patch<Project>(`/v1/admin/projects/${id}`, patch);
+    projects.value = projects.value.map((p) => (p.id === id ? { ...p, ...updated } : p));
+  }
+
+  async function updateMe(patch: {
+    display_name?: string | null;
+    avatar_url?: string | null;
+  }): Promise<void> {
+    const updated = await api.patch<User>('/v1/admin/me', patch);
+    user.value = updated;
+  }
+
+  async function loadAuditLog(reset = true): Promise<void> {
+    const q = !reset && auditLogNextBefore.value !== null
+      ? `?before=${auditLogNextBefore.value}`
+      : '';
+    const data = await api.get<{ entries: AuditLogEntry[]; next_before: number | null }>(
+      `/v1/admin/audit-log${q}`
+    );
+    auditLog.value = reset ? data.entries : [...auditLog.value, ...data.entries];
+    auditLogNextBefore.value = data.next_before;
+  }
+
+  return {
+    user, projects, loading, error,
+    auditLog, auditLogNextBefore,
+    load, createProject, deleteProject, updateProject, loadAuditLog, updateMe,
+  };
 });

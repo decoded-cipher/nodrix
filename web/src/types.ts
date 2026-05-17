@@ -125,6 +125,7 @@ export type Integration = {
 export type AuditLogEntry = {
   id: number;
   project_id: string | null;
+  project_name: string | null;        // joined from projects on read
   user_id: string | null;
   user_email: string | null;          // joined from users on read
   action: string;                     // e.g. 'device.create', 'automation.run'

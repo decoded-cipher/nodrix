@@ -4,7 +4,6 @@ import { api } from '../api';
 import type {
   Automation,
   AutomationTriggerType,
-  AuditLogEntry,
   Dashboard,
   DashboardMeta,
   Device,
@@ -22,8 +21,6 @@ export const useProjectStore = defineStore('project', () => {
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
   const integrations = ref<Integration[]>([]);
-  const auditLog = ref<AuditLogEntry[]>([]);
-  const auditLogNextBefore = ref<number | null>(null);
 
   async function switchTo(projectId: string): Promise<void> {
     if (currentProjectId.value === projectId && devices.value.length + dashboards.value.length > 0) {
@@ -226,32 +223,6 @@ export const useProjectStore = defineStore('project', () => {
     integrations.value = integrations.value.filter((i) => i.id !== id);
   }
 
-  // ─── Audit log ──────────────────────────────────────────────────────────────
-
-  async function loadAuditLog(reset = true): Promise<void> {
-    if (!currentProjectId.value) return;
-    const q = !reset && auditLogNextBefore.value !== null
-      ? `?before=${auditLogNextBefore.value}`
-      : '';
-    const data = await api.get<{ entries: AuditLogEntry[]; next_before: number | null }>(
-      `/v1/admin/projects/${currentProjectId.value}/audit-log${q}`
-    );
-    auditLog.value = reset ? data.entries : [...auditLog.value, ...data.entries];
-    auditLogNextBefore.value = data.next_before;
-  }
-
-  // ─── Project update ─────────────────────────────────────────────────────────
-
-  async function updateProject(patch: {
-    name?: string;
-    description?: string | null;
-    icon?: string | null;
-    color?: string | null;
-  }): Promise<void> {
-    if (!currentProjectId.value) return;
-    await api.patch<unknown>(`/v1/admin/projects/${currentProjectId.value}`, patch);
-  }
-
   return {
     currentProjectId,
     devices,
@@ -259,8 +230,6 @@ export const useProjectStore = defineStore('project', () => {
     tokens,
     automations,
     integrations,
-    auditLog,
-    auditLogNextBefore,
     switchTo,
     loadDevices,
     createDevice,
@@ -281,7 +250,5 @@ export const useProjectStore = defineStore('project', () => {
     createIntegration,
     updateIntegration,
     deleteIntegration,
-    loadAuditLog,
-    updateProject,
   };
 });

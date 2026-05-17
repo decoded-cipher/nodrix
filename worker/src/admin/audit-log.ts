@@ -1,20 +1,19 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireAccess } from '../middleware/require-access';
-import { resolveUser } from '../middleware/resolve-user';
-import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
+import { resolveUser, type UserContextVars } from '../middleware/resolve-user';
 
-const auditLog = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
+const auditLog = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
 auditLog.use('*', requireAccess);
 auditLog.use('*', resolveUser);
-auditLog.use('*', resolveProject);
 
-// GET /v1/admin/projects/:proj/audit-log?limit=50&before=<id>
-// Keyset pagination over the auto-increment id (descending). The idx_audit_log_project
-// index covers (project_id, created_at DESC) so this stays cheap as the table grows.
+// GET /v1/admin/audit-log?limit=50&before=<id>
+// Account-wide log: returns entries from every project the caller is a member
+// of, plus entries with project_id IS NULL (e.g. project.delete) authored by
+// the caller. Keyset-paginated on the auto-increment id.
 auditLog.get('/', async (c) => {
-  const project = c.get('project');
+  const user = c.get('user');
 
   const limitRaw = parseInt(c.req.query('limit') ?? '50', 10);
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 50;
@@ -24,6 +23,7 @@ auditLog.get('/', async (c) => {
   type Row = {
     id: number;
     project_id: string | null;
+    project_name: string | null;
     user_id: string | null;
     user_email: string | null;
     action: string;
@@ -33,34 +33,46 @@ auditLog.get('/', async (c) => {
     created_at: number;
   };
 
+  // Scope: any project the caller is a member of, OR entries with a null
+  // project (system-wide actions like project.delete) that the caller authored.
+  const baseWhere = `
+    (a.project_id IN (SELECT project_id FROM project_members WHERE user_id = ?1)
+     OR (a.project_id IS NULL AND a.user_id = ?1))
+  `;
+
   const stmt = before !== null && Number.isFinite(before)
     ? c.env.DB
         .prepare(
-          `SELECT a.id, a.project_id, a.user_id, u.email AS user_email,
+          `SELECT a.id, a.project_id, p.name AS project_name,
+                  a.user_id, u.email AS user_email,
                   a.action, a.target_type, a.target_id, a.metadata, a.created_at
              FROM audit_log a
-             LEFT JOIN users u ON u.id = a.user_id
-            WHERE a.project_id = ? AND a.id < ?
+             LEFT JOIN users u    ON u.id = a.user_id
+             LEFT JOIN projects p ON p.id = a.project_id
+            WHERE ${baseWhere} AND a.id < ?2
             ORDER BY a.id DESC
-            LIMIT ?`
+            LIMIT ?3`
         )
-        .bind(project.id, before, limit)
+        .bind(user.id, before, limit)
     : c.env.DB
         .prepare(
-          `SELECT a.id, a.project_id, a.user_id, u.email AS user_email,
+          `SELECT a.id, a.project_id, p.name AS project_name,
+                  a.user_id, u.email AS user_email,
                   a.action, a.target_type, a.target_id, a.metadata, a.created_at
              FROM audit_log a
-             LEFT JOIN users u ON u.id = a.user_id
-            WHERE a.project_id = ?
+             LEFT JOIN users u    ON u.id = a.user_id
+             LEFT JOIN projects p ON p.id = a.project_id
+            WHERE ${baseWhere}
             ORDER BY a.id DESC
-            LIMIT ?`
+            LIMIT ?2`
         )
-        .bind(project.id, limit);
+        .bind(user.id, limit);
 
   const rows = await stmt.all<Row>();
   const entries = rows.results.map((r) => ({
     id: r.id,
     project_id: r.project_id,
+    project_name: r.project_name,
     user_id: r.user_id,
     user_email: r.user_email,
     action: r.action,
