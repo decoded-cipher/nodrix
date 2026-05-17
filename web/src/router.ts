@@ -1,42 +1,33 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
-  { path: '/', name: 'home', component: () => import('./pages/Home.vue') },
+  // Setup lives outside the app shell.
   { path: '/setup', name: 'setup', component: () => import('./pages/Setup.vue') },
+
+  // Everything else is wrapped in the authenticated app shell.
   {
-    path: '/p/:proj',
-    component: () => import('./pages/ProjectShell.vue'),
+    path: '/',
+    component: () => import('./layouts/AppShell.vue'),
     children: [
-      { path: '', redirect: (to) => `/p/${to.params['proj'] as string}/dashboards` },
+      { path: '', name: 'home', component: () => import('./pages/Home.vue') },
+      { path: 'projects', name: 'projects', component: () => import('./pages/Projects.vue') },
+      { path: 'users', name: 'users', component: () => import('./pages/account/Users.vue') },
+      { path: 'tokens', name: 'tokens', component: () => import('./pages/account/Tokens.vue') },
+      { path: 'settings', name: 'settings', component: () => import('./pages/account/Settings.vue') },
+
+      // Project-scoped routes.
       {
-        path: 'dashboards',
-        name: 'dashboard-list',
-        component: () => import('./pages/DashboardList.vue'),
-      },
-      {
-        path: 'd/:dash',
-        name: 'dashboard-view',
-        component: () => import('./pages/DashboardView.vue'),
-      },
-      {
-        path: 'd/:dash/edit',
-        name: 'dashboard-edit',
-        component: () => import('./pages/DashboardEdit.vue'),
-      },
-      {
-        path: 'admin/devices',
-        name: 'admin-devices',
-        component: () => import('./pages/admin/Devices.vue'),
-      },
-      {
-        path: 'admin/tokens',
-        name: 'admin-tokens',
-        component: () => import('./pages/admin/Tokens.vue'),
-      },
-      {
-        path: 'admin/settings',
-        name: 'admin-settings',
-        component: () => import('./pages/admin/ProjectSettings.vue'),
+        path: 'p/:proj',
+        children: [
+          { path: '', redirect: (to) => `/p/${to.params['proj'] as string}/dashboards` },
+          { path: 'dashboards', name: 'dashboards', component: () => import('./pages/project/Dashboards.vue') },
+          { path: 'd/:dash', name: 'dashboard-view', component: () => import('./pages/project/DashboardView.vue') },
+          { path: 'd/:dash/edit', name: 'dashboard-edit', component: () => import('./pages/project/DashboardEdit.vue') },
+          { path: 'devices', name: 'devices', component: () => import('./pages/project/Devices.vue') },
+          { path: 'automations', name: 'automations', component: () => import('./pages/project/Automations.vue') },
+          { path: 'webhooks', name: 'webhooks', component: () => import('./pages/project/Webhooks.vue') },
+          { path: 'settings', name: 'project-settings', component: () => import('./pages/project/Settings.vue') },
+        ],
       },
     ],
   },

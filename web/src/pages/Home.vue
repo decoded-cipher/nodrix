@@ -1,35 +1,155 @@
 <script setup lang="ts">
-import { onMounted, watchEffect } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted } from 'vue';
 import { useSessionStore } from '../stores/session';
-import ProjectList from './ProjectList.vue';
+import { useProjectStore } from '../stores/project';
+import { useUiStore } from '../stores/ui';
 
 const session = useSessionStore();
-const router = useRouter();
+const project = useProjectStore();
+const ui = useUiStore();
 
-onMounted(() => session.load());
-
-watchEffect(() => {
-  if (session.error && session.error.status === 401) {
-    router.replace('/setup');
-  }
+onMounted(async () => {
+  if (!session.user) await session.load();
+  ui.ensureValidProject();
+  if (ui.currentProject) await project.switchTo(ui.currentProject.id);
 });
+
+const greeting = computed(() => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+});
+
+const stats = computed(() => [
+  {
+    label: 'Projects',
+    value: session.projects.length,
+    href: '/projects',
+  },
+  {
+    label: 'Devices',
+    value: project.devices.length,
+    href: ui.currentProject ? `/p/${ui.currentProject.id}/devices` : '/projects',
+  },
+  {
+    label: 'Dashboards',
+    value: project.dashboards.length,
+    href: ui.currentProject ? `/p/${ui.currentProject.id}/dashboards` : '/projects',
+  },
+  {
+    label: 'Online now',
+    value: project.devices.filter((d) => {
+      if (!d.last_seen) return false;
+      return Date.now() / 1000 - d.last_seen < 60;
+    }).length,
+    href: ui.currentProject ? `/p/${ui.currentProject.id}/devices` : '/projects',
+  },
+]);
+
+const projectQuickLinks = computed(() => {
+  if (!ui.currentProject) return [];
+  const id = ui.currentProject.id;
+  return [
+    { label: 'New dashboard', desc: 'Drag widgets to visualize device data', to: `/p/${id}/dashboards`, color: 'orange' },
+    { label: 'Add device', desc: 'Register a new device and get its token', to: `/p/${id}/devices`, color: 'sky' },
+    { label: 'Create automation', desc: 'Trigger actions on schedule, state, or event', to: `/p/${id}/automations`, color: 'emerald' },
+    { label: 'Webhook', desc: 'Forward telemetry or events to external URLs', to: `/p/${id}/webhooks`, color: 'violet' },
+  ];
+});
+
+const colorClasses: Record<string, string> = {
+  orange: 'bg-orange-50 text-orange-700',
+  sky: 'bg-sky-50 text-sky-700',
+  emerald: 'bg-emerald-50 text-emerald-700',
+  violet: 'bg-violet-50 text-violet-700',
+};
 </script>
 
 <template>
-  <div v-if="session.loading" class="flex h-full items-center justify-center text-neutral-500">
-    Loading...
-  </div>
-  <div v-else-if="session.error" class="flex h-full items-center justify-center">
-    <div class="max-w-md text-center">
-      <h2 class="text-lg font-semibold">Sign-in required</h2>
-      <p class="mt-2 text-sm text-neutral-600">
-        Status {{ session.error.status }}<span v-if="session.error.reason">: {{ session.error.reason }}</span>
+  <div class="mx-auto max-w-6xl px-6 py-8">
+    <header class="mb-8">
+      <h1 class="text-2xl font-semibold tracking-tight">
+        {{ greeting }}{{ session.user ? `, ${session.user.email.split('@')[0]}` : '' }}
+      </h1>
+      <p class="mt-1 text-sm text-neutral-600">
+        Here's what's happening in
+        <span class="font-medium text-neutral-900">{{ ui.currentProject?.name ?? 'your workspace' }}</span>.
       </p>
-      <RouterLink to="/setup" class="mt-4 inline-block text-sm text-orange-600 hover:underline">
-        Continue to setup
+    </header>
+
+    <!-- Stats -->
+    <section class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <RouterLink
+        v-for="s in stats"
+        :key="s.label"
+        :to="s.href"
+        class="rounded-lg border border-neutral-200 bg-white p-4 hover:border-orange-300"
+      >
+        <div class="text-xs uppercase tracking-wide text-neutral-500">{{ s.label }}</div>
+        <div class="mt-1 text-2xl font-semibold tracking-tight">{{ s.value }}</div>
       </RouterLink>
-    </div>
+    </section>
+
+    <!-- Quick actions -->
+    <section v-if="projectQuickLinks.length" class="mb-8">
+      <h2 class="mb-3 text-sm font-semibold text-neutral-900">Quick actions</h2>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <RouterLink
+          v-for="q in projectQuickLinks"
+          :key="q.label"
+          :to="q.to"
+          class="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-orange-300 hover:shadow-sm"
+        >
+          <div
+            class="grid h-9 w-9 place-items-center rounded-md"
+            :class="colorClasses[q.color]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+              <path d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </div>
+          <div class="mt-3 text-sm font-medium">{{ q.label }}</div>
+          <div class="mt-1 text-xs text-neutral-500">{{ q.desc }}</div>
+        </RouterLink>
+      </div>
+    </section>
+
+    <!-- Empty state for no projects -->
+    <section v-if="session.projects.length === 0" class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
+      <h3 class="text-base font-semibold">Create your first project</h3>
+      <p class="mx-auto mt-2 max-w-md text-sm text-neutral-600">
+        Projects are isolated workspaces. Each one holds its own devices, dashboards, and automations.
+      </p>
+      <RouterLink
+        to="/projects"
+        class="mt-4 inline-block rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+      >Go to Projects</RouterLink>
+    </section>
+
+    <!-- Recent dashboards -->
+    <section v-else-if="project.dashboards.length" class="rounded-lg border border-neutral-200 bg-white">
+      <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+        <h2 class="text-sm font-semibold">Recent dashboards</h2>
+        <RouterLink
+          v-if="ui.currentProject"
+          :to="`/p/${ui.currentProject.id}/dashboards`"
+          class="text-xs text-orange-700 hover:underline"
+        >View all →</RouterLink>
+      </div>
+      <ul class="divide-y divide-neutral-100">
+        <li
+          v-for="d in project.dashboards.slice(0, 5)"
+          :key="d.id"
+          class="flex items-center justify-between px-4 py-3"
+        >
+          <RouterLink
+            :to="ui.currentProject ? `/p/${ui.currentProject.id}/d/${d.id}` : '/'"
+            class="text-sm font-medium hover:underline"
+          >{{ d.name }}</RouterLink>
+          <span class="font-mono text-[11px] text-neutral-400">{{ d.id.slice(0, 8) }}</span>
+        </li>
+      </ul>
+    </section>
   </div>
-  <ProjectList v-else />
 </template>

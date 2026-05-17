@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useRoute } from 'vue-router';
-import { useProjectStore } from '../stores/project';
-import { DashboardWs } from '../ws';
+import { useProjectStore } from '../../stores/project';
+import { DashboardWs } from '../../ws';
 import {
   buildDataIndex,
   applyProps,
   createWidgetElement,
   type DataIndex,
-} from '../builder/render-widget';
+} from '../../builder/render-widget';
 import type {
   Dashboard,
   Layout,
   SnapshotMsg,
   UpdateMsg,
   WsServerMsg,
-} from '../types';
+} from '../../types';
 
 const route = useRoute();
 const project = useProjectStore();
@@ -31,8 +31,6 @@ onMounted(async () => {
   const projId = route.params['proj'] as string;
   const dashId = route.params['dash'] as string;
   try {
-    // Child components mount before parent's onMounted in Vue 3, so
-    // ProjectShell may not have set currentProjectId yet on a fresh load.
     await project.switchTo(projId);
     dashboard.value = await project.fetchDashboard(dashId);
     mountGrid(dashboard.value.layout);

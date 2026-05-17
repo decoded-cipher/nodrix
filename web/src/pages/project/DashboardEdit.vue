@@ -2,13 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { GridLayout, GridItem } from 'grid-layout-plus';
-import { useProjectStore } from '../stores/project';
-import { specFor } from '../builder/widget-catalog';
-import WidgetPalette from '../builder/WidgetPalette.vue';
-import WidgetConfigPanel from '../builder/WidgetConfigPanel.vue';
-import { applyProps, createWidgetElement, buildDataIndex } from '../builder/render-widget';
-import { DashboardWs } from '../ws';
-import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../types';
+import { useProjectStore } from '../../stores/project';
+import { specFor } from '../../builder/widget-catalog';
+import WidgetPalette from '../../builder/WidgetPalette.vue';
+import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
+import { applyProps, createWidgetElement, buildDataIndex } from '../../builder/render-widget';
+import { DashboardWs } from '../../ws';
+import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../../types';
 
 const route = useRoute();
 const router = useRouter();
