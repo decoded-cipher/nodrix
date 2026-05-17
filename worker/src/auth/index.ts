@@ -75,16 +75,16 @@ export async function buildAuth(env: Env, request?: Request) {
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
+      // `role` rides through Better Auth's adapter so the INSERT includes it
+      // (column is NOT NULL). input: false prevents users from setting it
+      // during signup. The before-hook flips the first user to 'owner'.
       additionalFields: {
         role: {
-          type: ['owner', 'admin', 'viewer'] as const,
+          type: 'string',
           required: true,
           defaultValue: 'viewer',
           input: false,
         },
-        first_name: { type: 'string', required: false },
-        last_name: { type: 'string', required: false },
-        last_login_at: { type: 'number', required: false, input: false },
       },
     },
 
@@ -128,8 +128,12 @@ export async function buildAuth(env: Env, request?: Request) {
       },
     },
 
-    // Bootstrap: the first signup becomes 'owner'. Everyone else stays 'viewer'
-    // until promoted (RBAC ships later).
+    // Bootstrap + profile shaping:
+    //   • before: flip role='owner' for the very first signup; let everyone
+    //     else default to 'viewer'. role is in additionalFields so this lands
+    //     in the INSERT itself, not a follow-up UPDATE.
+    //   • after: split the provider-supplied `name` into first_name/last_name
+    //     via raw D1 (those columns aren't part of Better Auth's schema view).
     databaseHooks: {
       user: {
         create: {
@@ -137,19 +141,18 @@ export async function buildAuth(env: Env, request?: Request) {
             const existing = await env.DB
               .prepare(`SELECT 1 AS one FROM users LIMIT 1`)
               .first<{ one: number }>();
-            const role = existing ? 'viewer' : 'owner';
-            // Split provider-supplied `name` into first/last on first signup
-            // so the rest of the UI can use first_name + last_name.
+            return { data: { ...user, role: existing ? 'viewer' : 'owner' } };
+          },
+          after: async (user) => {
             const name = (user.name ?? '').trim();
-            const parts = name.split(/\s+/, 2);
-            return {
-              data: {
-                ...user,
-                role,
-                first_name: user.first_name ?? parts[0] ?? null,
-                last_name: user.last_name ?? parts[1] ?? null,
-              },
-            };
+            if (!name) return;
+            const parts = name.split(/\s+/);
+            const firstName = parts[0] ?? null;
+            const lastName = parts.length > 1 ? parts.slice(1).join(' ') : null;
+            await env.DB
+              .prepare(`UPDATE users SET first_name = ?, last_name = ? WHERE id = ?`)
+              .bind(firstName, lastName, user.id)
+              .run();
           },
         },
       },

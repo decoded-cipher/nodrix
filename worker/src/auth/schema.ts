@@ -6,16 +6,18 @@
 
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// Columns Better Auth's adapter needs to know about. `role` is here as an
+// additionalField (input: false, defaultValue: 'viewer') so its value lands
+// in the INSERT — without it, the NOT NULL constraint on role fires.
+// first_name / last_name / last_login_at are owned by us (raw D1 in the
+// after-hook and admin/me) and intentionally absent from this schema.
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
   name: text('name'),
   image: text('image'),
-  role: text('role').notNull(),
-  firstName: text('first_name'),
-  lastName: text('last_name'),
-  lastLoginAt: integer('last_login_at'),
+  role: text('role').notNull().default('viewer'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });

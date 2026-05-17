@@ -47,16 +47,14 @@ async function submit() {
   submitting.value = true;
   try {
     if (mode.value === 'register') {
+      // Worker's after-hook splits `name` into first_name/last_name.
       const name = [form.value.first_name.trim(), form.value.last_name.trim()]
         .filter(Boolean).join(' ') || form.value.email;
       const res = await authClient.signUp.email({
         email: form.value.email.trim(),
         password: form.value.password,
         name,
-        // additionalFields pass through Better Auth:
-        first_name: form.value.first_name.trim() || null,
-        last_name: form.value.last_name.trim() || null,
-      } as unknown as { email: string; password: string; name: string });
+      });
       if (res.error) throw new Error(res.error.message ?? 'Sign-up failed');
     } else {
       const res = await authClient.signIn.email({
