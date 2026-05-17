@@ -24,29 +24,39 @@ const err = ref<string | null>(null);
 const widgetEls = shallowRef<Map<string, HTMLElement>>(new Map());
 let ws: DashboardWs | null = null;
 
-// Convert layout.items into a shape grid-layout-plus understands.
-// We keep our `items` as the source of truth and project to/from grid format.
-const gridItems = computed({
-  get: () =>
-    layout.value.items.map((it) => ({
-      i: it.id,
-      x: it.x,
-      y: it.y,
-      w: it.w,
-      h: it.h,
-    })),
-  set: (val) => {
-    const map = new Map(val.map((g) => [g.i, g] as const));
-    layout.value = {
-      ...layout.value,
-      items: layout.value.items.map((it) => {
-        const g = map.get(it.id);
-        return g ? { ...it, x: g.x, y: g.y, w: g.w, h: g.h } : it;
-      }),
-    };
+// Project layout.items into grid-layout-plus's shape. One-way bind because
+// grid-layout-plus 1.x emits `layout-updated` on drag/resize, NOT
+// `update:layout` — so v-model:layout silently doesn't work. We listen to
+// layout-updated explicitly via onGridLayoutUpdated() below.
+const gridItems = computed(() =>
+  layout.value.items.map((it) => ({
+    i: it.id,
+    x: it.x,
+    y: it.y,
+    w: it.w,
+    h: it.h,
+  }))
+);
+
+type GridShape = { i: string; x: number; y: number; w: number; h: number };
+
+function onGridLayoutUpdated(newLayout: GridShape[]) {
+  const map = new Map(newLayout.map((g) => [g.i, g] as const));
+  let changed = false;
+  const newItems = layout.value.items.map((it) => {
+    const g = map.get(it.id);
+    if (!g) return it;
+    if (g.x !== it.x || g.y !== it.y || g.w !== it.w || g.h !== it.h) {
+      changed = true;
+      return { ...it, x: g.x, y: g.y, w: g.w, h: g.h };
+    }
+    return it;
+  });
+  if (changed) {
+    layout.value = { ...layout.value, items: newItems };
     dirty.value = true;
-  },
-});
+  }
+}
 
 const selected = computed(() => layout.value.items.find((it) => it.id === selectedId.value) ?? null);
 
@@ -162,24 +172,39 @@ function applyUpdate(u: UpdateMsg) {
 function addWidget(type: WidgetType) {
   const spec = specFor(type);
   const id = `w_${Math.random().toString(36).slice(2, 10)}`;
-  // Place new widget below the lowest existing one. y: 999 used to rely on
-  // grid-layout-plus auto-compacting, but compaction only updates the model
-  // when the user drags — saving immediately persisted y=999 to D1, which
-  // pushed widgets ~90k px below the viewport in view mode.
-  let nextY = 0;
-  for (const it of layout.value.items) {
-    nextY = Math.max(nextY, it.y + it.h);
+  const w = spec.defaultSize.w;
+  const h = spec.defaultSize.h;
+  const cols = layout.value.grid.columns;
+  const items = layout.value.items;
+  // Pack horizontally first, then wrap. Find leftmost (x, y) that fits.
+  let placedX = 0;
+  let placedY = 0;
+  outer: for (let y = 0; y < 1000; y++) {
+    for (let x = 0; x + w <= cols; x++) {
+      const overlaps = items.some(
+        (it) =>
+          x < it.x + it.w &&
+          x + w > it.x &&
+          y < it.y + it.h &&
+          y + h > it.y
+      );
+      if (!overlaps) {
+        placedX = x;
+        placedY = y;
+        break outer;
+      }
+    }
   }
   layout.value = {
     ...layout.value,
     items: [
-      ...layout.value.items,
+      ...items,
       {
         id,
-        x: 0,
-        y: nextY,
-        w: spec.defaultSize.w,
-        h: spec.defaultSize.h,
+        x: placedX,
+        y: placedY,
+        w,
+        h,
         type,
         props: { ...spec.defaultProps },
       },
@@ -262,7 +287,7 @@ function exitToView() {
 
       <div class="flex-1 overflow-auto bg-neutral-100 p-6">
         <GridLayout
-          v-model:layout="gridItems"
+          :layout="gridItems"
           :col-num="layout.grid.columns"
           :row-height="80"
           :is-draggable="true"
@@ -270,6 +295,7 @@ function exitToView() {
           :margin="[12, 12]"
           :use-css-transforms="true"
           class="rounded-md bg-white p-2"
+          @layout-updated="onGridLayoutUpdated"
         >
           <GridItem
             v-for="g in gridItems"
