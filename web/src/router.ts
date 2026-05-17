@@ -25,7 +25,7 @@ const routes: RouteRecordRaw[] = [
           { path: 'd/:dash/edit', name: 'dashboard-edit', component: () => import('./pages/project/DashboardEdit.vue') },
           { path: 'devices', name: 'devices', component: () => import('./pages/project/Devices.vue') },
           { path: 'automations', name: 'automations', component: () => import('./pages/project/Automations.vue') },
-          { path: 'webhooks', name: 'webhooks', component: () => import('./pages/project/Webhooks.vue') },
+          { path: 'integrations', name: 'integrations', component: () => import('./pages/project/Integrations.vue') },
           { path: 'settings', name: 'project-settings', component: () => import('./pages/project/Settings.vue') },
         ],
       },

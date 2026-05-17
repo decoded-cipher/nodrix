@@ -54,7 +54,7 @@ const projectQuickLinks = computed(() => {
     { label: 'New dashboard', desc: 'Drag widgets to visualize device data', to: `/p/${id}/dashboards`, color: 'orange' },
     { label: 'Add device', desc: 'Register a new device and get its token', to: `/p/${id}/devices`, color: 'sky' },
     { label: 'Create automation', desc: 'Trigger actions on schedule, state, or event', to: `/p/${id}/automations`, color: 'emerald' },
-    { label: 'Webhook', desc: 'Forward telemetry or events to external URLs', to: `/p/${id}/webhooks`, color: 'violet' },
+    { label: 'Add integration', desc: 'Webhooks, code blocks, Slack — reusable connectors', to: `/p/${id}/integrations`, color: 'violet' },
   ];
 });
 

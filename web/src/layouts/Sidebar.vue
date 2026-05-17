@@ -12,8 +12,8 @@ const projId = computed(() => ui.currentProject?.id ?? '');
 const hasProject = computed(() => projId.value !== '');
 
 type IconName =
-  | 'home' | 'folder' | 'gauge' | 'cpu' | 'bolt'
-  | 'webhook' | 'users' | 'key' | 'settings';
+  | 'home' | 'folder' | 'dashboards' | 'cpu' | 'bolt'
+  | 'integrations' | 'users' | 'key' | 'settings';
 
 type NavItem = {
   label: string;
@@ -28,10 +28,10 @@ const globalTop = computed<NavItem[]>(() => [
 ]);
 
 const projectScoped = computed<NavItem[]>(() => [
-  { label: 'Dashboards', to: `/p/${projId.value}/dashboards`, icon: 'gauge', disabled: !hasProject.value },
+  { label: 'Dashboards', to: `/p/${projId.value}/dashboards`, icon: 'dashboards', disabled: !hasProject.value },
   { label: 'Devices', to: `/p/${projId.value}/devices`, icon: 'cpu', disabled: !hasProject.value },
   { label: 'Automations', to: `/p/${projId.value}/automations`, icon: 'bolt', disabled: !hasProject.value },
-  { label: 'Webhooks', to: `/p/${projId.value}/webhooks`, icon: 'webhook', disabled: !hasProject.value },
+  { label: 'Integrations', to: `/p/${projId.value}/integrations`, icon: 'integrations', disabled: !hasProject.value },
 ]);
 
 const globalBottom = computed<NavItem[]>(() => [
@@ -44,11 +44,11 @@ const globalBottom = computed<NavItem[]>(() => [
 const ICON_PATHS: Record<IconName, string> = {
   home: 'M2.25 12 12 2.25 21.75 12M4.5 9.75v9.75a.75.75 0 0 0 .75.75H9.75V15h4.5v5.25h4.5a.75.75 0 0 0 .75-.75V9.75',
   folder: 'M3.75 9.75h16.5M3.75 9.75A1.5 1.5 0 0 1 5.25 8.25h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.121a1.5 1.5 0 0 0 1.06.44h6.379a1.5 1.5 0 0 1 1.5 1.5v6.75a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V9.75Z',
-  gauge: 'M12 6v3m0 9a6 6 0 1 1 0-12 6 6 0 0 1 0 12Zm0 0v3m6-9h-3M9 12H6m11.485-4.485-2.121 2.121M9.636 14.364l-2.121 2.121',
+  dashboards: 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z',
   cpu: 'M9 3v3m6-3v3M3 9h3m12 0h3M3 15h3m12 0h3M9 21v-3m6 3v-3M7.5 6.75h9a.75.75 0 0 1 .75.75v9a.75.75 0 0 1-.75.75h-9a.75.75 0 0 1-.75-.75v-9a.75.75 0 0 1 .75-.75Z',
   bolt: 'M3.75 13.5 14.25 2.25v8.25h6L9.75 21.75V13.5h-6Z',
-  webhook: 'M9 16.5a4.5 4.5 0 1 1 6.364-6.364l1.06-1.06a4.5 4.5 0 1 1 1.061 1.06l-7.07 7.071a4.5 4.5 0 0 1-1.415-7.778M12 12.75v6.75',
-  users: 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M9 11.25a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  integrations: 'M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959 0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58Z',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
   key: 'M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z',
   settings: 'M4.5 12a7.5 7.5 0 0 0 .104 1.243l-1.32 1.02a.75.75 0 0 0-.176.957l1.5 2.598a.75.75 0 0 0 .912.328l1.561-.624a7.45 7.45 0 0 0 2.155 1.244l.236 1.66a.75.75 0 0 0 .742.643h3a.75.75 0 0 0 .742-.643l.237-1.66a7.45 7.45 0 0 0 2.154-1.244l1.561.624a.75.75 0 0 0 .912-.328l1.5-2.598a.75.75 0 0 0-.176-.957l-1.32-1.02A7.51 7.51 0 0 0 19.5 12c0-.42-.035-.832-.103-1.232l1.319-1.02a.75.75 0 0 0 .176-.958l-1.5-2.598a.75.75 0 0 0-.912-.327l-1.561.624A7.46 7.46 0 0 0 14.764 5.245l-.236-1.66A.75.75 0 0 0 13.786 3h-3a.75.75 0 0 0-.742.643l-.237 1.66a7.45 7.45 0 0 0-2.154 1.244l-1.561-.624a.75.75 0 0 0-.912.327l-1.5 2.598a.75.75 0 0 0 .176.958l1.32 1.02C4.535 11.168 4.5 11.58 4.5 12Zm10.5 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
 };
@@ -84,7 +84,10 @@ function initials(email?: string | null): string {
     :class="ui.sidebarCollapsed ? 'w-16' : 'w-60'"
   >
     <!-- Brand -->
-    <div class="flex h-14 items-center gap-2 border-b border-neutral-200 px-4">
+    <div
+      class="flex h-14 items-center gap-2 border-b border-neutral-200"
+      :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'px-4'"
+    >
       <div class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-neutral-900 text-white">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
           <path d="M4 6v12M4 6l8 12M12 6v12M12 6l8 12M20 6v12" />
@@ -107,8 +110,10 @@ function initials(email?: string | null): string {
         <li v-for="item in globalTop" :key="item.to">
           <RouterLink
             :to="item.to"
-            class="flex items-center gap-3 rounded-md px-2.5 py-2 text-neutral-700 hover:bg-neutral-100"
+            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100"
+            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
             active-class="bg-orange-50 text-orange-700 font-medium"
+            :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
             <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
@@ -128,16 +133,19 @@ function initials(email?: string | null): string {
           <RouterLink
             v-if="!item.disabled"
             :to="item.to"
-            class="flex items-center gap-3 rounded-md px-2.5 py-2 text-neutral-700 hover:bg-neutral-100"
+            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100"
+            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
             active-class="bg-orange-50 text-orange-700 font-medium"
+            :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
             <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
           </RouterLink>
           <span
             v-else
-            class="flex cursor-not-allowed items-center gap-3 rounded-md px-2.5 py-2 text-neutral-400"
-            title="Select a project first"
+            class="flex cursor-not-allowed items-center rounded-md py-2 text-neutral-400"
+            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
+            :title="ui.sidebarCollapsed ? `${item.label} — select a project first` : 'Select a project first'"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
             <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
@@ -156,8 +164,10 @@ function initials(email?: string | null): string {
         <li v-for="item in globalBottom" :key="item.to">
           <RouterLink
             :to="item.to"
-            class="flex items-center gap-3 rounded-md px-2.5 py-2 text-neutral-700 hover:bg-neutral-100"
+            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100"
+            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
             active-class="bg-orange-50 text-orange-700 font-medium"
+            :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
             <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>

@@ -39,8 +39,8 @@ const crumbs = computed<Crumb[]>(() => {
       out.push({ label: 'Devices' });
     } else if (path.includes('/automations')) {
       out.push({ label: 'Automations' });
-    } else if (path.includes('/webhooks')) {
-      out.push({ label: 'Webhooks' });
+    } else if (path.includes('/integrations')) {
+      out.push({ label: 'Integrations' });
     } else if (path.includes('/settings')) {
       out.push({ label: 'Settings' });
     }

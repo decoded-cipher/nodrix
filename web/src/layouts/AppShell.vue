@@ -14,6 +14,7 @@ const route = useRoute();
 const router = useRouter();
 
 const routeProjId = computed(() => (route.params['proj'] as string | undefined) ?? null);
+const isDashboardEditor = computed(() => route.name === 'dashboard-edit');
 
 onMounted(async () => {
   if (!session.user) await session.load();
@@ -45,6 +46,16 @@ watch(routeProjId, async (id) => {
 watch(
   () => session.projects.length,
   () => ui.ensureValidProject()
+);
+
+// Collapse the sidebar while the dashboard editor is open, restore on exit.
+watch(
+  isDashboardEditor,
+  (editing) => {
+    if (editing) ui.autoCollapseForEditor();
+    else ui.restoreSidebarFromEditor();
+  },
+  { immediate: true }
 );
 </script>
 
