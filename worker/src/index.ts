@@ -19,6 +19,7 @@ import readState from './read/state';
 import readSeries from './read/series';
 import readList from './read/list';
 import ws from './dashboard/ws';
+import { sha256Hex } from './lib/ids';
 
 export { DeviceDO } from './do/device-do';
 export { DashboardDO } from './do/dashboard-do';
@@ -99,6 +100,44 @@ app.route('/v1/admin/audit-log', auditLog);
 // Device-facing (Bearer token auth, see the route modules):
 app.route('/v1/telemetry', telemetry);
 app.route('/v1/commands', commands);
+
+// Device WebSocket: hibernated push channel for commands. Bearer token may
+// arrive in Authorization OR ?token=... (WS clients can't set headers on the
+// upgrade request). Routed to the Device DO which owns the WS connection.
+app.get('/v1/devices/ws', async (c) => {
+  const headerToken = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim();
+  const queryToken = c.req.query('token');
+  const token = headerToken || queryToken;
+  if (!token) return c.text('unauthorized', 401);
+
+  if (c.req.header('upgrade') !== 'websocket') {
+    return c.text('expected websocket', 426);
+  }
+
+  const hash = await sha256Hex(token);
+  const row = await c.env.DB
+    .prepare(
+      `SELECT t.id AS token_id, d.id AS device_id
+         FROM device_tokens t
+         JOIN devices d ON d.id = t.device_id
+        WHERE t.hash = ? AND t.revoked_at IS NULL`
+    )
+    .bind(hash)
+    .first<{ token_id: string; device_id: string }>();
+  if (!row) return c.text('unauthorized', 401);
+
+  c.executionCtx.waitUntil(
+    c.env.DB
+      .prepare(`UPDATE device_tokens SET last_used_at = ? WHERE id = ?`)
+      .bind(Math.floor(Date.now() / 1000), row.token_id)
+      .run()
+      .then(() => undefined)
+      .catch(() => undefined)
+  );
+
+  const stub = c.env.DEVICE_DO.get(c.env.DEVICE_DO.idFromName(row.device_id));
+  return stub.fetch(c.req.raw);
+});
 
 // Public read API (user/API token auth):
 app.route('/v1/projects/:proj/devices', readList);

@@ -188,6 +188,13 @@ export class DeviceDO extends DurableObject<Env> {
       JSON.stringify(value),
       now
     );
+
+    // Push to any connected device WS clients. If the device is offline the
+    // command stays in pending_commands and will be flushed on next connect.
+    const payload = JSON.stringify({ type: 'command', id, name, value });
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.send(payload); } catch { /* dead socket; ignore */ }
+    }
   }
 
   async listPendingCommands(): Promise<Array<{ id: string; name: string; value: unknown }>> {
@@ -218,6 +225,65 @@ export class DeviceDO extends DurableObject<Env> {
 
   async flushNow(): Promise<FlushResult> {
     return this.runFlush();
+  }
+
+  // ---- HTTP entry: device WebSocket upgrade ---------------------------------
+  // The worker forwards GET /v1/devices/ws to us after Bearer-token auth.
+  // We accept the upgrade as a hibernated WS so an always-connected device
+  // costs ~zero compute when idle.
+  override async fetch(request: Request): Promise<Response> {
+    const upgrade = request.headers.get('upgrade');
+    if (upgrade !== 'websocket') {
+      return new Response('expected websocket', { status: 426 });
+    }
+    const pair = new WebSocketPair();
+    const client = pair[0] as WebSocket;
+    const server = pair[1] as WebSocket;
+    this.ctx.acceptWebSocket(server);
+
+    // Flush any pending (undelivered) commands on connect so a device that
+    // missed messages while offline catches up immediately. The device will
+    // ack them via `{type:'ack', ids:[...]}` once processed.
+    const pending = this.sql
+      .exec<{ id: string; name: string; value: string }>(
+        `SELECT id, name, value FROM pending_commands
+          WHERE delivered_at IS NULL
+          ORDER BY created_at ASC`
+      )
+      .toArray();
+    for (const cmd of pending) {
+      try {
+        server.send(JSON.stringify({
+          type: 'command',
+          id: cmd.id,
+          name: cmd.name,
+          value: safeParse(cmd.value),
+        }));
+      } catch { /* ignore */ }
+    }
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  // ---- WebSocket hibernation handlers ----------------------------------------
+  override async webSocketMessage(_ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    try {
+      const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+      const msg = JSON.parse(raw) as { type?: string; ids?: unknown };
+      if (msg.type === 'ack' && Array.isArray(msg.ids)) {
+        const ids = msg.ids.filter((x): x is string => typeof x === 'string');
+        if (ids.length > 0) await this.ackCommands(ids);
+      }
+    } catch { /* malformed frame — drop */ }
+  }
+
+  override async webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): Promise<void> {
+    // No per-connection state to clean up — commands stay in pending_commands
+    // and flush on the next connect.
+  }
+
+  override async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
+    // Same as close: nothing to do.
   }
 
   // ---- RPC: destroy ----------------------------------------------------------
