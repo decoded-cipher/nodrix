@@ -16,9 +16,20 @@ devices.use('*', resolveProject);
 devices.get('/', async (c) => {
   const project = c.get('project');
   const rows = await c.env.DB
-    .prepare(`SELECT id, name, created_at, last_seen FROM devices WHERE project_id = ? ORDER BY created_at ASC`)
+    .prepare(
+      `SELECT id, name, description, created_at, updated_at, last_seen, archived_at
+         FROM devices WHERE project_id = ? ORDER BY created_at ASC`
+    )
     .bind(project.id)
-    .all<{ id: string; name: string; created_at: number; last_seen: number | null }>();
+    .all<{
+      id: string;
+      name: string;
+      description: string | null;
+      created_at: number;
+      updated_at: number;
+      last_seen: number | null;
+      archived_at: number | null;
+    }>();
   return c.json({ devices: rows.results });
 });
 
@@ -30,6 +41,7 @@ devices.post('/', async (c) => {
   if (!name) return c.json({ error: 'bad_request', reason: 'missing_name' }, 400);
 
   const project = c.get('project');
+  const user = c.get('user');
   const deviceId = newId('device');
   const tokenId = newId('token');
   const token = newToken();
@@ -38,16 +50,20 @@ devices.post('/', async (c) => {
 
   await c.env.DB.batch([
     c.env.DB
-      .prepare(`INSERT INTO devices (id, project_id, name, created_at) VALUES (?, ?, ?, ?)`)
-      .bind(deviceId, project.id, name, now),
+      .prepare(
+        `INSERT INTO devices (id, project_id, name, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .bind(deviceId, project.id, name, user.id, now, now),
     c.env.DB
       .prepare(
-        `INSERT INTO device_tokens (id, device_id, hash, created_at) VALUES (?, ?, ?, ?)`
+        `INSERT INTO device_tokens (id, device_id, hash, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?)`
       )
-      .bind(tokenId, deviceId, hash, now),
+      .bind(tokenId, deviceId, hash, user.id, now),
   ]);
 
-  return c.json({ id: deviceId, name, created_at: now, token }, 201);
+  return c.json({ id: deviceId, name, created_at: now, updated_at: now, token }, 201);
 });
 
 // DELETE /v1/admin/projects/:proj/devices/:id

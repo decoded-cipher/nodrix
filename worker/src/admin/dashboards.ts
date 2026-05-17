@@ -17,11 +17,22 @@ dashboards.get('/', async (c) => {
   const project = c.get('project');
   const rows = await c.env.DB
     .prepare(
-      `SELECT id, name, created_at, updated_at FROM dashboards
+      `SELECT id, name, description, visibility, share_token,
+              created_at, updated_at, archived_at
+         FROM dashboards
         WHERE project_id = ? ORDER BY created_at ASC`
     )
     .bind(project.id)
-    .all<{ id: string; name: string; created_at: number; updated_at: number }>();
+    .all<{
+      id: string;
+      name: string;
+      description: string | null;
+      visibility: 'private' | 'public';
+      share_token: string | null;
+      created_at: number;
+      updated_at: number;
+      archived_at: number | null;
+    }>();
   return c.json({ dashboards: rows.results });
 });
 
@@ -31,11 +42,23 @@ dashboards.get('/:id', async (c) => {
   const id = c.req.param('id');
   const row = await c.env.DB
     .prepare(
-      `SELECT id, name, layout, created_at, updated_at FROM dashboards
+      `SELECT id, name, description, layout, visibility, share_token,
+              created_at, updated_at, archived_at
+         FROM dashboards
         WHERE id = ? AND project_id = ?`
     )
     .bind(id, project.id)
-    .first<{ id: string; name: string; layout: string; created_at: number; updated_at: number }>();
+    .first<{
+      id: string;
+      name: string;
+      description: string | null;
+      layout: string;
+      visibility: 'private' | 'public';
+      share_token: string | null;
+      created_at: number;
+      updated_at: number;
+      archived_at: number | null;
+    }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   return c.json({ ...row, layout: JSON.parse(row.layout) });
 });
@@ -55,17 +78,21 @@ dashboards.post('/', async (c) => {
   if (crossProject) return c.json({ error: 'bad_request', reason: 'cross_project_device' }, 400);
 
   const id = newId('dashboard');
+  const user = c.get('user');
   const now = Math.floor(Date.now() / 1000);
 
   await c.env.DB
     .prepare(
-      `INSERT INTO dashboards (id, project_id, name, layout, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO dashboards (id, project_id, name, layout, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, project.id, name, JSON.stringify(v.value), now, now)
+    .bind(id, project.id, name, JSON.stringify(v.value), user.id, now, now)
     .run();
 
-  return c.json({ id, name, layout: v.value, created_at: now, updated_at: now }, 201);
+  return c.json(
+    { id, name, layout: v.value, visibility: 'private', created_at: now, updated_at: now },
+    201
+  );
 });
 
 // PUT /v1/admin/projects/:proj/dashboards/:id  body: { name?, layout?, if_updated_at? }

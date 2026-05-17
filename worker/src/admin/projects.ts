@@ -14,14 +14,24 @@ projects.get('/', async (c) => {
   const user = c.get('user');
   const rows = await c.env.DB
     .prepare(
-      `SELECT p.id, p.name, p.created_at
+      `SELECT p.id, p.name, p.description, p.icon, p.color,
+              p.created_at, p.updated_at, p.archived_at
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id
         WHERE pm.user_id = ?
         ORDER BY p.created_at ASC`
     )
     .bind(user.id)
-    .all<{ id: string; name: string; created_at: number }>();
+    .all<{
+      id: string;
+      name: string;
+      description: string | null;
+      icon: string | null;
+      color: string | null;
+      created_at: number;
+      updated_at: number;
+      archived_at: number | null;
+    }>();
   return c.json({ projects: rows.results });
 });
 
@@ -36,16 +46,20 @@ projects.post('/', async (c) => {
 
   await c.env.DB.batch([
     c.env.DB
-      .prepare(`INSERT INTO projects (id, name, created_at) VALUES (?, ?, ?)`)
-      .bind(id, name, now),
+      .prepare(
+        `INSERT INTO projects (id, name, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .bind(id, name, user.id, now, now),
     c.env.DB
       .prepare(
-        `INSERT INTO project_members (user_id, project_id, role) VALUES (?, ?, 'owner')`
+        `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
+         VALUES (?, ?, 'owner', ?, ?)`
       )
-      .bind(user.id, id),
+      .bind(user.id, id, now, user.id),
   ]);
 
-  return c.json({ id, name, created_at: now }, 201);
+  return c.json({ id, name, created_at: now, updated_at: now }, 201);
 });
 
 // Cascade: destroys every Device DO (with R2 telemetry history) and Dashboard

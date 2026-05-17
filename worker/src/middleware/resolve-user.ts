@@ -20,5 +20,17 @@ export const resolveUser = createMiddleware<{
     .first<{ id: string; email: string; role: 'owner' | 'admin' | 'viewer' }>();
   if (!row) return c.json({ error: 'forbidden', reason: 'no_account_for_email' }, 403);
   c.set('user', row);
+
+  // Best-effort heartbeat — don't gate the request on the write.
+  const now = Math.floor(Date.now() / 1000);
+  c.executionCtx.waitUntil(
+    c.env.DB
+      .prepare(`UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?`)
+      .bind(now, now, row.id)
+      .run()
+      .then(() => undefined)
+      .catch(() => undefined)
+  );
+
   await next();
 });

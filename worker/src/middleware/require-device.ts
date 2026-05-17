@@ -25,16 +25,28 @@ export const requireDevice = createMiddleware<{
 
   const hash = await sha256Hex(token);
   const row = await c.env.DB.prepare(
-    `SELECT d.id AS device_id, d.project_id
+    `SELECT t.id AS token_id, d.id AS device_id, d.project_id
        FROM device_tokens t
        JOIN devices d ON d.id = t.device_id
       WHERE t.hash = ? AND t.revoked_at IS NULL`
   )
     .bind(hash)
-    .first<{ device_id: string; project_id: string }>();
+    .first<{ token_id: string; device_id: string; project_id: string }>();
 
   if (!row) return c.json({ error: 'unauthorized' }, 401);
 
   c.set('device', { id: row.device_id, project_id: row.project_id });
+
+  // Best-effort token heartbeat — don't gate the response.
+  const now = Math.floor(Date.now() / 1000);
+  c.executionCtx.waitUntil(
+    c.env.DB
+      .prepare(`UPDATE device_tokens SET last_used_at = ? WHERE id = ?`)
+      .bind(now, row.token_id)
+      .run()
+      .then(() => undefined)
+      .catch(() => undefined)
+  );
+
   await next();
 });

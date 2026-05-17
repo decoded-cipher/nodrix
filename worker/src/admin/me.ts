@@ -32,20 +32,42 @@ me.get('/', async (c) => {
   }
 
   const user = await c.env.DB
-    .prepare('SELECT id, email, role FROM users WHERE email = ?')
+    .prepare(
+      `SELECT id, email, role, display_name, avatar_url, last_login_at, created_at, updated_at
+         FROM users WHERE email = ?`
+    )
     .bind(access.email)
-    .first<{ id: string; email: string; role: string }>();
+    .first<{
+      id: string;
+      email: string;
+      role: string;
+      display_name: string | null;
+      avatar_url: string | null;
+      last_login_at: number | null;
+      created_at: number;
+      updated_at: number;
+    }>();
 
   const projects = await c.env.DB
     .prepare(
-      `SELECT p.id, p.name, p.created_at
-       FROM projects p
-       JOIN project_members pm ON pm.project_id = p.id
-       WHERE pm.user_id = ?
-       ORDER BY p.created_at ASC`
+      `SELECT p.id, p.name, p.description, p.icon, p.color,
+              p.created_at, p.updated_at, p.archived_at
+         FROM projects p
+         JOIN project_members pm ON pm.project_id = p.id
+        WHERE pm.user_id = ?
+        ORDER BY p.created_at ASC`
     )
     .bind(user!.id)
-    .all<{ id: string; name: string; created_at: number }>();
+    .all<{
+      id: string;
+      name: string;
+      description: string | null;
+      icon: string | null;
+      color: string | null;
+      created_at: number;
+      updated_at: number;
+      archived_at: number | null;
+    }>();
 
   return c.json({
     user,
@@ -61,19 +83,22 @@ async function seedOwner(db: Env['DB'], email: string): Promise<void> {
   await db.batch([
     db
       .prepare(
-        'INSERT INTO users (id, email, role, created_at) VALUES (?, ?, ?, ?)'
+        `INSERT INTO users (id, email, role, created_at, updated_at, last_login_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .bind(userId, email, 'owner', now),
+      .bind(userId, email, 'owner', now, now, now),
     db
       .prepare(
-        'INSERT INTO projects (id, name, created_at) VALUES (?, ?, ?)'
+        `INSERT INTO projects (id, name, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)`
       )
-      .bind(projectId, 'Default', now),
+      .bind(projectId, 'Default', userId, now, now),
     db
       .prepare(
-        'INSERT INTO project_members (user_id, project_id, role) VALUES (?, ?, ?)'
+        `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
+         VALUES (?, ?, ?, ?, ?)`
       )
-      .bind(userId, projectId, 'owner'),
+      .bind(userId, projectId, 'owner', now, userId),
   ]);
 }
 
