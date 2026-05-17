@@ -1,11 +1,17 @@
 name = "nodrix"
-main = "src/index.ts"
+main = "worker/src/index.ts"
 compatibility_date = "2025-05-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Build the Vue SPA before wrangler deploys, so ASSETS has content.
+# Cloudflare Workers Builds + the Deploy button run `npx wrangler deploy` at
+# the repo root; this build step makes that one command sufficient.
+[build]
+command = "bun install && bun run --filter @nodrix/web build"
+
 # Vue SPA built by `web/` workspace is served as static assets.
 [assets]
-directory = "../web/dist"
+directory = "web/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
@@ -15,7 +21,7 @@ not_found_handling = "single-page-application"
 binding = "DB"
 database_name = "nodrix"
 database_id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
-migrations_dir = "src/db/migrations"
+migrations_dir = "worker/src/db/migrations"
 
 # R2 — cold telemetry history, NDJSON partitioned by device + hour.
 [[r2_buckets]]
