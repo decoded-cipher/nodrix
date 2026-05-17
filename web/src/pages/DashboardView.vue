@@ -28,8 +28,12 @@ const idx = shallowRef<DataIndex | null>(null);
 let ws: DashboardWs | null = null;
 
 onMounted(async () => {
+  const projId = route.params['proj'] as string;
   const dashId = route.params['dash'] as string;
   try {
+    // Child components mount before parent's onMounted in Vue 3, so
+    // ProjectShell may not have set currentProjectId yet on a fresh load.
+    await project.switchTo(projId);
     dashboard.value = await project.fetchDashboard(dashId);
     mountGrid(dashboard.value.layout);
   } catch (e) {

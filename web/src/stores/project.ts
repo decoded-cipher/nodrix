@@ -17,6 +17,9 @@ export const useProjectStore = defineStore('project', () => {
   const tokens = ref<UserToken[]>([]);
 
   async function switchTo(projectId: string): Promise<void> {
+    if (currentProjectId.value === projectId && devices.value.length + dashboards.value.length > 0) {
+      return;
+    }
     currentProjectId.value = projectId;
     await Promise.all([loadDevices(), loadDashboards()]);
   }

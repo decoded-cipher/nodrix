@@ -51,8 +51,12 @@ const gridItems = computed({
 const selected = computed(() => layout.value.items.find((it) => it.id === selectedId.value) ?? null);
 
 onMounted(async () => {
+  const projId = route.params['proj'] as string;
   const dashId = route.params['dash'] as string;
   try {
+    // Child mounts before parent's onMounted in Vue 3 — make sure the
+    // project context exists before any project-scoped fetch.
+    await project.switchTo(projId);
     dashboard.value = await project.fetchDashboard(dashId);
     layout.value = dashboard.value.layout;
     dirty.value = false;
