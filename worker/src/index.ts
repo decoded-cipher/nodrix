@@ -33,15 +33,21 @@ app.get('/v1/version', (c) => c.json({ name: 'nodrix', version: '0.0.0' }));
 // Better Auth: signup/login/logout/OAuth callbacks. Public — no session gate.
 // Runs migrations on first call so a fresh deploy can bootstrap directly into
 // signup without a separate provisioning step.
-app.on(['GET', 'POST'], '/v1/auth/*', async (c) => {
+// NOTE: `/v1/auth/*` was unreliable in Hono's RegExpRouter — multi-segment
+// callback paths like /v1/auth/callback/google fell through to the SPA
+// fallback. The explicit named-param + regex catches everything under /v1/auth/.
+app.all('/v1/auth/:rest{.+}', async (c) => {
   if (!(await isBootstrapped(c.env.DB))) {
     await runMigrations(c.env.DB);
   }
   const auth = await buildAuth(c.env, c.req.raw);
 
+  const url = new URL(c.req.url);
+  const path = url.pathname;
+  console.log(`[auth] ${c.req.method} ${path}${url.search}`);
+
   // Capture the user BEFORE sign-out invalidates the session, so we can
   // emit a user.logout audit entry with the right user_id.
-  const path = new URL(c.req.url).pathname;
   const isSignOut = path.endsWith('/sign-out');
   let logoutUserId: string | null = null;
   let logoutSessionId: string | null = null;
@@ -55,7 +61,29 @@ app.on(['GET', 'POST'], '/v1/auth/*', async (c) => {
     } catch { /* no session — nothing to log */ }
   }
 
-  const res = await auth.handler(c.req.raw);
+  let res: Response;
+  try {
+    res = await auth.handler(c.req.raw);
+  } catch (e) {
+    const err = e as Error;
+    console.error(`[auth] handler threw on ${path}: ${err.message}\n${err.stack ?? ''}`);
+    return c.json({
+      error: 'auth_handler_threw',
+      message: err.message,
+      stack: err.stack,
+    }, 500);
+  }
+
+  console.log(`[auth] ${c.req.method} ${path} -> ${res.status}`);
+  if (res.status >= 400 && res.status < 600) {
+    // Body is consumed once — clone to log without breaking the response.
+    try {
+      const body = await res.clone().text();
+      console.error(`[auth] error body: ${body.slice(0, 500)}`);
+    } catch { /* ignore */ }
+  }
+  const loc = res.headers.get('location');
+  if (loc) console.log(`[auth] redirect -> ${loc}`);
 
   if (logoutUserId && res.status < 400) {
     c.executionCtx.waitUntil(
