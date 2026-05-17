@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed, h, type FunctionalComponent } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
 import ProjectSwitcher from './ProjectSwitcher.vue';
 
 const session = useSessionStore();
 const ui = useUiStore();
+const router = useRouter();
+
+async function signOut() {
+  await session.signOut();
+  router.replace('/login');
+}
 
 const projId = computed(() => ui.currentProject?.id ?? '');
 const hasProject = computed(() => projId.value !== '');
@@ -191,17 +197,51 @@ const initials = computed(() => {
       </ul>
     </nav>
 
-    <!-- Footer: user + collapse toggle -->
+    <!-- Footer: user + sign out + collapse toggle -->
     <div class="border-t border-neutral-200 p-3">
       <div v-if="!ui.sidebarCollapsed" class="mb-2 flex items-center gap-2 px-1">
-        <div class="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
+        <div class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
           {{ initials }}
         </div>
         <div class="min-w-0 flex-1">
           <div class="truncate text-xs font-medium">{{ displayName }}</div>
           <div class="text-[10px] uppercase tracking-wide text-neutral-500">{{ session.user?.role ?? '' }}</div>
         </div>
+        <button
+          type="button"
+          class="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          title="Sign out"
+          aria-label="Sign out"
+          @click="signOut"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+        </button>
       </div>
+
+      <!-- Collapsed state: stacked icon buttons -->
+      <div v-else class="mb-2 flex flex-col items-center gap-1">
+        <button
+          type="button"
+          class="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 hover:ring-2 hover:ring-orange-200"
+          title="Sign out"
+          aria-label="Sign out"
+          @click="signOut"
+        >{{ initials }}</button>
+        <button
+          type="button"
+          class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          title="Sign out"
+          aria-label="Sign out"
+          @click="signOut"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+        </button>
+      </div>
+
       <button
         type="button"
         class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
