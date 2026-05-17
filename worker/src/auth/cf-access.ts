@@ -16,7 +16,11 @@ export async function verifyAccessJwt(
   env: Env
 ): Promise<AccessClaims | null> {
   if (!env.CF_ACCESS_TEAM_DOMAIN) {
-    const dev = request.headers.get('x-dev-email');
+    // Header is the primary path; the query-string fallback exists because
+    // browsers can't set custom headers on WebSocket upgrades.
+    const dev =
+      request.headers.get('x-dev-email') ??
+      new URL(request.url).searchParams.get('dev_email');
     if (dev) return { email: dev, sub: `dev:${dev}` };
     return null;
   }
