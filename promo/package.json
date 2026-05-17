@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler pages deploy dist --project-name nodrix-promo",
+    "deploy": "astro build && wrangler pages deploy dist --project-name nodrix",
     "typecheck": "astro check"
   },
   "dependencies": {
