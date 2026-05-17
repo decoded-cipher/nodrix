@@ -4,8 +4,8 @@ export type User = {
   id: string;
   email: string;
   role: 'owner' | 'admin' | 'viewer';
-  display_name?: string | null;
-  avatar_url?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   last_login_at?: number | null;
   created_at?: number;
   updated_at?: number;

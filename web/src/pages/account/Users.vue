@@ -9,29 +9,36 @@ onMounted(() => {
 });
 
 const editing = ref(false);
-const form = ref({ display_name: '', avatar_url: '' });
+const form = ref({ first_name: '', last_name: '' });
 const saving = ref(false);
 const saveError = ref<string | null>(null);
-const previewBroken = ref(false);
 
 watch(
   () => session.user,
   (u) => {
     if (!u) return;
-    form.value.display_name = u.display_name ?? '';
-    form.value.avatar_url = u.avatar_url ?? '';
+    form.value.first_name = u.first_name ?? '';
+    form.value.last_name = u.last_name ?? '';
   },
   { immediate: true }
 );
 
+const displayName = computed(() => {
+  const u = session.user;
+  if (!u) return '';
+  const parts = [u.first_name, u.last_name].filter((s): s is string => !!s && !!s.trim());
+  return parts.length > 0 ? parts.join(' ') : u.email;
+});
+
 const initials = computed(() => {
-  const base = session.user?.display_name || session.user?.email || '';
-  if (session.user?.display_name) {
-    const parts = base.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-    return (parts[0]!.charAt(0) + parts[parts.length - 1]!.charAt(0)).toUpperCase();
-  }
-  return (base.split('@')[0] ?? '').slice(0, 2).toUpperCase();
+  const u = session.user;
+  if (!u) return '?';
+  const f = (u.first_name ?? '').trim();
+  const l = (u.last_name ?? '').trim();
+  if (f && l) return (f.charAt(0) + l.charAt(0)).toUpperCase();
+  if (f) return f.slice(0, 2).toUpperCase();
+  const local = u.email.split('@')[0] ?? '';
+  return local.slice(0, 2).toUpperCase();
 });
 
 function fmt(ts: number | null | undefined): string {
@@ -40,10 +47,9 @@ function fmt(ts: number | null | undefined): string {
 
 function startEdit() {
   if (!session.user) return;
-  form.value.display_name = session.user.display_name ?? '';
-  form.value.avatar_url = session.user.avatar_url ?? '';
+  form.value.first_name = session.user.first_name ?? '';
+  form.value.last_name = session.user.last_name ?? '';
   saveError.value = null;
-  previewBroken.value = false;
   editing.value = true;
 }
 
@@ -57,8 +63,8 @@ async function save() {
   saveError.value = null;
   try {
     await session.updateMe({
-      display_name: form.value.display_name.trim() || null,
-      avatar_url: form.value.avatar_url.trim() || null,
+      first_name: form.value.first_name.trim() || null,
+      last_name: form.value.last_name.trim() || null,
     });
     editing.value = false;
   } catch (e) {
@@ -83,22 +89,13 @@ async function save() {
       <!-- Display row -->
       <div v-if="session.user && !editing" class="flex items-center justify-between px-4 py-4">
         <div class="flex min-w-0 items-center gap-3">
-          <img
-            v-if="session.user.avatar_url"
-            :src="session.user.avatar_url"
-            :alt="session.user.email"
-            class="h-10 w-10 shrink-0 rounded-full object-cover"
-          />
-          <div
-            v-else
-            class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700"
-          >{{ initials }}</div>
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
+            {{ initials }}
+          </div>
 
           <div class="min-w-0">
-            <div class="truncate text-sm font-medium">
-              {{ session.user.display_name || session.user.email }}
-            </div>
-            <div v-if="session.user.display_name" class="truncate text-xs text-neutral-500">
+            <div class="truncate text-sm font-medium">{{ displayName }}</div>
+            <div v-if="displayName !== session.user.email" class="truncate text-xs text-neutral-500">
               {{ session.user.email }}
             </div>
             <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500">
@@ -121,18 +118,9 @@ async function save() {
       <!-- Edit form -->
       <form v-else-if="session.user" class="space-y-3 px-4 py-4" @submit.prevent="save">
         <div class="flex items-center gap-3">
-          <img
-            v-if="form.avatar_url && !previewBroken"
-            :src="form.avatar_url"
-            alt="Avatar preview"
-            class="h-10 w-10 rounded-full object-cover"
-            @error="previewBroken = true"
-            @load="previewBroken = false"
-          />
-          <div
-            v-else
-            class="grid h-10 w-10 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700"
-          >{{ initials }}</div>
+          <div class="grid h-10 w-10 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
+            {{ initials }}
+          </div>
           <div class="min-w-0">
             <div class="text-xs text-neutral-500">{{ session.user.email }}</div>
             <div class="mt-0.5 text-[11px] uppercase tracking-wide text-neutral-500">
@@ -141,30 +129,28 @@ async function save() {
           </div>
         </div>
 
-        <label class="block">
-          <span class="block text-xs font-medium text-neutral-600">Display name</span>
-          <input
-            v-model="form.display_name"
-            type="text"
-            maxlength="80"
-            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            placeholder="How your name appears in the app"
-          />
-        </label>
-
-        <label class="block">
-          <span class="block text-xs font-medium text-neutral-600">Avatar URL</span>
-          <input
-            v-model="form.avatar_url"
-            type="url"
-            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs"
-            placeholder="https://…"
-            @input="previewBroken = false"
-          />
-          <span v-if="form.avatar_url && previewBroken" class="mt-1 block text-[11px] text-amber-700">
-            Couldn't load that image. Save will still work — the avatar will fall back to your initials.
-          </span>
-        </label>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600">First name</span>
+            <input
+              v-model="form.first_name"
+              type="text"
+              maxlength="80"
+              class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              placeholder="First"
+            />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600">Last name</span>
+            <input
+              v-model="form.last_name"
+              type="text"
+              maxlength="80"
+              class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              placeholder="Last"
+            />
+          </label>
+        </div>
 
         <p v-if="saveError" class="text-xs text-red-600">{{ saveError }}</p>
 

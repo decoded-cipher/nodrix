@@ -73,11 +73,24 @@ function iconFor(name: IconName): FunctionalComponent {
     );
 }
 
-function initials(email?: string | null): string {
-  if (!email) return '?';
-  const local = email.split('@')[0] ?? '';
+const displayName = computed(() => {
+  const u = session.user;
+  if (!u) return '...';
+  const parts = [u.first_name, u.last_name].filter((s): s is string => !!s && !!s.trim());
+  if (parts.length > 0) return parts.join(' ');
+  return u.email;
+});
+
+const initials = computed(() => {
+  const u = session.user;
+  if (!u) return '?';
+  const f = (u.first_name ?? '').trim();
+  const l = (u.last_name ?? '').trim();
+  if (f && l) return (f.charAt(0) + l.charAt(0)).toUpperCase();
+  if (f) return f.slice(0, 2).toUpperCase();
+  const local = u.email.split('@')[0] ?? '';
   return local.slice(0, 2).toUpperCase();
-}
+});
 </script>
 
 <template>
@@ -182,10 +195,10 @@ function initials(email?: string | null): string {
     <div class="border-t border-neutral-200 p-3">
       <div v-if="!ui.sidebarCollapsed" class="mb-2 flex items-center gap-2 px-1">
         <div class="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
-          {{ initials(session.user?.email) }}
+          {{ initials }}
         </div>
         <div class="min-w-0 flex-1">
-          <div class="truncate text-xs font-medium">{{ session.user?.email ?? '...' }}</div>
+          <div class="truncate text-xs font-medium">{{ displayName }}</div>
           <div class="text-[10px] uppercase tracking-wide text-neutral-500">{{ session.user?.role ?? '' }}</div>
         </div>
       </div>

@@ -11,8 +11,8 @@ const STATEMENTS = [
     id            TEXT PRIMARY KEY,
     email         TEXT NOT NULL UNIQUE,
     role          TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),
-    display_name  TEXT,
-    avatar_url    TEXT,
+    first_name    TEXT,
+    last_name     TEXT,
     last_login_at INTEGER,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL

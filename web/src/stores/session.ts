@@ -52,8 +52,8 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function updateMe(patch: {
-    display_name?: string | null;
-    avatar_url?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
   }): Promise<void> {
     const updated = await api.patch<User>('/v1/admin/me', patch);
     user.value = updated;

@@ -21,6 +21,13 @@ const greeting = computed(() => {
   return 'Good evening';
 });
 
+const greetingName = computed(() => {
+  const u = session.user;
+  if (!u) return null;
+  if (u.first_name && u.first_name.trim()) return u.first_name.trim();
+  return 'there';
+});
+
 const stats = computed(() => [
   {
     label: 'Projects',
@@ -70,7 +77,7 @@ const colorClasses: Record<string, string> = {
   <div class="mx-auto max-w-6xl px-6 py-8">
     <header class="mb-8">
       <h1 class="text-2xl font-semibold tracking-tight">
-        {{ greeting }}{{ session.user ? `, ${session.user.email.split('@')[0]}` : '' }}
+        {{ greeting }}{{ greetingName ? `, ${greetingName}` : '' }}
       </h1>
       <p class="mt-1 text-sm text-neutral-600">
         Here's what's happening in

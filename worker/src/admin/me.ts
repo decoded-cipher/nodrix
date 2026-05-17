@@ -34,7 +34,7 @@ me.get('/', async (c) => {
 
   const user = await c.env.DB
     .prepare(
-      `SELECT id, email, role, display_name, avatar_url, last_login_at, created_at, updated_at
+      `SELECT id, email, role, first_name, last_name, last_login_at, created_at, updated_at
          FROM users WHERE email = ?`
     )
     .bind(access.email)
@@ -42,8 +42,8 @@ me.get('/', async (c) => {
       id: string;
       email: string;
       role: string;
-      display_name: string | null;
-      avatar_url: string | null;
+      first_name: string | null;
+      last_name: string | null;
       last_login_at: number | null;
       created_at: number;
       updated_at: number;
@@ -76,14 +76,14 @@ me.get('/', async (c) => {
   });
 });
 
-// PATCH /v1/admin/me  body: { display_name?, avatar_url? }
+// PATCH /v1/admin/me  body: { first_name?, last_name? }
 // Self-service profile edit. Email/role are not editable here — email comes
 // from CF Access, role changes need RBAC (not built yet).
 me.patch('/', async (c) => {
   const access = c.get('access');
   const body = await c.req.json<{
-    display_name?: string | null;
-    avatar_url?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
   }>();
 
   const existing = await c.env.DB
@@ -94,13 +94,13 @@ me.patch('/', async (c) => {
 
   const sets: string[] = [];
   const vals: unknown[] = [];
-  if ('display_name' in body) {
-    const v = typeof body.display_name === 'string' ? body.display_name.trim() : null;
-    sets.push('display_name = ?'); vals.push(v && v.length > 0 ? v : null);
+  if ('first_name' in body) {
+    const v = typeof body.first_name === 'string' ? body.first_name.trim() : null;
+    sets.push('first_name = ?'); vals.push(v && v.length > 0 ? v : null);
   }
-  if ('avatar_url' in body) {
-    const v = typeof body.avatar_url === 'string' ? body.avatar_url.trim() : null;
-    sets.push('avatar_url = ?'); vals.push(v && v.length > 0 ? v : null);
+  if ('last_name' in body) {
+    const v = typeof body.last_name === 'string' ? body.last_name.trim() : null;
+    sets.push('last_name = ?'); vals.push(v && v.length > 0 ? v : null);
   }
   if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
 
@@ -126,7 +126,7 @@ me.patch('/', async (c) => {
 
   const updated = await c.env.DB
     .prepare(
-      `SELECT id, email, role, display_name, avatar_url, last_login_at, created_at, updated_at
+      `SELECT id, email, role, first_name, last_name, last_login_at, created_at, updated_at
          FROM users WHERE id = ?`
     )
     .bind(existing.id)
