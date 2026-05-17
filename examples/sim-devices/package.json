@@ -1,0 +1,12 @@
+{
+  "name": "nodrix-sim-devices",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env simulate.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7"
+  }
+}
