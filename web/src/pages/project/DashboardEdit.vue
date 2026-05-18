@@ -263,29 +263,21 @@ function exitToView() {
     <WidgetPalette @add="addWidget" />
 
     <div class="relative flex flex-1 flex-col">
-      <header class="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-3">
-        <div>
-          <h2 class="text-lg font-semibold tracking-tight">{{ dashboard?.name ?? 'Loading...' }}</h2>
-          <p class="text-xs text-neutral-500">
-            {{ dirty ? 'Unsaved changes' : 'Up to date' }}
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
-            @click="exitToView"
-          >Done</button>
-          <button
-            class="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-            :disabled="!dirty || saving"
-            @click="save"
-          >{{ saving ? 'Saving...' : 'Save' }}</button>
-        </div>
-      </header>
+      <Teleport to="#topbar-actions" defer>
+        <button
+          class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+          @click="exitToView"
+        >Done</button>
+        <button
+          class="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+          :disabled="!dirty || saving"
+          @click="save"
+        >{{ saving ? 'Saving...' : 'Save' }}</button>
+      </Teleport>
 
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700">{{ err }}</div>
 
-      <div class="canvas-dots flex-1 overflow-auto p-6">
+      <div class="canvas-dots flex-1 overflow-auto p-6 select-none">
         <GridLayout
           :layout="gridItems"
           :col-num="layout.grid.columns"
@@ -294,7 +286,6 @@ function exitToView() {
           :is-resizable="true"
           :margin="[12, 12]"
           :use-css-transforms="true"
-          class="rounded-md bg-white/80 p-2 shadow-sm ring-1 ring-neutral-200 backdrop-blur-sm"
           @layout-updated="onGridLayoutUpdated"
         >
           <GridItem

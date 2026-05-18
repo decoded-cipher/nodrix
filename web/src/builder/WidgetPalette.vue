@@ -35,30 +35,30 @@ function hideTip() {
 </script>
 
 <template>
-  <aside class="w-80 shrink-0 border-r border-neutral-200 bg-white">
-    <div class="border-b border-neutral-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+  <aside class="w-56 shrink-0 border-r border-neutral-200 bg-white">
+    <div class="border-b border-neutral-200 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
       Widgets
     </div>
 
-    <div class="space-y-4 p-3">
+    <div class="space-y-3 p-2">
       <section v-for="g in groups" :key="g.category">
-        <div class="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+        <div class="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
           {{ g.category }}
         </div>
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-3 gap-1.5">
           <button
             v-for="w in g.items"
             :key="w.type"
             type="button"
-            class="group flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-700 transition hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"
+            class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"
             @click="$emit('add', w.type)"
             @mouseenter="showTip(w, $event)"
             @mouseleave="hideTip"
             @focus="showTip(w, $event)"
             @blur="hideTip"
           >
-            <span class="h-7 w-7" v-html="w.icon"></span>
-            <span class="text-xs font-medium">{{ w.label }}</span>
+            <span class="h-5 w-5" v-html="w.icon"></span>
+            <span class="text-[10px] font-medium leading-none">{{ w.label }}</span>
           </button>
         </div>
       </section>

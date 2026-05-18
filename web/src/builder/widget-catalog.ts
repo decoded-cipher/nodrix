@@ -32,11 +32,12 @@ export type WidgetSpec = {
 export const CATEGORY_ORDER: ReadonlyArray<WidgetCategory> = ['Monitor', 'Control'];
 
 // Inline SVG glyphs (stroke=currentColor) used in the palette grid + tooltip
-// header. Keep them ~24x24 with no fill so they tint with text-color.
-const ICON_VALUE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"/><path d="M9 7v12"/><path d="M5 13h7"/></svg>`;
-const ICON_GAUGE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17a9 9 0 1 1 17 0"/><path d="M12 17l4-5"/><circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none"/></svg>`;
-const ICON_CHART = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>`;
-const ICON_TOGGLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="16" cy="12" r="3" fill="currentColor" stroke="none"/></svg>`;
+// header. Lucide-style outlines, 24x24, ~1.75 stroke so they read well at
+// small sizes.
+const ICON_VALUE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9.5h4"/><path d="M7 14.5h10" stroke-width="2.5"/></svg>`;
+const ICON_GAUGE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17a9 9 0 0 1 18 0"/><path d="M12 17l4.5-4.5"/><circle cx="12" cy="17" r="1.6" fill="currentColor" stroke="none"/></svg>`;
+const ICON_CHART = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 2L19 6"/><circle cx="19" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>`;
+const ICON_TOGGLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>`;
 
 export const CATALOG: ReadonlyArray<WidgetSpec> = [
   {
