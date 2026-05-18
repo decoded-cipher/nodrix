@@ -262,7 +262,7 @@ function exitToView() {
   <main class="flex h-full">
     <WidgetPalette @add="addWidget" />
 
-    <div class="flex flex-1 flex-col">
+    <div class="relative flex flex-1 flex-col">
       <header class="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-3">
         <div>
           <h2 class="text-lg font-semibold tracking-tight">{{ dashboard?.name ?? 'Loading...' }}</h2>
@@ -285,7 +285,7 @@ function exitToView() {
 
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700">{{ err }}</div>
 
-      <div class="flex-1 overflow-auto bg-neutral-100 p-6">
+      <div class="canvas-dots flex-1 overflow-auto p-6">
         <GridLayout
           :layout="gridItems"
           :col-num="layout.grid.columns"
@@ -294,7 +294,7 @@ function exitToView() {
           :is-resizable="true"
           :margin="[12, 12]"
           :use-css-transforms="true"
-          class="rounded-md bg-white p-2"
+          class="rounded-md bg-white/80 p-2 shadow-sm ring-1 ring-neutral-200 backdrop-blur-sm"
           @layout-updated="onGridLayoutUpdated"
         >
           <GridItem
@@ -318,10 +318,22 @@ function exitToView() {
           </GridItem>
         </GridLayout>
       </div>
-    </div>
 
-    <WidgetConfigPanel :item="selected" @update="updateItem" @remove="removeItem" />
+      <WidgetConfigPanel
+        :item="selected"
+        @update="updateItem"
+        @remove="removeItem"
+        @close="selectedId = null"
+      />
+    </div>
   </main>
 </template>
 
-<!-- grid-layout-plus injects its own styles on import; no explicit CSS needed. -->
+<style scoped>
+.canvas-dots {
+  background-color: #f5f5f5;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-position: 0 0;
+}
+</style>

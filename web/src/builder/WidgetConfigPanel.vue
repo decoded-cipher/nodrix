@@ -8,6 +8,7 @@ const props = defineProps<{ item: WidgetInstance | null }>();
 const emit = defineEmits<{
   update: [WidgetInstance];
   remove: [string];
+  close: [];
 }>();
 
 const project = useProjectStore();
@@ -41,24 +42,32 @@ function removeSeries(idx: number) {
 </script>
 
 <template>
-  <aside class="w-72 shrink-0 border-l border-neutral-200 bg-white overflow-y-auto">
+  <aside
+    v-if="item"
+    class="pointer-events-auto absolute right-4 top-4 bottom-4 z-30 flex w-80 flex-col rounded-lg border border-neutral-200 bg-white shadow-xl"
+  >
     <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
       <div class="text-xs font-semibold uppercase tracking-wide text-neutral-500">
         Widget config
       </div>
-      <button
-        v-if="item"
-        type="button"
-        class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-        @click="emit('remove', item.id)"
-      >Remove</button>
+      <div class="flex items-center gap-1.5">
+        <button
+          type="button"
+          class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+          @click="emit('remove', item.id)"
+        >Remove</button>
+        <button
+          type="button"
+          aria-label="Close"
+          class="rounded-md p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          @click="emit('close')"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </div>
     </div>
 
-    <div v-if="!item" class="p-6 text-sm text-neutral-500">
-      Select a widget to configure it.
-    </div>
-
-    <div v-else class="space-y-4 p-4 text-sm">
+    <div class="flex-1 space-y-4 overflow-y-auto p-4 text-sm">
       <div class="rounded bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
         {{ spec?.label }} · <span class="font-mono">{{ item.id }}</span>
       </div>
