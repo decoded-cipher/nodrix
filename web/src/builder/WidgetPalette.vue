@@ -35,7 +35,7 @@ function hideTip() {
 </script>
 
 <template>
-  <aside class="w-56 shrink-0 border-r border-neutral-200 bg-white">
+  <aside class="w-60 shrink-0 border-r border-neutral-200 bg-white">
     <div class="border-b border-neutral-200 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
       Widgets
     </div>
@@ -57,8 +57,8 @@ function hideTip() {
             @focus="showTip(w, $event)"
             @blur="hideTip"
           >
-            <span class="h-5 w-5" v-html="w.icon"></span>
-            <span class="text-[10px] font-medium leading-none">{{ w.label }}</span>
+            <span class="h-7 w-7" v-html="w.icon"></span>
+            <span class="text-[11px] font-medium leading-none">{{ w.label }}</span>
           </button>
         </div>
       </section>

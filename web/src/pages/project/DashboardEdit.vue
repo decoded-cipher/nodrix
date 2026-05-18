@@ -277,7 +277,7 @@ function exitToView() {
 
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700">{{ err }}</div>
 
-      <div class="canvas-dots flex-1 overflow-auto p-6 select-none">
+      <div class="canvas-dots flex-1 overflow-auto p-6 select-none" @click="selectedId = null">
         <GridLayout
           :layout="gridItems"
           :col-num="layout.grid.columns"
@@ -301,7 +301,7 @@ function exitToView() {
             <div
               class="relative h-full overflow-hidden rounded-md border-2"
               :class="selectedId === g.i ? 'border-orange-500' : 'border-transparent'"
-              @click="selectedId = g.i"
+              @click.stop="selectedId = g.i"
             >
               <div class="drag-handle absolute inset-x-0 top-0 z-10 h-4 cursor-move bg-neutral-200/40"></div>
               <div :data-host="g.i" class="h-full pt-4"></div>
