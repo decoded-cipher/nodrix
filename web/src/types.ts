@@ -45,7 +45,7 @@ export type UserToken = {
   expires_at?: number | null;
 };
 
-export type WidgetType = 'iot-value' | 'iot-gauge' | 'iot-chart' | 'iot-toggle';
+export type WidgetType = 'iot-value' | 'iot-gauge' | 'iot-chart' | 'iot-toggle' | 'iot-push';
 
 export type WidgetInstance = {
   id: string;

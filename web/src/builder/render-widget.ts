@@ -40,7 +40,7 @@ export function buildDataIndex(layout: Layout, els: Map<string, HTMLElement>): D
         addSub(el, device, metric);
       }
       chartKeys.set(item.id, m);
-    } else if (item.type !== 'iot-toggle') {
+    } else if (item.type !== 'iot-toggle' && item.type !== 'iot-push') {
       const device = String(item.props['device'] ?? '');
       const metric = String(item.props['metric'] ?? '');
       if (device && metric) addSub(el, device, metric);
@@ -66,6 +66,8 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
   if (typeof p['max'] === 'number') el.setAttribute('data-max', String(p['max']));
   if (typeof p['onValue'] === 'string') el.setAttribute('data-on-value', p['onValue']);
   if (typeof p['offValue'] === 'string') el.setAttribute('data-off-value', p['offValue']);
+  if (typeof p['value'] === 'string') el.setAttribute('data-value', p['value']);
+  if (typeof p['label'] === 'string') el.setAttribute('data-label', p['label']);
 
   if (item.type === 'iot-chart') {
     const series = (p['series'] as Array<Record<string, unknown>> | undefined) ?? [];

@@ -2,6 +2,7 @@ import { IotValueElement } from './iot-value';
 import { IotGaugeElement } from './iot-gauge';
 import { IotChartElement } from './iot-chart';
 import { IotToggleElement } from './iot-toggle';
+import { IotPushElement } from './iot-push';
 
 let registered = false;
 
@@ -12,4 +13,5 @@ export function registerWidgets(): void {
   if (!customElements.get('iot-gauge')) customElements.define('iot-gauge', IotGaugeElement);
   if (!customElements.get('iot-chart')) customElements.define('iot-chart', IotChartElement);
   if (!customElements.get('iot-toggle')) customElements.define('iot-toggle', IotToggleElement);
+  if (!customElements.get('iot-push')) customElements.define('iot-push', IotPushElement);
 }

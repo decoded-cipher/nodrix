@@ -38,6 +38,7 @@ const ICON_VALUE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_GAUGE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17a9 9 0 0 1 18 0"/><path d="M12 17l4.5-4.5"/><circle cx="12" cy="17" r="1.6" fill="currentColor" stroke="none"/></svg>`;
 const ICON_CHART = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 2L19 6"/><circle cx="19" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>`;
 const ICON_TOGGLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>`;
+const ICON_PUSH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg>`;
 
 export const CATALOG: ReadonlyArray<WidgetSpec> = [
   {
@@ -107,6 +108,24 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
       { key: 'command', label: 'Command name', type: 'string' },
       { key: 'onValue', label: 'On value', type: 'string' },
       { key: 'offValue', label: 'Off value', type: 'string' },
+    ],
+  },
+  {
+    type: 'iot-push',
+    label: 'Push button',
+    description: 'Fire a one-shot command.',
+    category: 'Control',
+    dataTypes: ['Momentary command'],
+    whenToUse: 'Trigger a one-shot action — restart a device, run a scene, reset a counter. No persistent state; each press sends the command once.',
+    icon: ICON_PUSH,
+    defaultSize: { w: 3, h: 2 },
+    defaultProps: { title: '', device: '', command: '', value: '', label: '' },
+    fields: [
+      { key: 'title', label: 'Title', type: 'string' },
+      { key: 'device', label: 'Device', type: 'device' },
+      { key: 'command', label: 'Command name', type: 'string' },
+      { key: 'value', label: 'Payload value', type: 'string' },
+      { key: 'label', label: 'Button label (optional)', type: 'string' },
     ],
   },
 ];
