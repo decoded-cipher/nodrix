@@ -13,26 +13,72 @@ const PALETTE = ['#ea580c', '#0ea5e9', '#10b981', '#a855f7', '#f59e0b', '#ef4444
 const TEMPLATE = `
   <style>
     :host {
+      display: block;
+      height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      container-type: size;
+      font-family: system-ui, sans-serif;
+      color: var(--color-text, #171717);
+    }
+    .card {
       display: flex;
       flex-direction: column;
       height: 100%;
-      padding: 1rem;
+      width: 100%;
       box-sizing: border-box;
+      padding: clamp(10px, 5cqmin, 18px);
       background: var(--color-bg-elevated, white);
       border: 1px solid var(--color-border, #e5e5e5);
-      border-radius: 8px;
-      font-family: system-ui, sans-serif;
+      border-radius: 10px;
+      transition: border-color 120ms ease;
+      overflow: hidden;
+      gap: clamp(4px, 2cqmin, 10px);
     }
-    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; }
-    svg { flex: 1; width: 100%; min-height: 0; }
+    .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
+    .title {
+      font-size: clamp(10px, 4cqmin, 13px);
+      color: var(--color-text-muted, #525252);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
+    }
+    .chart-area {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      position: relative;
+    }
+    svg { width: 100%; height: 100%; display: block; }
+    svg .grid-line { stroke: var(--color-border, #e5e5e5); stroke-opacity: 0.4; stroke-dasharray: 2 3; }
     svg .empty-text { fill: var(--color-text-faint, #a3a3a3); }
-    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.75rem; color: var(--color-text-muted, #525252); }
-    .swatch { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; vertical-align: middle; margin-right: 0.25rem; }
-    .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-text-faint, #a3a3a3); font-size: 0.875rem; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6em 0.9em;
+      font-size: clamp(9px, 3.5cqmin, 12px);
+      color: var(--color-text-muted, #525252);
+      flex-shrink: 0;
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.35em; }
+    .swatch {
+      width: 0.7em;
+      height: 0.7em;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
   </style>
-  <div class="title"></div>
-  <svg viewBox="0 0 400 200" preserveAspectRatio="none"></svg>
-  <div class="legend"></div>
+  <div class="card">
+    <div class="title"></div>
+    <div class="chart-area">
+      <svg viewBox="0 0 400 200" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="legend"></div>
+  </div>
 `;
 
 export class IotChartElement extends HTMLElement {
@@ -92,22 +138,29 @@ export class IotChartElement extends HTMLElement {
     const xs = (ts: number) => PAD + ((ts - minTs) / tSpan) * (W - 2 * PAD);
     const ys = (v: number) => H - PAD - ((v - minV) / vSpan) * (H - 2 * PAD);
 
+    // Horizontal grid lines (3 of them, evenly spaced).
+    for (let i = 1; i <= 3; i++) {
+      const y = PAD + (i / 4) * (H - 2 * PAD);
+      svg.innerHTML += `<line class="grid-line" x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" />`;
+    }
+
     this.#series.forEach((s, i) => {
       if (s.points.length === 0) return;
       const color = s.color ?? PALETTE[i % PALETTE.length]!;
       const d = s.points
         .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${xs(p.ts).toFixed(2)} ${ys(p.value).toFixed(2)}`)
         .join(' ');
-      svg.innerHTML += `<path d="${d}" stroke="${color}" stroke-width="1.5" fill="none" />`;
+      svg.innerHTML += `<path d="${d}" stroke="${color}" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />`;
 
+      const item = document.createElement('span');
+      item.className = 'legend-item';
       const swatch = document.createElement('span');
       swatch.className = 'swatch';
       swatch.style.background = color;
       const label = document.createElement('span');
       label.textContent = s.label ?? s.key;
-      const wrap = document.createElement('span');
-      wrap.append(swatch, label);
-      legend.appendChild(wrap);
+      item.append(swatch, label);
+      legend.appendChild(item);
     });
   }
 }

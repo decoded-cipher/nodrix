@@ -10,38 +10,78 @@
 const TEMPLATE = `
   <style>
     :host {
+      display: block;
+      height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      container-type: size;
+      font-family: system-ui, sans-serif;
+      color: var(--color-text, #171717);
+    }
+    .card {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       height: 100%;
-      padding: 1rem;
+      width: 100%;
       box-sizing: border-box;
+      padding: clamp(10px, 7cqmin, 20px);
       background: var(--color-bg-elevated, white);
       border: 1px solid var(--color-border, #e5e5e5);
-      border-radius: 8px;
-      font-family: system-ui, sans-serif;
+      border-radius: 10px;
+      transition: border-color 120ms ease;
+      overflow: hidden;
+      gap: clamp(8px, 4cqmin, 16px);
     }
-    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; }
+    .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
+    .title {
+      font-size: clamp(10px, 5cqmin, 13px);
+      color: var(--color-text-muted, #525252);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .switch {
       align-self: flex-start;
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
+      gap: 0.5em;
+      padding: clamp(6px, 3cqmin, 12px) clamp(12px, 5cqmin, 20px);
       border: 1px solid var(--color-border, #d4d4d4);
       border-radius: 9999px;
       background: var(--color-bg-elevated, white);
       color: var(--color-text, #171717);
       cursor: pointer;
-      font-size: 0.875rem;
-      font-weight: 500;
+      font-family: inherit;
+      font-size: clamp(12px, 5cqmin, 16px);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 80ms ease;
     }
-    .switch.on { background: #ea580c; color: white; border-color: #ea580c; }
-    .dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--color-text-faint, #d4d4d4); }
+    .switch:active { transform: scale(0.97); }
+    .switch.on {
+      background: #ea580c;
+      color: white;
+      border-color: #ea580c;
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.18);
+    }
+    .dot {
+      width: 0.55em;
+      height: 0.55em;
+      border-radius: 9999px;
+      background: var(--color-text-faint, #a3a3a3);
+      transition: background 140ms ease;
+    }
     .switch.on .dot { background: white; }
+    .label { text-transform: uppercase; }
   </style>
-  <div class="title"></div>
-  <button class="switch" type="button"><span class="dot"></span><span class="label">—</span></button>
+  <div class="card">
+    <div class="title"></div>
+    <button class="switch" type="button"><span class="dot"></span><span class="label">—</span></button>
+  </div>
 `;
 
 export class IotToggleElement extends HTMLElement {

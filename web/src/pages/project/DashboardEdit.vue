@@ -299,12 +299,21 @@ function exitToView() {
             drag-allow-from=".drag-handle"
           >
             <div
-              class="relative h-full overflow-hidden rounded-md border-2"
-              :class="selectedId === g.i ? 'border-orange-500' : 'border-transparent'"
+              class="widget-frame group relative h-full rounded-[12px] transition-shadow"
+              :class="selectedId === g.i ? 'is-selected' : ''"
               @click.stop="selectedId = g.i"
             >
-              <div class="drag-handle absolute inset-x-0 top-0 z-10 h-4 cursor-move bg-neutral-200/40 dark:bg-neutral-700/40"></div>
-              <div :data-host="g.i" class="h-full pt-4"></div>
+              <div :data-host="g.i" class="h-full w-full"></div>
+              <button
+                type="button"
+                class="drag-handle"
+                title="Drag to move"
+                aria-label="Drag widget"
+              >
+                <span class="drag-grip"></span>
+                <span class="drag-grip"></span>
+                <span class="drag-grip"></span>
+              </button>
             </div>
           </GridItem>
         </GridLayout>
@@ -326,5 +335,102 @@ function exitToView() {
   background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
   background-size: 16px 16px;
   background-position: 0 0;
+}
+
+/* Widget frame: a transparent wrapper that gets a soft outline on hover
+   and a stronger one when selected. The widget itself has its own border. */
+.widget-frame {
+  cursor: pointer;
+}
+.widget-frame::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow 140ms ease;
+}
+.widget-frame:hover::after {
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
+}
+.widget-frame.is-selected::after {
+  box-shadow: 0 0 0 2px #ea580c, 0 6px 24px -8px rgba(234, 88, 12, 0.45);
+}
+
+/* Drag handle — a centered grip pill on top edge. Hidden until hover or selected. */
+.drag-handle {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 38px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(23, 23, 23, 0.55);
+  backdrop-filter: blur(4px);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, transform 140ms ease;
+}
+.widget-frame:hover .drag-handle,
+.widget-frame.is-selected .drag-handle {
+  opacity: 1;
+}
+.drag-handle:hover {
+  background: #ea580c;
+  transform: translateX(-50%) translateY(-1px);
+}
+.drag-handle:active {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(0.96);
+}
+.drag-grip {
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* Custom resize handle in the bottom-right corner — replaces the default
+   2-line corner from grid-layout-plus. Scoped via :deep to reach the
+   GridLayout's internal element. */
+:deep(.vgl-layout) {
+  --vgl-resizer-size: 18px;
+  --vgl-placeholder-bg: #ea580c;
+  --vgl-placeholder-opacity: 14%;
+}
+:deep(.vgl-item__resizer) {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+:deep(.vgl-item__resizer::before) {
+  display: none;
+}
+:deep(.vgl-item__resizer::after) {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid #ea580c;
+  border-bottom: 2px solid #ea580c;
+  border-bottom-right-radius: 4px;
+}
+:deep(.vgl-item:hover .vgl-item__resizer),
+:deep(.vgl-item--resizing .vgl-item__resizer) {
+  opacity: 1;
+}
+:deep(.vgl-item--dragging),
+:deep(.vgl-item--resizing) {
+  cursor: grabbing;
 }
 </style>

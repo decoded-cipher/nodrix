@@ -6,27 +6,77 @@
 const TEMPLATE = `
   <style>
     :host {
+      display: block;
+      height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      container-type: size;
+      font-family: system-ui, sans-serif;
+      color: var(--color-text, #171717);
+    }
+    .card {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       height: 100%;
-      padding: 1rem;
+      width: 100%;
       box-sizing: border-box;
+      padding: clamp(10px, 7cqmin, 20px);
       background: var(--color-bg-elevated, white);
       border: 1px solid var(--color-border, #e5e5e5);
-      border-radius: 8px;
-      font-family: system-ui, sans-serif;
+      border-radius: 10px;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+      overflow: hidden;
     }
-    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; }
-    .value { font-size: 2.5rem; font-weight: 600; line-height: 1; color: var(--color-text, #171717); }
-    .unit  { font-size: 0.875rem; color: var(--color-text-subtle, #737373); margin-left: 0.25rem; }
-    .ts    { font-size: 0.6875rem; color: var(--color-text-faint, #a3a3a3); font-variant-numeric: tabular-nums; }
+    .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
+    .title {
+      font-size: clamp(10px, 5cqmin, 13px);
+      color: var(--color-text-muted, #525252);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .reading {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25em;
+      min-width: 0;
+      line-height: 1;
+    }
+    .value {
+      font-size: clamp(20px, 28cqmin, 64px);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--color-text, #171717);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .unit {
+      font-size: clamp(10px, 8cqmin, 18px);
+      color: var(--color-text-subtle, #737373);
+      font-weight: 500;
+    }
+    .ts {
+      font-size: clamp(9px, 4cqmin, 12px);
+      color: var(--color-text-faint, #a3a3a3);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
   </style>
-  <div class="title"></div>
-  <div>
-    <span class="value">—</span><span class="unit"></span>
+  <div class="card">
+    <div class="title"></div>
+    <div class="reading">
+      <span class="value">—</span><span class="unit"></span>
+    </div>
+    <div class="ts"></div>
   </div>
-  <div class="ts"></div>
 `;
 
 export class IotValueElement extends HTMLElement {

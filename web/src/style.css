@@ -14,6 +14,7 @@
   --color-bg: #ffffff;
   --color-bg-elevated: #ffffff;
   --color-border: #e5e5e5;
+  --color-border-strong: #d4d4d4;
   --color-text: #171717;
   --color-text-muted: #525252;
   --color-text-subtle: #737373;
@@ -26,6 +27,7 @@
   --color-bg: #181818;
   --color-bg-elevated: #1f1f1f;
   --color-border: #2a2a2a;
+  --color-border-strong: #3a3a3a;
   --color-text: #e5e5e5;
   --color-text-muted: #a3a3a3;
   --color-text-subtle: #737373;
