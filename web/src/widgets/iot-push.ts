@@ -54,45 +54,45 @@ const TEMPLATE = `
     }
     .button {
       display: inline-flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: clamp(8px, 3cqmin, 14px);
-      padding: clamp(8px, min(10cqh, 5cqw), 24px) clamp(24px, min(20cqh, 12cqw), 64px);
-      min-width: min(75cqw, 320px);
+      gap: clamp(2px, 1cqmin, 6px);
+      width: clamp(56px, min(70cqh, 36cqw), 200px);
+      aspect-ratio: 1;
+      padding: 0;
       border: none;
-      border-radius: 9999px;
+      border-radius: 50%;
       background: #ea580c;
       color: white;
       cursor: pointer;
       font-family: inherit;
-      font-size: clamp(14px, min(18cqh, 9cqw), 28px);
+      font-size: clamp(11px, min(13cqh, 6cqw), 18px);
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      box-shadow: 0 4px 14px -4px rgba(234, 88, 12, 0.45), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+      box-shadow: 0 6px 18px -4px rgba(234, 88, 12, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
       transition: transform 80ms ease, background 140ms ease, box-shadow 140ms ease;
       max-width: 100%;
+      max-height: 100%;
     }
     .button:hover { background: #f97316; }
     .button:active,
     .button.pressing {
-      transform: translateY(1px) scale(0.98);
+      transform: translateY(1px) scale(0.97);
       background: #c2410c;
-      box-shadow: 0 1px 4px -1px rgba(234, 88, 12, 0.45), inset 0 2px 0 rgba(0, 0, 0, 0.15);
+      box-shadow: 0 2px 6px -1px rgba(234, 88, 12, 0.5), inset 0 3px 0 rgba(0, 0, 0, 0.18);
     }
     .button.flashed {
-      box-shadow: 0 0 0 6px rgba(234, 88, 12, 0.22), 0 4px 14px -4px rgba(234, 88, 12, 0.45), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
-    }
-    .icon {
-      width: 0.9em;
-      height: 0.9em;
-      flex-shrink: 0;
+      box-shadow: 0 0 0 8px rgba(234, 88, 12, 0.22), 0 6px 18px -4px rgba(234, 88, 12, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
     }
     .label {
+      max-width: 80%;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .label:empty { display: none; }
     .ts {
       font-size: clamp(9px, min(6cqh, 3cqw), 12px);
       color: var(--color-text-faint, #a3a3a3);
@@ -105,11 +105,7 @@ const TEMPLATE = `
     <div class="title"></div>
     <div class="button-wrap">
       <button class="button" type="button">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14" />
-          <path d="m13 6 6 6-6 6" />
-        </svg>
-        <span class="label">Press</span>
+        <span class="label"></span>
       </button>
     </div>
     <div class="ts"></div>
@@ -173,8 +169,8 @@ export class IotPushElement extends HTMLElement {
   private render() {
     const shadow = this.shadowRoot!;
     shadow.querySelector('.title')!.textContent = this.getAttribute('data-title') ?? '';
-    const label = this.getAttribute('data-label') ?? this.getAttribute('data-command') ?? 'Press';
-    shadow.querySelector('.label')!.textContent = label;
+    // Only show in-button label if explicitly set — otherwise the icon stands alone.
+    shadow.querySelector('.label')!.textContent = this.getAttribute('data-label') ?? '';
     shadow.querySelector('.ts')!.textContent = this.#ts ? new Date(this.#ts * 1000).toLocaleTimeString() : '';
   }
 }

@@ -39,6 +39,7 @@ const ICON_GAUGE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_CHART = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 2L19 6"/><circle cx="19" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>`;
 const ICON_TOGGLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>`;
 const ICON_PUSH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg>`;
+const ICON_SLIDER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><circle cx="14" cy="12" r="3.25" fill="currentColor" stroke="none"/></svg>`;
 
 export const CATALOG: ReadonlyArray<WidgetSpec> = [
   {
@@ -112,7 +113,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
   },
   {
     type: 'iot-push',
-    label: 'Push button',
+    label: 'Push',
     description: 'Fire a one-shot command.',
     category: 'Control',
     dataTypes: ['Momentary command'],
@@ -126,6 +127,28 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
       { key: 'command', label: 'Command name', type: 'string' },
       { key: 'value', label: 'Payload value', type: 'string' },
       { key: 'label', label: 'Button label (optional)', type: 'string' },
+    ],
+  },
+  {
+    type: 'iot-slider',
+    label: 'Slider',
+    description: 'Set a numeric value within a range.',
+    category: 'Control',
+    dataTypes: ['Numeric command'],
+    whenToUse: 'Set a continuous numeric value — brightness, fan speed, setpoint, volume. Sends the command on release; reflects reported state via the chosen metric.',
+    icon: ICON_SLIDER,
+    defaultSize: { w: 4, h: 2 },
+    defaultProps: { title: '', device: '', command: '', metric: '', orientation: 'horizontal', min: 0, max: 100, step: 1, unit: '' },
+    fields: [
+      { key: 'title', label: 'Title', type: 'string' },
+      { key: 'device', label: 'Device', type: 'device' },
+      { key: 'command', label: 'Command name', type: 'string' },
+      { key: 'metric', label: 'State metric (optional)', type: 'string' },
+      { key: 'orientation', label: 'Orientation', type: 'select', options: ['horizontal', 'vertical'] },
+      { key: 'min', label: 'Min', type: 'number' },
+      { key: 'max', label: 'Max', type: 'number' },
+      { key: 'step', label: 'Step', type: 'number' },
+      { key: 'unit', label: 'Unit', type: 'string' },
     ],
   },
 ];

@@ -64,10 +64,12 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
   if (typeof p['command'] === 'string') el.setAttribute('data-command', p['command']);
   if (typeof p['min'] === 'number') el.setAttribute('data-min', String(p['min']));
   if (typeof p['max'] === 'number') el.setAttribute('data-max', String(p['max']));
+  if (typeof p['step'] === 'number') el.setAttribute('data-step', String(p['step']));
   if (typeof p['onValue'] === 'string') el.setAttribute('data-on-value', p['onValue']);
   if (typeof p['offValue'] === 'string') el.setAttribute('data-off-value', p['offValue']);
   if (typeof p['value'] === 'string') el.setAttribute('data-value', p['value']);
   if (typeof p['label'] === 'string') el.setAttribute('data-label', p['label']);
+  if (typeof p['orientation'] === 'string') el.setAttribute('data-orientation', p['orientation']);
 
   if (item.type === 'iot-chart') {
     const series = (p['series'] as Array<Record<string, unknown>> | undefined) ?? [];
