@@ -117,8 +117,8 @@ async function save() {
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">Users</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-        People with access to this deployment. Sign-in is handled by Cloudflare Access — invite
-        users by adding them to your Access policy.
+        People with access to this deployment. Sign-in uses email/password or a configured
+        social provider.
       </p>
     </header>
 

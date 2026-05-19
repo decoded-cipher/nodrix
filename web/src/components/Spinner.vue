@@ -20,7 +20,7 @@ withDefaults(
   >
     <svg
       class="animate-spin"
-      :class="size === 'lg' ? 'h-6 w-6' : size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'"
+      :class="size === 'lg' ? 'h-10 w-10' : size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'"
       viewBox="0 0 24 24"
       fill="none"
     >

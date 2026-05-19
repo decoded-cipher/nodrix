@@ -58,7 +58,7 @@ function expiryLabel(ts: number | null | undefined): string {
   <main class="mx-auto max-w-4xl px-6 py-8">
     <h2 class="text-xl font-semibold tracking-tight">API tokens</h2>
     <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-      For external apps (Grafana, scripts, dashboards). Browser sessions use Cloudflare Access.
+      For external apps (Grafana, scripts, dashboards). Browser sessions use signed-in cookies.
     </p>
 
     <RevealOnce
