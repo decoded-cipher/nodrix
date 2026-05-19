@@ -14,6 +14,11 @@ import { drizzle } from 'drizzle-orm/d1';
 import type { Env } from '../env';
 import * as schema from './schema';
 import { recordAudit } from '../lib/audit';
+import { decryptSecret } from '../lib/crypto';
+
+// Shared with admin/auth-providers.ts — encryption info string for OAuth
+// client secrets at rest in D1. Changing this invalidates existing rows.
+export const OAUTH_SECRET_ENC_INFO = 'oauth-client-secret-v1';
 
 type ProviderRow = {
   kind: 'google' | 'github';
@@ -27,6 +32,14 @@ type SocialProviders = {
   github?: { clientId: string; clientSecret: string };
 };
 
+async function readClientSecret(env: Env, stored: string): Promise<string> {
+  // Rows written before secret-at-rest encryption was added stored the value
+  // in plaintext. The encrypted format always starts with `v1:` (see
+  // lib/crypto.ts), so we can tell legacy rows apart and pass them through.
+  if (!stored.startsWith('v1:')) return stored;
+  return decryptSecret(env.BETTER_AUTH_SECRET, stored, OAUTH_SECRET_ENC_INFO);
+}
+
 async function loadProviders(env: Env): Promise<SocialProviders> {
   try {
     const rows = await env.DB
@@ -34,7 +47,13 @@ async function loadProviders(env: Env): Promise<SocialProviders> {
       .all<ProviderRow>();
     const out: SocialProviders = {};
     for (const r of rows.results) {
-      out[r.kind] = { clientId: r.client_id, clientSecret: r.client_secret };
+      try {
+        const clientSecret = await readClientSecret(env, r.client_secret);
+        out[r.kind] = { clientId: r.client_id, clientSecret };
+      } catch {
+        // Decrypt failed (corrupted row or BETTER_AUTH_SECRET rotated).
+        // Skip this provider rather than taking down the whole auth pipeline.
+      }
     }
     return out;
   } catch {

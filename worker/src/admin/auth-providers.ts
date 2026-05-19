@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { recordAudit } from '../lib/audit';
+import { encryptSecret } from '../lib/crypto';
+import { OAUTH_SECRET_ENC_INFO } from '../auth/index';
 
 const authProviders = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -65,6 +67,12 @@ authProviders.put('/:kind', async (c) => {
   const enabled = body.enabled === false ? 0 : 1;
   const now = Math.floor(Date.now() / 1000);
 
+  const encryptedSecret = await encryptSecret(
+    c.env.BETTER_AUTH_SECRET,
+    clientSecret,
+    OAUTH_SECRET_ENC_INFO
+  );
+
   await c.env.DB
     .prepare(
       `INSERT INTO auth_providers (kind, client_id, client_secret, enabled, created_at, updated_at)
@@ -75,7 +83,7 @@ authProviders.put('/:kind', async (c) => {
          enabled = excluded.enabled,
          updated_at = excluded.updated_at`
     )
-    .bind(kind, clientId, clientSecret, enabled, now, now)
+    .bind(kind, clientId, encryptedSecret, enabled, now, now)
     .run();
 
   c.executionCtx.waitUntil(
