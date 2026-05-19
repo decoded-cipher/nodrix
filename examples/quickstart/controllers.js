@@ -1,14 +1,17 @@
 // Controller side — WebSocket commands.
 //
 // Connects to the worker's device WS and prints (i.e. "applies") whatever
-// commands come in from dashboard widgets. Handles three command names:
+// commands come in from dashboard widgets. Demonstrates the three control
+// widget types:
 //
-//   power      — from iot-toggle widget        ("on" / "off")
-//   push       — from iot-push widget          (one-shot)
-//   brightness — from iot-slider widget        (0–100)
+//   power      — iot-toggle  ("on" / "off")
+//   push       — iot-push    (one-shot, no value)
+//   brightness — iot-slider  (numeric)
 //
-// Replace the apply* functions with GPIO writes / serial / MQTT publishes
-// for a real device. Acks each command so the worker stops retrying.
+// The keys in `handlers` below must match the "Command name" field of the
+// corresponding widget in your dashboard — rename freely. Replace the body
+// of each handler with a GPIO write / serial / MQTT publish for a real
+// device. Acks each command so the worker stops retrying.
 
 import WebSocket from 'ws';
 
@@ -23,7 +26,9 @@ function required(name) {
 }
 
 // Local mirror of "device" state. Just enough so we can show the effect of
-// each command in the log.
+// each command in the log. To close the loop with the slider's State Metric
+// subscription, POST the new value back as telemetry after applying — e.g.
+// after a brightness command, POST `{ metrics: { brightness: <value> } }`.
 const device = {
   power: 'off',
   brightness: 0,
@@ -35,7 +40,6 @@ const handlers = {
     console.log(`  → power = ${device.power}`);
   },
   push() {
-    // One-shot — no payload meaning. Treat as "the user pressed the button".
     console.log(`  → push! (e.g. trigger a scene, reset a counter, kick a script)`);
   },
   brightness(value) {
@@ -50,7 +54,7 @@ const handlers = {
 function apply(name, value) {
   const fn = handlers[name];
   if (fn) fn(value);
-  else console.log(`  → (unknown command "${name}", value=${JSON.stringify(value)})`);
+  else console.log(`  → (no handler for "${name}" — add one if your widget uses this command name)`);
 }
 
 let stopped = false;

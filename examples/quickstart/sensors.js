@@ -1,10 +1,10 @@
 // Sensor side — HTTP telemetry.
 //
-// Two devices (home, office) POST temperature + humidity every INTERVAL_MS.
-// This feeds iot-value, iot-gauge, and iot-chart widgets in the dashboard.
+// Two devices POST temperature + humidity every INTERVAL_MS. This feeds the
+// iot-value, iot-gauge, and iot-chart widgets in the dashboard.
 //
-//   home  → temperature, humidity
-//   office → temperature, humidity
+// The labels below ("home", "office") are local console tags only — device
+// identity comes from the token.
 
 import axios from 'axios';
 
