@@ -75,12 +75,11 @@ class_name = "Provision"
 [vars]
 NODRIX_UPSTREAM_REPO = "decoded-cipher/nodrix"
 
-# Secrets (KMS-encrypted). The Deploy to Cloudflare wizard reads this list
-# and prompts for each one during setup; `wrangler deploy` also fails if
-# they're missing locally. OAuth callback URLs and Better Auth's baseURL are
-# derived from each request's origin, so no APP_URL env var is needed.
-[secrets]
-required = ["BETTER_AUTH_SECRET"]
+# No secrets are required at deploy time. The signing secret used for
+# session cookies and OAuth-secret encryption is generated on first boot
+# and stored in deployment_settings (see worker/src/lib/auth-secret.ts).
+# OAuth callback URLs and Better Auth's baseURL are derived from each
+# request's origin, so no APP_URL env var is needed either.
 
 [observability]
 enabled = true

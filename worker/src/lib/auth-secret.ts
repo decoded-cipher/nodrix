@@ -1,0 +1,36 @@
+// Single source of truth for the deployment's signing secret. Used for:
+//   - Better Auth session cookie signing
+//   - HKDF base for at-rest encryption of OAuth client secrets in D1
+//
+// First-boot bootstrap: on the very first read, we either reuse a value the
+// operator previously set via env.BETTER_AUTH_SECRET (legacy path — older
+// deploys came through "Deploy to Cloudflare" with a Workers Secret), or
+// generate 32 random bytes. Either way the result is persisted to
+// deployment_settings so subsequent reads are stable and the env var
+// becomes optional.
+//
+// Reads after the first are KV-cached by getSetting (5 min TTL), so the
+// hot path is at most one KV hit per cache window.
+
+import type { Env } from '../env';
+import { getSetting, setSetting } from './deployment-settings';
+
+const KEY = 'auth.signing_secret';
+const BYTES = 32;
+
+function generate(): string {
+  const buf = crypto.getRandomValues(new Uint8Array(BYTES));
+  let s = '';
+  for (const b of buf) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+export async function getOrCreateSigningSecret(env: Env): Promise<string> {
+  const existing = await getSetting(env, KEY);
+  if (existing) return existing;
+  // Seed from env on legacy deploys so the upgrade doesn't invalidate live
+  // sessions; otherwise generate fresh.
+  const seed = (env.BETTER_AUTH_SECRET ?? '').trim() || generate();
+  await setSetting(env, KEY, seed);
+  return seed;
+}

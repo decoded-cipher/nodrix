@@ -15,6 +15,7 @@ import type { Env } from '../env';
 import * as schema from './schema';
 import { recordAudit } from '../lib/audit';
 import { decryptSecret } from '../lib/crypto';
+import { getOrCreateSigningSecret } from '../lib/auth-secret';
 
 // Shared with admin/auth-providers.ts — encryption info string for OAuth
 // client secrets at rest in D1. Changing this invalidates existing rows.
@@ -32,15 +33,15 @@ type SocialProviders = {
   github?: { clientId: string; clientSecret: string };
 };
 
-async function readClientSecret(env: Env, stored: string): Promise<string> {
+async function readClientSecret(signingSecret: string, stored: string): Promise<string> {
   // Rows written before secret-at-rest encryption was added stored the value
   // in plaintext. The encrypted format always starts with `v1:` (see
   // lib/crypto.ts), so we can tell legacy rows apart and pass them through.
   if (!stored.startsWith('v1:')) return stored;
-  return decryptSecret(env.BETTER_AUTH_SECRET, stored, OAUTH_SECRET_ENC_INFO);
+  return decryptSecret(signingSecret, stored, OAUTH_SECRET_ENC_INFO);
 }
 
-async function loadProviders(env: Env): Promise<SocialProviders> {
+async function loadProviders(env: Env, signingSecret: string): Promise<SocialProviders> {
   try {
     const rows = await env.DB
       .prepare(`SELECT kind, client_id, client_secret, enabled FROM auth_providers WHERE enabled = 1`)
@@ -48,11 +49,11 @@ async function loadProviders(env: Env): Promise<SocialProviders> {
     const out: SocialProviders = {};
     for (const r of rows.results) {
       try {
-        const clientSecret = await readClientSecret(env, r.client_secret);
+        const clientSecret = await readClientSecret(signingSecret, r.client_secret);
         out[r.kind] = { clientId: r.client_id, clientSecret };
       } catch {
-        // Decrypt failed (corrupted row or BETTER_AUTH_SECRET rotated).
-        // Skip this provider rather than taking down the whole auth pipeline.
+        // Decrypt failed (corrupted row or signing secret rotated). Skip
+        // this provider rather than taking down the whole auth pipeline.
       }
     }
     return out;
@@ -64,10 +65,11 @@ async function loadProviders(env: Env): Promise<SocialProviders> {
 
 // baseURL is derived from the request origin so the same code works on
 // localhost, *.workers.dev, and custom domains with no env var to set.
-// The signing secret comes from a Workers Secret (KMS-encrypted) — see
-// README "Post-deploy setup".
+// The signing secret is generated on first boot and persisted in
+// deployment_settings — see lib/auth-secret.ts.
 export async function buildAuth(env: Env, request?: Request) {
-  const socialProviders = await loadProviders(env);
+  const signingSecret = await getOrCreateSigningSecret(env);
+  const socialProviders = await loadProviders(env, signingSecret);
   const db = drizzle(env.DB, { schema });
 
   const baseURL = request
@@ -77,7 +79,7 @@ export async function buildAuth(env: Env, request?: Request) {
   return betterAuth({
     baseURL,
     basePath: '/v1/auth',
-    secret: env.BETTER_AUTH_SECRET,
+    secret: signingSecret,
     trustedOrigins: request ? [new URL(request.url).origin] : undefined,
     database: drizzleAdapter(db, { provider: 'sqlite' }),
 

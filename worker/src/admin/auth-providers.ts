@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { recordAudit } from '../lib/audit';
 import { encryptSecret } from '../lib/crypto';
+import { getOrCreateSigningSecret } from '../lib/auth-secret';
 import { OAUTH_SECRET_ENC_INFO } from '../auth/index';
 
 const authProviders = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
@@ -67,8 +68,9 @@ authProviders.put('/:kind', async (c) => {
   const enabled = body.enabled === false ? 0 : 1;
   const now = Math.floor(Date.now() / 1000);
 
+  const signingSecret = await getOrCreateSigningSecret(c.env);
   const encryptedSecret = await encryptSecret(
-    c.env.BETTER_AUTH_SECRET,
+    signingSecret,
     clientSecret,
     OAUTH_SECRET_ENC_INFO
   );

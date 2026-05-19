@@ -16,10 +16,11 @@ export interface Env {
   DASHBOARD_DO: DurableObjectNamespace;
   PROVISION: Workflow;
 
-  // Better Auth signing secret. Set as a Workers Secret (KMS-encrypted) —
-  // never a plaintext var. baseURL is derived from each request's origin so
-  // there's no APP_URL to configure.
-  BETTER_AUTH_SECRET: string;
+  // Legacy: the signing secret is now auto-generated on first boot and
+  // stored in deployment_settings (see lib/auth-secret.ts). Still honored
+  // when present so existing deployments upgrade without invalidating live
+  // sessions — once seeded into D1, the env var can be removed.
+  BETTER_AUTH_SECRET?: string;
 
   // Upstream repo (owner/repo) the Settings → Version & updates page polls
   // to detect new commits. Plaintext var defaulted in wrangler.toml.
