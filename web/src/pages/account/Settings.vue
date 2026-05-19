@@ -32,6 +32,46 @@ const error = ref<string | null>(null);
 
 const isOwner = ref(false);
 
+// Version & updates state. Polled once on mount — the worker side
+// KV-caches the upstream lookup (1h) so this is cheap to re-fetch.
+type VersionInfo = {
+  current: { version: string; commit: string; short_commit: string; built_at: number | null };
+  upstream_repo: string;
+  upstream: {
+    commit: { sha: string; short_sha: string; message: string; author_date: number | null; html_url: string };
+    fetched_at: number;
+  } | null;
+  status: 'up_to_date' | 'behind' | 'unknown';
+  compare_url: string | null;
+};
+const versionInfo = ref<VersionInfo | null>(null);
+const versionLoading = ref(false);
+
+async function refreshVersion() {
+  versionLoading.value = true;
+  try {
+    versionInfo.value = await api.get<VersionInfo>('/v1/admin/version');
+  } catch {
+    versionInfo.value = null;
+  } finally {
+    versionLoading.value = false;
+  }
+}
+
+function fmtAgo(unix: number | null): string {
+  if (!unix) return '';
+  const diff = Math.max(0, Math.floor(Date.now() / 1000) - unix);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function fmtDate(unix: number | null): string {
+  if (!unix) return '—';
+  return new Date(unix * 1000).toLocaleString();
+}
+
 // Custom domain state. The worker auto-detects the canonical on first non-
 // *.workers.dev request, so most owners never touch the manual controls.
 // The advanced override exists for the rare "multiple custom domains, pick
@@ -136,7 +176,7 @@ onMounted(async () => {
     } catch {
       providers.value = [];
     }
-    await refreshCustomDomain();
+    await Promise.all([refreshCustomDomain(), refreshVersion()]);
   }
 });
 
@@ -424,6 +464,109 @@ const PROVIDER_META = {
           </div>
         </li>
       </ul>
+    </section>
+
+    <!-- Version & updates (owner-only) -->
+    <section v-if="isOwner" class="mb-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <div class="text-sm font-semibold">Version &amp; updates</div>
+        <span
+          v-if="versionInfo?.status === 'behind'"
+          class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+        >Update available</span>
+        <span
+          v-else-if="versionInfo?.status === 'up_to_date'"
+          class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+        >Up to date</span>
+      </div>
+
+      <div class="space-y-3 px-4 py-4 text-sm">
+        <!-- Current build -->
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Current</div>
+            <div class="mt-0.5 font-mono text-sm">
+              v{{ versionInfo?.current.version ?? '…' }}
+              <span class="ml-1 text-xs text-neutral-500 dark:text-neutral-400">
+                {{ versionInfo?.current.short_commit ?? '' }}
+              </span>
+            </div>
+            <div v-if="versionInfo?.current.built_at" class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+              Built {{ fmtDate(versionInfo.current.built_at) }}
+            </div>
+          </div>
+
+          <!-- Upstream -->
+          <div class="text-right">
+            <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Upstream</div>
+            <div v-if="versionInfo?.upstream" class="mt-0.5">
+              <a
+                :href="versionInfo.upstream.commit.html_url"
+                target="_blank"
+                rel="noreferrer"
+                class="font-mono text-sm text-orange-700 hover:underline dark:text-orange-400"
+              >{{ versionInfo.upstream.commit.short_sha }} ↗</a>
+              <div class="mt-0.5 max-w-[260px] truncate text-[11px] text-neutral-500 dark:text-neutral-400" :title="versionInfo.upstream.commit.message">
+                {{ versionInfo.upstream.commit.message }}
+              </div>
+              <div class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                {{ fmtAgo(versionInfo.upstream.commit.author_date) }} · checked {{ fmtAgo(versionInfo.upstream.fetched_at) }}
+              </div>
+            </div>
+            <div v-else-if="versionLoading" class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Checking…</div>
+            <div v-else class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Couldn't reach GitHub</div>
+          </div>
+        </div>
+
+        <!-- Behind: show 'See diff' link -->
+        <div
+          v-if="versionInfo?.status === 'behind' && versionInfo.compare_url"
+          class="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
+        >
+          <div class="font-semibold text-orange-900 dark:text-orange-300">A newer version is on upstream</div>
+          <p class="mt-1 text-orange-800 dark:text-orange-300/80">
+            See what changed:
+            <a :href="versionInfo.compare_url" target="_blank" rel="noreferrer" class="underline">
+              {{ versionInfo.current.short_commit }} … {{ versionInfo.upstream!.commit.short_sha }}
+            </a>
+          </p>
+        </div>
+
+        <!-- How to update — always visible -->
+        <details class="rounded-md border border-neutral-200 dark:border-neutral-800">
+          <summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800">
+            How to update
+          </summary>
+          <div class="space-y-3 border-t border-neutral-100 px-3 py-3 text-xs dark:border-neutral-800">
+            <div>
+              <div class="font-semibold text-neutral-700 dark:text-neutral-200">If you deployed via the Cloudflare button</div>
+              <ol class="mt-1 list-decimal space-y-1 pl-4 text-neutral-600 dark:text-neutral-400">
+                <li>Open your fork on GitHub.</li>
+                <li>Click GitHub's <span class="font-medium">Sync fork</span> button (it appears when your fork is behind).</li>
+                <li>Cloudflare Workers Builds picks up the push and redeploys (~1 min).</li>
+                <li>Reload this page when the deploy finishes.</li>
+              </ol>
+              <a
+                :href="`https://github.com/${versionInfo?.upstream_repo ?? 'decoded-cipher/nodrix'}/network/members`"
+                target="_blank"
+                rel="noreferrer"
+                class="mt-2 inline-block text-orange-700 hover:underline dark:text-orange-400"
+              >Find your fork on GitHub ↗</a>
+            </div>
+            <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
+              <div class="font-semibold text-neutral-700 dark:text-neutral-200">If you deployed manually</div>
+              <pre class="mt-1 overflow-x-auto rounded bg-neutral-50 px-3 py-2 font-mono text-[11px] text-neutral-700 dark:bg-neutral-950 dark:text-neutral-300">git pull
+bun install
+bun run build
+bun run --filter @nodrix/worker deploy</pre>
+            </div>
+            <div class="border-t border-neutral-100 pt-3 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+              Tracking upstream <span class="font-mono">{{ versionInfo?.upstream_repo ?? '…' }}</span>.
+              Change <span class="font-mono">NODRIX_UPSTREAM_REPO</span> in <span class="font-mono">wrangler.toml</span> to follow a different repo.
+            </div>
+          </div>
+        </details>
+      </div>
     </section>
 
     <!-- Custom domain (owner-only) -->

@@ -20,4 +20,8 @@ export interface Env {
   // never a plaintext var. baseURL is derived from each request's origin so
   // there's no APP_URL to configure.
   BETTER_AUTH_SECRET: string;
+
+  // Upstream repo (owner/repo) the Settings → Version & updates page polls
+  // to detect new commits. Plaintext var defaulted in wrangler.toml.
+  NODRIX_UPSTREAM_REPO?: string;
 }

@@ -6,8 +6,12 @@ compatibility_flags = ["nodejs_compat"]
 # Build the Vue SPA before wrangler deploys, so ASSETS has content.
 # Cloudflare Workers Builds + the Deploy button run `npx wrangler deploy` at
 # the repo root; this build step makes that one command sufficient.
+#
+# build:version writes worker/src/version.gen.ts with the running build's
+# commit SHA (from WORKERS_CI_COMMIT_SHA in CI, git rev-parse locally) so the
+# Settings → Version & updates section can compare against upstream.
 [build]
-command = "bun install && bun run --filter @nodrix/web build"
+command = "bun install && bun run build:version && bun run --filter @nodrix/web build"
 
 # Vue SPA built by `web/` workspace is served as static assets.
 # `run_worker_first = true` is REQUIRED: without it, Cloudflare's edge serves
@@ -57,6 +61,12 @@ new_sqlite_classes = ["DeviceDO", "DashboardDO"]
 name = "nodrix-provision"
 binding = "PROVISION"
 class_name = "Provision"
+
+# Plaintext vars. Settings → Version & updates polls the upstream repo to
+# tell owners when a new commit is on main. Fork the upstream and override
+# this if you're tracking a different canonical source.
+[vars]
+NODRIX_UPSTREAM_REPO = "decoded-cipher/nodrix"
 
 # Secrets (KMS-encrypted). The Deploy to Cloudflare wizard reads this list
 # and prompts for each one during setup; `wrangler deploy` also fails if
