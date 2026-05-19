@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { specFor } from './widget-catalog';
 import { useProjectStore } from '../stores/project';
+import Dropdown from '../components/Dropdown.vue';
 import type { WidgetInstance } from '../types';
 
 const props = defineProps<{ item: WidgetInstance | null }>();
@@ -13,6 +14,10 @@ const emit = defineEmits<{
 
 const project = useProjectStore();
 const spec = computed(() => (props.item ? specFor(props.item.type) : null));
+
+const deviceOptions = computed(() =>
+  project.devices.map((d) => ({ value: d.id, label: d.name, hint: d.id }))
+);
 
 function setProp(key: string, v: unknown) {
   if (!props.item) return;
@@ -93,28 +98,26 @@ function removeSeries(idx: number) {
           />
         </label>
 
-        <label v-else-if="f.type === 'device'" class="block">
+        <div v-else-if="f.type === 'device'" class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</span>
-          <select
-            :value="item.props[f.key] ?? ''"
-            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-            @change="setProp(f.key, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Select a device</option>
-            <option v-for="d in project.devices" :key="d.id" :value="d.id">{{ d.name }} ({{ d.id }})</option>
-          </select>
-        </label>
+          <Dropdown
+            class="mt-1"
+            :model-value="(item.props[f.key] as string) ?? ''"
+            :options="deviceOptions"
+            placeholder="Select a device"
+            @update:model-value="(v) => setProp(f.key, v)"
+          />
+        </div>
 
-        <label v-else-if="f.type === 'select'" class="block">
+        <div v-else-if="f.type === 'select'" class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</span>
-          <select
-            :value="item.props[f.key]"
-            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-            @change="setProp(f.key, ($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="o in f.options ?? []" :key="o" :value="o">{{ o }}</option>
-          </select>
-        </label>
+          <Dropdown
+            class="mt-1"
+            :model-value="(item.props[f.key] as string) ?? ''"
+            :options="(f.options ?? []).map((o) => ({ value: o, label: o }))"
+            @update:model-value="(v) => setProp(f.key, v)"
+          />
+        </div>
 
         <div v-else-if="f.type === 'series'" class="space-y-3">
           <div class="text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</div>
@@ -123,14 +126,13 @@ function removeSeries(idx: number) {
             :key="idx"
             class="space-y-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800"
           >
-            <select
-              :value="s['device'] ?? ''"
-              class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-              @change="updateSeries(idx, 'device', ($event.target as HTMLSelectElement).value)"
-            >
-              <option value="">device</option>
-              <option v-for="d in project.devices" :key="d.id" :value="d.id">{{ d.name }}</option>
-            </select>
+            <Dropdown
+              :model-value="(s['device'] as string) ?? ''"
+              :options="deviceOptions"
+              placeholder="device"
+              size="sm"
+              @update:model-value="(v) => updateSeries(idx, 'device', v)"
+            />
             <input
               :value="s['metric'] ?? ''"
               type="text"

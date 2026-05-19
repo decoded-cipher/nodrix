@@ -2,7 +2,13 @@
 import { onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import RevealOnce from '../../components/RevealOnce.vue';
+import Dropdown from '../../components/Dropdown.vue';
 import { confirm } from '../../lib/confirm';
+
+const scopeOptions = [
+  { value: 'read' as const, label: 'read', hint: 'Can read data and stream updates.' },
+  { value: 'admin' as const, label: 'admin', hint: 'Full control: read, write, manage.' },
+];
 
 const project = useProjectStore();
 const scope = ref<'read' | 'admin'>('read');
@@ -89,13 +95,14 @@ function expiryLabel(ts: number | null | undefined): string {
             class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
           />
         </label>
-        <label class="block">
+        <div class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Scope</span>
-          <select v-model="scope" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100">
-            <option value="read">read</option>
-            <option value="admin">admin</option>
-          </select>
-        </label>
+          <Dropdown
+            v-model="scope"
+            class="mt-1"
+            :options="scopeOptions"
+          />
+        </div>
         <label class="flex items-end gap-2 text-sm">
           <input v-model="projectScoped" type="checkbox" class="mb-2.5" />
           <span class="mb-2.5">Limit to this project</span>
