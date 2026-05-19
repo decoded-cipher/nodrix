@@ -216,6 +216,17 @@ function addWidget(type: WidgetType) {
 }
 
 function updateItem(next: WidgetInstance) {
+  const prev = layout.value.items.find((it) => it.id === next.id);
+  // Swap w/h when a slider's orientation flips — a 4×2 horizontal slider
+  // should become a 2×4 vertical one, so the user doesn't have to manually
+  // re-shape the widget after switching orientation.
+  if (
+    prev &&
+    next.type === 'iot-slider' &&
+    prev.props['orientation'] !== next.props['orientation']
+  ) {
+    next = { ...next, w: next.h, h: next.w };
+  }
   layout.value = {
     ...layout.value,
     items: layout.value.items.map((it) => (it.id === next.id ? next : it)),

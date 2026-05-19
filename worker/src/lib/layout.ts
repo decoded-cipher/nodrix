@@ -3,13 +3,15 @@
 // validated client-side; the server just enforces the structural envelope so
 // we never persist a layout that the renderer can't even iterate over.
 
-export type WidgetType = 'iot-value' | 'iot-gauge' | 'iot-chart' | 'iot-toggle';
+export type WidgetType = 'iot-value' | 'iot-gauge' | 'iot-chart' | 'iot-toggle' | 'iot-push' | 'iot-slider';
 
 const ALLOWED_TYPES: ReadonlySet<string> = new Set([
   'iot-value',
   'iot-gauge',
   'iot-chart',
   'iot-toggle',
+  'iot-push',
+  'iot-slider',
 ]);
 
 export type WidgetInstance = {
