@@ -6,10 +6,14 @@
 //   2. POST /config validates it (GET /accounts), extracts the account_id,
 //      AES-GCM encrypts it with BETTER_AUTH_SECRET, stores in D1.
 //   3. Later, owner clicks "Update now" in Settings.
-//   4. POST /trigger reads the encrypted token, calls Cloudflare's
-//      Workers Builds API to kick off a new build. The build pulls upstream
-//      HEAD (per scripts/build-from-upstream.sh) and redeploys.
-//   5. UI polls GET /status until the build finishes.
+//   4. POST /trigger returns a Cloudflare dashboard deep-link to the Worker's
+//      Builds tab. Cloudflare doesn't expose a public token-authed endpoint
+//      for triggering Workers Builds yet (the dashboard's own "Retry
+//      deployment" button uses an internal Global-API-Key-only endpoint),
+//      so the owner clicks Retry there. A new build pulls upstream HEAD via
+//      scripts/build-from-upstream.sh and redeploys.
+//   5. The UI re-fetches the version comparison; when the deployed SHA
+//      catches up to upstream, the "Update available" state clears.
 
 import { Hono } from 'hono';
 import type { Env } from '../env';
@@ -18,7 +22,6 @@ import { getSetting, setSetting } from '../lib/deployment-settings';
 import { encryptSecret, decryptSecret } from '../lib/crypto';
 import {
   validateToken,
-  triggerBuild,
   getBuild,
   CloudflareApiError,
 } from '../lib/cloudflare-api';
@@ -162,41 +165,29 @@ update.post('/dismiss', async (c) => {
   return c.json({ dismissed_at: Math.floor(Date.now() / 1000) });
 });
 
-// POST /v1/admin/update/trigger — kick off a Workers Build.
+// POST /v1/admin/update/trigger — return a Cloudflare dashboard deep-link
+// pointing at the Worker's Builds tab. Cloudflare doesn't expose a stable
+// public API for "retry/trigger a new Workers Build" — the dashboard's own
+// "Retry deployment" button calls an internal endpoint that requires Global
+// API Key auth (errors with `10405: Method not allowed for this authentication
+// scheme` when called with a scoped API token). So we deep-link the owner
+// instead. Once Cloudflare ships a public trigger-build endpoint we swap
+// this back to a real API call.
 update.post('/trigger', async (c) => {
   const user = c.get('user');
   if (!ownerOnly(user.role)) return c.json({ error: 'forbidden' }, 403);
 
-  const [enc, accountId, scriptName] = await Promise.all([
-    getSetting(c.env, TOKEN_KEY),
+  const [accountId, scriptName] = await Promise.all([
     getSetting(c.env, ACCOUNT_KEY),
     getSetting(c.env, SCRIPT_NAME_KEY),
   ]);
-  if (!enc || !accountId || !scriptName) {
+  if (!accountId || !scriptName) {
     return c.json({ error: 'not_configured' }, 400);
   }
 
-  let token: string;
-  try {
-    token = await decryptSecret(c.env.BETTER_AUTH_SECRET, enc, TOKEN_ENC_INFO);
-  } catch {
-    return c.json({ error: 'token_decrypt_failed' }, 500);
-  }
-
-  let result: { build_id: string };
-  try {
-    result = await triggerBuild(token, accountId, scriptName);
-  } catch (e) {
-    if (e instanceof CloudflareApiError) {
-      return c.json(
-        { error: 'trigger_failed', status: e.status, details: e.errors },
-        502
-      );
-    }
-    return c.json({ error: 'trigger_failed', message: (e as Error).message }, 502);
-  }
-
-  await setSetting(c.env, LAST_BUILD_KEY, result.build_id);
+  const dashboardUrl =
+    `https://dash.cloudflare.com/${encodeURIComponent(accountId)}` +
+    `/workers/services/view/${encodeURIComponent(scriptName)}/production/builds`;
 
   c.executionCtx.waitUntil(
     recordAudit(c.env, {
@@ -204,11 +195,10 @@ update.post('/trigger', async (c) => {
       userId: user.id,
       action: 'update.trigger',
       targetType: 'deployment',
-      targetId: result.build_id,
     })
   );
 
-  return c.json({ build_id: result.build_id, status: 'queued' });
+  return c.json({ dashboard_url: dashboardUrl });
 });
 
 // GET /v1/admin/update/status — poll the latest build's state.

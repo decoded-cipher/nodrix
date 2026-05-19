@@ -134,20 +134,50 @@ function schedulePoll() {
   }, 5000);
 }
 
+// Tracks the post-click prompt that asks the owner to hit "Retry deployment"
+// over in the Cloudflare dashboard tab we just opened.
+const updateDispatched = ref(false);
+
 async function triggerUpdate() {
   updateTriggering.value = true;
   updateError.value = null;
   try {
-    const res = await api.post<{ build_id: string; status: BuildStatus['status'] }>(
-      '/v1/admin/update/trigger'
-    );
-    buildStatus.value = { build_id: res.build_id, status: res.status };
-    schedulePoll();
+    const res = await api.post<{ dashboard_url: string }>('/v1/admin/update/trigger');
+    // Open the dashboard's Workers Builds tab in a new tab. Cloudflare's
+    // public API doesn't expose a token-authed "trigger build" endpoint yet,
+    // so the owner clicks "Retry deployment" there. We start lightweight
+    // polling here so we auto-detect when the new SHA lands.
+    window.open(res.dashboard_url, '_blank', 'noopener,noreferrer');
+    updateDispatched.value = true;
+    scheduleVersionRecheck();
   } catch (e) {
     updateError.value = (e as Error).message;
   } finally {
     updateTriggering.value = false;
   }
+}
+
+// After "Update now" opens the dashboard, poll /v1/admin/version every 10s
+// for up to 10 min so the UI flips from "Update available" → "Up to date"
+// without the owner having to refresh manually. Stops early once we detect
+// the deployed SHA caught up.
+let versionRecheckTimer: ReturnType<typeof setTimeout> | null = null;
+let versionRecheckCount = 0;
+const VERSION_RECHECK_MAX = 60; // 60 * 10s = 10 min
+function scheduleVersionRecheck() {
+  versionRecheckCount = 0;
+  if (versionRecheckTimer) clearTimeout(versionRecheckTimer);
+  const tick = async () => {
+    versionRecheckCount += 1;
+    await refreshVersion();
+    if (versionInfo.value?.status === 'up_to_date') {
+      updateDispatched.value = false;
+      return;
+    }
+    if (versionRecheckCount >= VERSION_RECHECK_MAX) return;
+    versionRecheckTimer = setTimeout(tick, 10_000);
+  };
+  versionRecheckTimer = setTimeout(tick, 10_000);
 }
 
 async function disconnectUpdateToken() {
@@ -606,6 +636,32 @@ const PROVIDER_META = {
           </div>
         </div>
 
+        <!-- Token configured + update dispatched: owner clicked the button,
+             we opened the Cloudflare dashboard for them; now waiting for the
+             deployed SHA to catch up to upstream. -->
+        <div
+          v-else-if="updateDispatched"
+          class="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
+        >
+          <div class="flex items-center gap-2 font-semibold text-orange-900 dark:text-orange-300">
+            <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" stroke-width="3" />
+              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" />
+            </svg>
+            <span>Cloudflare dashboard opened in a new tab</span>
+          </div>
+          <ol class="mt-2 list-decimal space-y-1 pl-4 text-orange-900/90 dark:text-orange-300/80">
+            <li>In the Cloudflare tab: click <span class="font-medium">Retry deployment</span> on the latest build (or <span class="font-medium">Trigger Deploy</span> if no recent build is shown).</li>
+            <li>Wait ~1 minute for the build to finish.</li>
+            <li>This page auto-refreshes when the new version goes live.</li>
+          </ol>
+          <button
+            type="button"
+            class="mt-2 text-[11px] text-orange-700 underline hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
+            @click="triggerUpdate"
+          >Reopen Cloudflare dashboard</button>
+        </div>
+
         <!-- Token configured + behind upstream → real Update button -->
         <div
           v-else-if="versionInfo?.status === 'behind'"
@@ -613,14 +669,14 @@ const PROVIDER_META = {
         >
           <div class="min-w-0 text-orange-900 dark:text-orange-300">
             <span class="font-semibold">Update available.</span>
-            One click pulls the latest upstream code into your deployment.
+            Opens the Cloudflare Builds page where you click <span class="font-medium">Retry deployment</span> to pull the latest upstream code.
           </div>
           <button
             type="button"
             :disabled="updateTriggering"
             class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
             @click="triggerUpdate"
-          >{{ updateTriggering ? 'Starting build…' : 'Update now' }}</button>
+          >{{ updateTriggering ? 'Opening…' : 'Update now ↗' }}</button>
         </div>
 
         <!-- Token configured + up to date → quiet confirmation -->
