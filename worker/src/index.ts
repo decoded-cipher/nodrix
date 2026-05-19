@@ -12,7 +12,9 @@ import automations from './admin/automations';
 import integrations from './admin/integrations';
 import auditLog from './admin/audit-log';
 import authProviders, { publicAuthProviders } from './admin/auth-providers';
+import customDomain from './admin/custom-domain';
 import sessionsRouter from './admin/sessions';
+import { canonicalHostMiddleware } from './middleware/canonical-host';
 import telemetry from './device/telemetry';
 import commands from './device/commands';
 import readState from './read/state';
@@ -26,6 +28,11 @@ export { DashboardDO } from './do/dashboard-do';
 export { Provision } from './workflows/provision';
 
 const app = new Hono<{ Bindings: Env }>();
+
+// Canonical-host: auto-detects the owner's custom domain on first hit, and
+// 308-redirects *.workers.dev to it on subsequent hits. See middleware file
+// for the exclusions (OAuth callbacks, WS upgrades).
+app.use('*', canonicalHostMiddleware);
 
 app.get('/healthz', (c) => c.json({ ok: true }));
 app.get('/v1/version', (c) => c.json({ name: 'nodrix', version: '0.0.0' }));
@@ -118,6 +125,7 @@ app.get('/v1/public/bootstrap-status', async (c) => {
 app.route('/v1/admin/me', me);
 app.route('/v1/admin/sessions', sessionsRouter);
 app.route('/v1/admin/auth-providers', authProviders);
+app.route('/v1/admin/custom-domain', customDomain);
 app.route('/v1/admin/projects', projects);
 app.route('/v1/admin/projects/:proj/devices', devices);
 app.route('/v1/admin/projects/:proj/dashboards', dashboards);

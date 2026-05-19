@@ -183,6 +183,11 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_audit_log_project ON audit_log(project_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_type, target_id)`,
+  `CREATE TABLE IF NOT EXISTS deployment_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
 ];
 
 // Idempotent: all statements use IF NOT EXISTS. Safe to call on every cold start

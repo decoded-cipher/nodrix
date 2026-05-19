@@ -13,7 +13,8 @@ export type AuditTargetType =
   | 'automation'
   | 'integration'
   | 'user'
-  | 'session';
+  | 'session'
+  | 'deployment';
 
 export async function recordAudit(
   env: Env,
