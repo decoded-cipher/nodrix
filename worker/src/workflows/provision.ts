@@ -1,12 +1,12 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
 import type { Env } from '../env';
-import { runMigrations } from '../db/migrate';
+import { ensureMigrated } from '../db/auto-migrate';
 
 // Provisioning workflow. Reserved for durable-execution provisioning tasks that
 // genuinely need checkpointing/retries (post-v1: dataset imports, complex
-// re-provisioning). Schema migration + first-owner bootstrap are fast enough
-// to run inline from /v1/admin/me; this Workflow exists for the §10 contract
-// and is exposed via /v1/admin/reprovision (admin-only) for re-running migrations.
+// re-provisioning). Routine migration application happens automatically in the
+// request pipeline; this Workflow exists for the §10 contract and is exposed
+// via /v1/admin/reprovision (admin-only) for forcing a fresh migration check.
 //
 // MUST NEVER be invoked from the telemetry/commands/dashboard hot paths.
 export type ProvisionParams = {
@@ -16,7 +16,7 @@ export type ProvisionParams = {
 export class Provision extends WorkflowEntrypoint<Env, ProvisionParams> {
   override async run(_event: WorkflowEvent<ProvisionParams>, step: WorkflowStep) {
     await step.do('run-migrations', async () => {
-      await runMigrations(this.env.DB);
+      await ensureMigrated(this.env.DB);
       return { ok: true };
     });
 

@@ -10,8 +10,16 @@ compatibility_flags = ["nodejs_compat"]
 # build:version writes worker/src/version.gen.ts with the running build's
 # commit SHA (from WORKERS_CI_COMMIT_SHA in CI, git rev-parse locally) so the
 # Settings → Version & updates section can compare against upstream.
+#
+# build:migrations bundles worker/src/db/migrations/*.sql into a TS array the
+# Worker reads at runtime. The auto-migrator (worker/src/db/auto-migrate.ts)
+# applies anything missing on the first request after each deploy, so users
+# never need to run `wrangler d1 migrations apply` by hand.
+# Anchor to repo root first — Workers Builds runs this from the repo root,
+# but local `wrangler deploy --dry-run` (invoked by the worker's build script
+# from worker/) starts in worker/. The cd-fallback makes both cases work.
 [build]
-command = "bun install && bun run build:version && bun run --filter @nodrix/web build"
+command = "[ -f scripts/gen-version.ts ] || cd ..; bun install && bun scripts/gen-version.ts && bun scripts/gen-migrations.ts && bun run --filter @nodrix/web build"
 
 # Vue SPA built by `web/` workspace is served as static assets.
 # `run_worker_first = true` is REQUIRED: without it, Cloudflare's edge serves

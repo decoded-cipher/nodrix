@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from './env';
 import { buildAuth } from './auth';
-import { isBootstrapped, runMigrations } from './db/migrate';
+import { ensureMigrated } from './db/auto-migrate';
 import { recordAudit } from './lib/audit';
 import me from './admin/me';
 import projects from './admin/projects';
@@ -30,6 +30,20 @@ export { Provision } from './workflows/provision';
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Auto-migrate: on the first request after a deploy, apply any pending
+// migrations bundled in worker/src/db/migrations.gen.ts. Module-level
+// guard inside makes this effectively free after the first successful
+// run per isolate. Logged-and-swallowed failures keep request handling
+// alive even when the migrator itself is broken.
+app.use('*', async (c, next) => {
+  try {
+    await ensureMigrated(c.env.DB);
+  } catch (e) {
+    console.error('[migrate] non-fatal:', e);
+  }
+  await next();
+});
+
 // Canonical-host: auto-detects the owner's custom domain on first hit, and
 // 308-redirects *.workers.dev to it on subsequent hits. See middleware file
 // for the exclusions (OAuth callbacks, WS upgrades).
@@ -39,16 +53,13 @@ app.get('/healthz', (c) => c.json({ ok: true }));
 app.get('/v1/version', (c) => c.json({ name: 'nodrix', version: '0.0.0' }));
 
 // Better Auth: signup/login/logout/OAuth callbacks. Public — no session gate.
-// Runs migrations on first call so a fresh deploy can bootstrap directly into
-// signup without a separate provisioning step.
+// Schema is guaranteed by the auto-migrate middleware running before us, so
+// Better Auth's tables exist regardless of whether this is a fresh deploy.
 // Better Auth handler mounted as a sub-app at /v1/auth. Sub-router routing
 // in Hono handles arbitrary nested paths reliably — bare wildcard patterns
 // have had quirks with multi-segment callback URLs in past versions.
 const authApp = new Hono<{ Bindings: Env }>();
 authApp.all('*', async (c) => {
-  if (!(await isBootstrapped(c.env.DB))) {
-    await runMigrations(c.env.DB);
-  }
   const auth = await buildAuth(c.env, c.req.raw);
 
   const url = new URL(c.req.url);
@@ -112,10 +123,8 @@ app.route('/v1/auth', authApp);
 app.route('/v1/public/auth-providers', publicAuthProviders);
 
 // Public bootstrap probe — login page shows registration form when true.
+// Schema is ensured by the auto-migrate middleware that runs before us.
 app.get('/v1/public/bootstrap-status', async (c) => {
-  if (!(await isBootstrapped(c.env.DB))) {
-    await runMigrations(c.env.DB);
-  }
   const row = await c.env.DB
     .prepare(`SELECT 1 AS one FROM users LIMIT 1`)
     .first<{ one: number }>();
