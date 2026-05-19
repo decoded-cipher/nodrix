@@ -60,8 +60,10 @@ const TEMPLATE = `
     .switch {
       display: inline-flex;
       align-items: center;
-      gap: clamp(6px, 2cqmin, 12px);
-      padding: clamp(8px, min(10cqh, 5cqw), 24px) clamp(14px, min(16cqh, 8cqw), 40px);
+      justify-content: center;
+      gap: clamp(8px, 3cqmin, 14px);
+      padding: clamp(8px, min(10cqh, 5cqw), 24px) clamp(24px, min(20cqh, 12cqw), 64px);
+      min-width: min(75cqw, 320px);
       border: 1.5px solid var(--color-border, #d4d4d4);
       border-radius: 9999px;
       background: var(--color-bg-elevated, white);
