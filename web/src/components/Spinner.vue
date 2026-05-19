@@ -13,7 +13,7 @@ withDefaults(
   <div
     :class="[
       block ? 'flex w-full flex-col items-center justify-center gap-2 py-6' : 'inline-flex items-center gap-2',
-      'text-neutral-500 dark:text-neutral-400',
+      'text-orange-600',
     ]"
     role="status"
     aria-live="polite"
