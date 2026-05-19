@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, type FunctionalComponent } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
 import ProjectSwitcher from './ProjectSwitcher.vue';
@@ -8,6 +8,7 @@ import ProjectSwitcher from './ProjectSwitcher.vue';
 const session = useSessionStore();
 const ui = useUiStore();
 const router = useRouter();
+const route = useRoute();
 
 async function signOut() {
   await session.signOut();
@@ -26,6 +27,9 @@ type NavItem = {
   to: string;
   icon: IconName;
   disabled?: boolean;
+  // Override the default exact-path active check. The Dashboards item uses
+  // this to stay highlighted on the view and edit routes too.
+  matchPath?: (path: string) => boolean;
 };
 
 const globalTop = computed<NavItem[]>(() => [
@@ -33,12 +37,22 @@ const globalTop = computed<NavItem[]>(() => [
   { label: 'Projects', to: '/projects', icon: 'folder' },
 ]);
 
-const projectScoped = computed<NavItem[]>(() => [
-  { label: 'Dashboards', to: `/p/${projId.value}/dashboards`, icon: 'dashboards', disabled: !hasProject.value },
-  { label: 'Devices', to: `/p/${projId.value}/devices`, icon: 'cpu', disabled: !hasProject.value },
-  { label: 'Automations', to: `/p/${projId.value}/automations`, icon: 'bolt', disabled: !hasProject.value },
-  { label: 'Integrations', to: `/p/${projId.value}/integrations`, icon: 'integrations', disabled: !hasProject.value },
-]);
+const projectScoped = computed<NavItem[]>(() => {
+  const id = projId.value;
+  return [
+    {
+      label: 'Dashboards',
+      to: `/p/${id}/dashboards`,
+      icon: 'dashboards',
+      disabled: !hasProject.value,
+      matchPath: (path) =>
+        path === `/p/${id}/dashboards` || path.startsWith(`/p/${id}/d/`),
+    },
+    { label: 'Devices', to: `/p/${id}/devices`, icon: 'cpu', disabled: !hasProject.value },
+    { label: 'Automations', to: `/p/${id}/automations`, icon: 'bolt', disabled: !hasProject.value },
+    { label: 'Integrations', to: `/p/${id}/integrations`, icon: 'integrations', disabled: !hasProject.value },
+  ];
+});
 
 const globalBottom = computed<NavItem[]>(() => [
   { label: 'Users', to: '/users', icon: 'users' },
@@ -46,6 +60,14 @@ const globalBottom = computed<NavItem[]>(() => [
   { label: 'Audit log', to: '/audit-log', icon: 'audit' },
   { label: 'Settings', to: '/settings', icon: 'settings' },
 ]);
+
+const ACTIVE_CLASSES =
+  'bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20';
+
+function isActive(item: NavItem): boolean {
+  if (item.matchPath) return item.matchPath(route.path);
+  return route.path === item.to;
+}
 
 // Heroicons-style 24x24 outline paths.
 const ICON_PATHS: Record<IconName, string> = {
@@ -135,8 +157,10 @@ const initials = computed(() => {
           <RouterLink
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            exact-active-class="bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20"
+            :class="[
+              ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5',
+              isActive(item) ? ACTIVE_CLASSES : '',
+            ]"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -158,8 +182,10 @@ const initials = computed(() => {
             v-if="!item.disabled"
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            exact-active-class="bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20"
+            :class="[
+              ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5',
+              isActive(item) ? ACTIVE_CLASSES : '',
+            ]"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -189,8 +215,10 @@ const initials = computed(() => {
           <RouterLink
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            exact-active-class="bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20"
+            :class="[
+              ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5',
+              isActive(item) ? ACTIVE_CLASSES : '',
+            ]"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
