@@ -12,11 +12,9 @@ import automations from './admin/automations';
 import integrations from './admin/integrations';
 import auditLog from './admin/audit-log';
 import authProviders, { publicAuthProviders } from './admin/auth-providers';
-import customDomain from './admin/custom-domain';
 import versionInfo from './admin/version';
 import updateRouter from './admin/update';
 import sessionsRouter from './admin/sessions';
-import { canonicalHostMiddleware } from './middleware/canonical-host';
 import telemetry from './device/telemetry';
 import commands from './device/commands';
 import readState from './read/state';
@@ -44,11 +42,6 @@ app.use('*', async (c, next) => {
   }
   await next();
 });
-
-// Canonical-host: auto-detects the owner's custom domain on first hit, and
-// 308-redirects *.workers.dev to it on subsequent hits. See middleware file
-// for the exclusions (OAuth callbacks, WS upgrades).
-app.use('*', canonicalHostMiddleware);
 
 app.get('/healthz', (c) => c.json({ ok: true }));
 app.get('/v1/version', (c) => c.json({ name: 'nodrix', version: '0.0.0' }));
@@ -136,7 +129,6 @@ app.get('/v1/public/bootstrap-status', async (c) => {
 app.route('/v1/admin/me', me);
 app.route('/v1/admin/sessions', sessionsRouter);
 app.route('/v1/admin/auth-providers', authProviders);
-app.route('/v1/admin/custom-domain', customDomain);
 app.route('/v1/admin/version', versionInfo);
 app.route('/v1/admin/update', updateRouter);
 app.route('/v1/admin/projects', projects);
