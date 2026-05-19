@@ -3,23 +3,22 @@ main = "worker/src/index.ts"
 compatibility_date = "2025-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Build the Vue SPA before wrangler deploys, so ASSETS has content.
-# Cloudflare Workers Builds + the Deploy button run `npx wrangler deploy` at
-# the repo root; this build step makes that one command sufficient.
+# Build pipeline. The Deploy to Cloudflare button creates a clone of this
+# repo in the user's GitHub. Without this hook, the cloned code would be
+# what's deployed forever — code updates pushed to upstream would never
+# reach existing deployments. scripts/build-from-upstream.sh, when running
+# under Workers Builds (detected via WORKERS_CI_COMMIT_SHA), replaces the
+# clone's working tree with upstream HEAD before invoking the build chain.
+# The user's wrangler.toml (with their resource IDs from the Deploy button)
+# is preserved across that overwrite.
 #
-# build:version writes worker/src/version.gen.ts with the running build's
-# commit SHA (from WORKERS_CI_COMMIT_SHA in CI, git rev-parse locally) so the
-# Settings → Version & updates section can compare against upstream.
+# Locally the same script falls through to the standard build chain, so
+# `bun run build` / `wrangler deploy --dry-run` still work for development.
 #
-# build:migrations bundles worker/src/db/migrations/*.sql into a TS array the
-# Worker reads at runtime. The auto-migrator (worker/src/db/auto-migrate.ts)
-# applies anything missing on the first request after each deploy, so users
-# never need to run `wrangler d1 migrations apply` by hand.
-# Anchor to repo root first — Workers Builds runs this from the repo root,
-# but local `wrangler deploy --dry-run` (invoked by the worker's build script
-# from worker/) starts in worker/. The cd-fallback makes both cases work.
+# The cd-fallback anchors to repo root regardless of whether wrangler is
+# invoked there (Workers Builds) or from worker/ (local `wrangler dev`).
 [build]
-command = "[ -f scripts/gen-version.ts ] || cd ..; bun install && bun scripts/gen-version.ts && bun scripts/gen-migrations.ts && bun run --filter @nodrix/web build"
+command = "[ -f scripts/build-from-upstream.sh ] || cd ..; bash scripts/build-from-upstream.sh"
 
 # Vue SPA built by `web/` workspace is served as static assets.
 # `run_worker_first = true` is REQUIRED: without it, Cloudflare's edge serves

@@ -72,6 +72,95 @@ function fmtDate(unix: number | null): string {
   return new Date(unix * 1000).toLocaleString();
 }
 
+// Update flow state — configured token, in-flight build, and polling.
+type UpdateConfig = {
+  configured: boolean;
+  account_id: string | null;
+  account_name: string | null;
+  script_name: string | null;
+  last_build_id: string | null;
+  dismissed_at: number | null;
+};
+type BuildStatus = {
+  build_id?: string;
+  status: 'idle' | 'queued' | 'running' | 'success' | 'failure' | 'unknown';
+  logs_url?: string;
+  error?: unknown;
+};
+
+const updateConfig = ref<UpdateConfig>({
+  configured: false,
+  account_id: null,
+  account_name: null,
+  script_name: null,
+  last_build_id: null,
+  dismissed_at: null,
+});
+const buildStatus = ref<BuildStatus>({ status: 'idle' });
+const updateTriggering = ref(false);
+const updateError = ref<string | null>(null);
+let buildPollTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function refreshUpdateConfig() {
+  try {
+    updateConfig.value = await api.get<UpdateConfig>('/v1/admin/update');
+  } catch {
+    // Owner-only endpoint; failures are tolerated.
+  }
+}
+
+async function refreshBuildStatus() {
+  try {
+    buildStatus.value = await api.get<BuildStatus>('/v1/admin/update/status');
+  } catch {
+    buildStatus.value = { status: 'unknown' };
+  }
+}
+
+function isBuildInFlight(s: BuildStatus['status']): boolean {
+  return s === 'queued' || s === 'running';
+}
+
+function schedulePoll() {
+  if (buildPollTimer) clearTimeout(buildPollTimer);
+  buildPollTimer = setTimeout(async () => {
+    await refreshBuildStatus();
+    if (isBuildInFlight(buildStatus.value.status)) {
+      schedulePoll();
+    } else if (buildStatus.value.status === 'success') {
+      // New build finished → fetch the freshly-baked version info.
+      await refreshVersion();
+    }
+  }, 5000);
+}
+
+async function triggerUpdate() {
+  updateTriggering.value = true;
+  updateError.value = null;
+  try {
+    const res = await api.post<{ build_id: string; status: BuildStatus['status'] }>(
+      '/v1/admin/update/trigger'
+    );
+    buildStatus.value = { build_id: res.build_id, status: res.status };
+    schedulePoll();
+  } catch (e) {
+    updateError.value = (e as Error).message;
+  } finally {
+    updateTriggering.value = false;
+  }
+}
+
+async function disconnectUpdateToken() {
+  const ok = await confirm({
+    title: 'Disconnect Cloudflare API token?',
+    message: 'In-app updates will stop working until you reconfigure. Your deployment keeps running fine.',
+    confirmLabel: 'Disconnect',
+  });
+  if (!ok) return;
+  await api.del<void>('/v1/admin/update/config');
+  await refreshUpdateConfig();
+}
+
 // Custom domain state. The worker auto-detects the canonical on first non-
 // *.workers.dev request, so most owners never touch the manual controls.
 // The advanced override exists for the rare "multiple custom domains, pick
@@ -176,7 +265,13 @@ onMounted(async () => {
     } catch {
       providers.value = [];
     }
-    await Promise.all([refreshCustomDomain(), refreshVersion()]);
+    await Promise.all([
+      refreshCustomDomain(),
+      refreshVersion(),
+      refreshUpdateConfig(),
+      refreshBuildStatus(),
+    ]);
+    if (isBuildInFlight(buildStatus.value.status)) schedulePoll();
   }
 });
 
@@ -532,40 +627,122 @@ const PROVIDER_META = {
           </p>
         </div>
 
-        <!-- How to update — always visible -->
-        <details class="rounded-md border border-neutral-200 dark:border-neutral-800">
-          <summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800">
-            How to update
-          </summary>
-          <div class="space-y-3 border-t border-neutral-100 px-3 py-3 text-xs dark:border-neutral-800">
-            <div>
-              <div class="font-semibold text-neutral-700 dark:text-neutral-200">If you deployed via the Cloudflare button</div>
-              <ol class="mt-1 list-decimal space-y-1 pl-4 text-neutral-600 dark:text-neutral-400">
-                <li>Open your fork on GitHub.</li>
-                <li>Click GitHub's <span class="font-medium">Sync fork</span> button (it appears when your fork is behind).</li>
-                <li>Cloudflare Workers Builds picks up the push and redeploys (~1 min).</li>
-                <li>Reload this page when the deploy finishes.</li>
-              </ol>
-              <a
-                :href="`https://github.com/${versionInfo?.upstream_repo ?? 'decoded-cipher/nodrix'}/network/members`"
-                target="_blank"
-                rel="noreferrer"
-                class="mt-2 inline-block text-orange-700 hover:underline dark:text-orange-400"
-              >Find your fork on GitHub ↗</a>
-            </div>
-            <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
-              <div class="font-semibold text-neutral-700 dark:text-neutral-200">If you deployed manually</div>
-              <pre class="mt-1 overflow-x-auto rounded bg-neutral-50 px-3 py-2 font-mono text-[11px] text-neutral-700 dark:bg-neutral-950 dark:text-neutral-300">git pull
-bun install
-bun run build
-bun run --filter @nodrix/worker deploy</pre>
-            </div>
-            <div class="border-t border-neutral-100 pt-3 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-              Tracking upstream <span class="font-mono">{{ versionInfo?.upstream_repo ?? '…' }}</span>.
-              Change <span class="font-mono">NODRIX_UPSTREAM_REPO</span> in <span class="font-mono">wrangler.toml</span> to follow a different repo.
-            </div>
+        <!-- Action row: depends on whether the CF API token is configured -->
+
+        <!-- Token NOT configured → CTA to onboarding wizard -->
+        <div
+          v-if="!updateConfig.configured"
+          class="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950"
+        >
+          <div class="font-semibold text-neutral-700 dark:text-neutral-200">One-click updates aren't set up yet</div>
+          <p class="mt-1 text-neutral-600 dark:text-neutral-400">
+            Connect a Cloudflare API token so this deployment can redeploy itself when new versions land upstream.
+            Setup takes about 2 minutes and the token stays encrypted at rest.
+          </p>
+          <RouterLink
+            to="/onboarding"
+            class="mt-2 inline-block rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+          >Set up one-click updates →</RouterLink>
+        </div>
+
+        <!-- Token configured + build in flight → polling state -->
+        <div
+          v-else-if="isBuildInFlight(buildStatus.status)"
+          class="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950"
+        >
+          <div class="flex items-center gap-2 font-semibold text-neutral-700 dark:text-neutral-200">
+            <svg class="h-3.5 w-3.5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.2" stroke-width="3" />
+              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" />
+            </svg>
+            <span>Build {{ buildStatus.status }}…</span>
           </div>
-        </details>
+          <p class="mt-1 text-neutral-600 dark:text-neutral-400">
+            Cloudflare Workers Builds is pulling the latest upstream code and redeploying.
+            This page will update when the build finishes (~1–2 minutes).
+          </p>
+          <a
+            v-if="buildStatus.logs_url"
+            :href="buildStatus.logs_url"
+            target="_blank"
+            rel="noreferrer"
+            class="mt-2 inline-block text-orange-700 hover:underline dark:text-orange-400"
+          >View build logs ↗</a>
+        </div>
+
+        <!-- Token configured + last build failed -->
+        <div
+          v-else-if="buildStatus.status === 'failure'"
+          class="rounded-md border border-red-200 bg-red-50 p-3 text-xs dark:border-red-900/60 dark:bg-red-950/30"
+        >
+          <div class="font-semibold text-red-900 dark:text-red-300">Last update build failed</div>
+          <p class="mt-1 text-red-800 dark:text-red-300/80">
+            Check the build logs for details. You can retry once you've fixed the issue.
+          </p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <a
+              v-if="buildStatus.logs_url"
+              :href="buildStatus.logs_url"
+              target="_blank"
+              rel="noreferrer"
+              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-100 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+            >View logs ↗</a>
+            <button
+              type="button"
+              :disabled="updateTriggering"
+              class="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+              @click="triggerUpdate"
+            >{{ updateTriggering ? 'Retrying…' : 'Retry build' }}</button>
+          </div>
+        </div>
+
+        <!-- Token configured + behind upstream → real Update button -->
+        <div
+          v-else-if="versionInfo?.status === 'behind'"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
+        >
+          <div class="min-w-0 text-orange-900 dark:text-orange-300">
+            <span class="font-semibold">Update available.</span>
+            One click pulls the latest upstream code into your deployment.
+          </div>
+          <button
+            type="button"
+            :disabled="updateTriggering"
+            class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+            @click="triggerUpdate"
+          >{{ updateTriggering ? 'Starting build…' : 'Update now' }}</button>
+        </div>
+
+        <!-- Token configured + up to date → quiet confirmation -->
+        <div
+          v-else-if="versionInfo?.status === 'up_to_date'"
+          class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/30"
+        >
+          <div class="font-semibold text-emerald-900 dark:text-emerald-300">You're on the latest version</div>
+          <p class="mt-1 text-emerald-800 dark:text-emerald-300/80">
+            One-click updates are wired up — you'll see a button here when new versions land upstream.
+          </p>
+        </div>
+
+        <p v-if="updateError" class="text-xs text-red-600 dark:text-red-400">{{ updateError }}</p>
+
+        <!-- Configured-state footer with disconnect + tracking info -->
+        <div
+          v-if="updateConfig.configured"
+          class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400"
+        >
+          <div>
+            Tracking upstream <span class="font-mono">{{ versionInfo?.upstream_repo ?? '…' }}</span>
+            ·
+            Account
+            <span class="font-mono">{{ updateConfig.account_name ?? updateConfig.account_id }}</span>
+          </div>
+          <button
+            type="button"
+            class="text-[11px] text-neutral-500 hover:text-red-600 dark:text-neutral-400 dark:hover:text-red-400"
+            @click="disconnectUpdateToken"
+          >Disconnect token</button>
+        </div>
       </div>
     </section>
 

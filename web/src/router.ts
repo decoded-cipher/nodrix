@@ -5,6 +5,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: () => import('./pages/Login.vue') },
   // Back-compat redirect for any bookmarks that still point at /setup.
   { path: '/setup', redirect: '/login' },
+  // Onboarding wizard — runs outside the app shell so the sidebar/topbar
+  // don't distract from the linear flow. AppShell auto-redirects owners
+  // here when /v1/admin/update reports !configured && !dismissed.
+  { path: '/onboarding', name: 'onboarding', component: () => import('./pages/Onboarding.vue') },
 
   // Everything else is wrapped in the authenticated app shell.
   {
