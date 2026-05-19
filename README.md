@@ -15,6 +15,8 @@
 > - ❌ Not yet recommended for any account you care about
 >
 > Setup, deploy, and contribution docs will land once the surface stabilizes. Until then, treat the repo as **read-only source for the curious**.
+>
+> ⭐ **Star** and 👀 **Watch** the repo to get notified the moment it's ready to deploy.
 
 ---
 
