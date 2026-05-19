@@ -304,16 +304,16 @@ function exitToView() {
               @click.stop="selectedId = g.i"
             >
               <div :data-host="g.i" class="h-full w-full"></div>
-              <button
-                type="button"
+              <div
                 class="drag-handle"
+                role="button"
                 title="Drag to move"
                 aria-label="Drag widget"
               >
                 <span class="drag-grip"></span>
                 <span class="drag-grip"></span>
                 <span class="drag-grip"></span>
-              </button>
+              </div>
             </div>
           </GridItem>
         </GridLayout>
@@ -358,7 +358,11 @@ function exitToView() {
   box-shadow: 0 0 0 2px #ea580c, 0 6px 24px -8px rgba(234, 88, 12, 0.45);
 }
 
-/* Drag handle — a centered grip pill on top edge. Hidden until hover or selected. */
+/* Drag handle — a centered grip pill on the top edge. Subtle by default,
+   stronger on hover/selection. NOTE: keep this a <div>, not a <button>;
+   interact.js (used by grid-layout-plus) doesn't reliably start drags
+   from native button elements because the browser swallows mousedown for
+   click activation. */
 .drag-handle {
   position: absolute;
   top: 4px;
@@ -369,23 +373,23 @@ function exitToView() {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  width: 38px;
-  height: 14px;
-  padding: 0;
-  border: none;
+  width: 44px;
+  height: 16px;
   border-radius: 9999px;
-  background: rgba(23, 23, 23, 0.55);
-  backdrop-filter: blur(4px);
+  background: rgba(23, 23, 23, 0.18);
   cursor: grab;
-  opacity: 0;
+  opacity: 0.55;
   transition: opacity 140ms ease, background 140ms ease, transform 140ms ease;
+  touch-action: none;
+  user-select: none;
 }
 .widget-frame:hover .drag-handle,
 .widget-frame.is-selected .drag-handle {
   opacity: 1;
+  background: rgba(23, 23, 23, 0.65);
 }
 .drag-handle:hover {
-  background: #ea580c;
+  background: #ea580c !important;
   transform: translateX(-50%) translateY(-1px);
 }
 .drag-handle:active {
@@ -396,7 +400,8 @@ function exitToView() {
   width: 3px;
   height: 3px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
+  pointer-events: none;
 }
 
 /* Custom resize handle in the bottom-right corner — replaces the default
