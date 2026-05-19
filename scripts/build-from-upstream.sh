@@ -30,8 +30,8 @@ WRANGLER_BACKUP="/tmp/nodrix-wrangler.toml"
 if [ -z "${WORKERS_CI_COMMIT_SHA:-}" ]; then
   echo "[build-from-upstream] not in Workers Builds CI — running local build chain"
   bun install
-  bun run --filter nodrix build:version
-  bun run --filter nodrix build:migrations
+  bun scripts/gen-version.ts
+  bun scripts/gen-migrations.ts
   bun run --filter @nodrix/web build
   exit 0
 fi
@@ -45,9 +45,15 @@ if [ ! -f wrangler.toml ]; then
 fi
 cp wrangler.toml "${WRANGLER_BACKUP}"
 
-# 2. Clone upstream HEAD into a temp dir.
+# 2. Clone upstream HEAD into a temp dir, and capture its commit SHA so the
+#    gen-version step bakes the right value (Workers Builds sets
+#    WORKERS_CI_COMMIT_SHA to the clone's commit, not upstream's, which would
+#    otherwise leave the deployed app reporting the wrong version).
 rm -rf "${UPSTREAM_DIR}"
 git clone --depth=1 "https://github.com/${UPSTREAM_REPO}.git" "${UPSTREAM_DIR}"
+UPSTREAM_SHA=$(cd "${UPSTREAM_DIR}" && git rev-parse HEAD)
+export WORKERS_CI_COMMIT_SHA="${UPSTREAM_SHA}"
+echo "[build-from-upstream] upstream HEAD: ${UPSTREAM_SHA}"
 
 # 3. Wipe local working tree (except wrangler.toml and .git), copy upstream
 #    in over the top. The find expression keeps wrangler.toml AND any dotfile
@@ -62,10 +68,12 @@ cp -R "${UPSTREAM_DIR}"/. .
 # 4. Restore user's wrangler.toml in case upstream had its own committed.
 cp "${WRANGLER_BACKUP}" wrangler.toml
 
-# 5. Run the standard build chain on the now-upstream source.
+# 5. Run the standard build chain on the now-upstream source. Invoke the
+#    gen scripts directly (not via `bun run --filter nodrix`) — bun's filter
+#    only matches workspace members, and "nodrix" is the workspace root.
 bun install
-bun run --filter nodrix build:version
-bun run --filter nodrix build:migrations
+bun scripts/gen-version.ts
+bun scripts/gen-migrations.ts
 bun run --filter @nodrix/web build
 
 echo "[build-from-upstream] done"
