@@ -6,6 +6,7 @@ import { useProjectStore } from '../stores/project';
 import { useUiStore } from '../stores/ui';
 import Sidebar from './Sidebar.vue';
 import Topbar from './Topbar.vue';
+import Spinner from '../components/Spinner.vue';
 
 const session = useSessionStore();
 const project = useProjectStore();
@@ -61,8 +62,8 @@ watch(
 </script>
 
 <template>
-  <div v-if="session.loading && !session.user" class="grid h-full place-items-center text-sm text-neutral-500">
-    Loading...
+  <div v-if="session.loading && !session.user" class="grid h-full place-items-center">
+    <Spinner size="lg" />
   </div>
   <div v-else-if="session.error && session.error.status !== 401" class="grid h-full place-items-center">
     <div class="max-w-md text-center">

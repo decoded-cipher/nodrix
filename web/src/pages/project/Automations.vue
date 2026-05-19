@@ -2,6 +2,7 @@
 import { h, onMounted, ref, type FunctionalComponent } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import { confirm } from '../../lib/confirm';
+import Spinner from '../../components/Spinner.vue';
 import type { Automation, AutomationTriggerType } from '../../types';
 
 const project = useProjectStore();
@@ -164,8 +165,8 @@ function triggerLabel(t: AutomationTriggerType): string {
       <div v-else-if="!loading" class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500">
         No automations yet. Click <span class="font-semibold">New automation</span> to create one.
       </div>
-      <div v-else class="rounded-lg border border-neutral-200 bg-white p-10 text-center text-sm text-neutral-500">
-        Loading…
+      <div v-else class="rounded-lg border border-neutral-200 bg-white p-10">
+        <Spinner block />
       </div>
     </section>
 

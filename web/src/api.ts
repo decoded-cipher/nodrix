@@ -3,6 +3,8 @@
 // credentials: 'include'. A 401 from any admin endpoint means the session
 // is gone — the app subscribes via onUnauthorized() to redirect to /login.
 
+import { progress } from './lib/progress';
+
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown) {
     super(`HTTP ${status}`);
@@ -17,19 +19,24 @@ export function onUnauthorized(fn: UnauthorizedHandler) {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'include',
-  });
+  progress.start();
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: 'include',
+    });
 
-  if (res.status === 401) unauthorizedHandler?.();
-  if (res.status === 204) return undefined as T;
+    if (res.status === 401) unauthorizedHandler?.();
+    if (res.status === 204) return undefined as T;
 
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, payload);
-  return payload as T;
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, payload);
+    return payload as T;
+  } finally {
+    progress.done();
+  }
 }
 
 export const api = {

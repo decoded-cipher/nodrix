@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { authClient } from '../lib/auth-client';
+import Spinner from '../components/Spinner.vue';
 
 const session = useSessionStore();
 const router = useRouter();
@@ -184,9 +185,9 @@ async function signInWith(provider: 'google' | 'github') {
         </div>
       </div>
 
-      <p v-if="loadingProviders" class="mt-4 text-center text-[11px] text-neutral-400">
-        Checking sign-in options…
-      </p>
+      <div v-if="loadingProviders" class="mt-4 flex justify-center">
+        <Spinner size="sm" label="Checking sign-in options…" />
+      </div>
     </div>
   </main>
 </template>

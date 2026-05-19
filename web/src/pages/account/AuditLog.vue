@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useSessionStore } from '../../stores/session';
+import Spinner from '../../components/Spinner.vue';
 
 const session = useSessionStore();
 const loading = ref(false);
@@ -126,8 +127,8 @@ const rangeEnd = computed(() =>
             </td>
           </tr>
           <tr v-if="loading && session.auditLog.length === 0">
-            <td colspan="5" class="px-4 py-10 text-center text-sm text-neutral-500">
-              Loading…
+            <td colspan="5" class="px-4 py-10">
+              <Spinner block />
             </td>
           </tr>
         </tbody>
