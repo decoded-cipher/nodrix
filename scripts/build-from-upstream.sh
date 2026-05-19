@@ -45,26 +45,32 @@ if [ ! -f wrangler.toml ]; then
 fi
 cp wrangler.toml "${WRANGLER_BACKUP}"
 
-# 2. Clone upstream HEAD into a temp dir, and capture its commit SHA so the
-#    gen-version step bakes the right value (Workers Builds sets
-#    WORKERS_CI_COMMIT_SHA to the clone's commit, not upstream's, which would
-#    otherwise leave the deployed app reporting the wrong version).
+# 2. Clone upstream HEAD into a temp dir, capture its commit SHA, then drop
+#    upstream's own .git directory — we never want to overlay upstream's git
+#    history into the deployment's git tree (and git's pack files are chmod
+#    444, so a second-pass cp would fail with EACCES, which is exactly what
+#    happens because Workers Builds runs the [build] command twice: once for
+#    `npm run build` and again for the subsequent `wrangler deploy`).
+#
+#    The SHA capture has to happen BEFORE the .git rm.
 rm -rf "${UPSTREAM_DIR}"
 git clone --depth=1 "https://github.com/${UPSTREAM_REPO}.git" "${UPSTREAM_DIR}"
 UPSTREAM_SHA=$(cd "${UPSTREAM_DIR}" && git rev-parse HEAD)
 export WORKERS_CI_COMMIT_SHA="${UPSTREAM_SHA}"
 echo "[build-from-upstream] upstream HEAD: ${UPSTREAM_SHA}"
+rm -rf "${UPSTREAM_DIR}/.git"
 
 # 3. Overlay upstream onto the local working tree IN-PLACE. Critical: do NOT
 #    rm-rf and recreate directories. The outer `bun run --filter @nodrix/worker
 #    build` process is holding a CWD inside worker/, and the wrangler subprocess
 #    it spawned is what's running THIS script. If we wipe worker/ and recreate
 #    it, those processes end up with a CWD pointing to a deleted inode — wrangler
-#    silently hangs on its next filesystem op. `cp -R src/. dst` overwrites
-#    files in place without touching the parent inode. We don't bother removing
-#    files that exist locally but not upstream — they just sit there unused
-#    (wrangler only bundles what wrangler.toml's `main` + assets dir reference).
-cp -R "${UPSTREAM_DIR}"/. .
+#    silently hangs on its next filesystem op. `cp -Rf src/. dst` overwrites
+#    files in place (including read-only ones via -f) without touching the
+#    parent inode. We don't bother removing files that exist locally but not
+#    upstream — they just sit there unused (wrangler only bundles what
+#    wrangler.toml's `main` + assets dir reference).
+cp -Rf "${UPSTREAM_DIR}"/. .
 
 # 4. Restore user's wrangler.toml in case upstream had its own (which it does).
 cp "${WRANGLER_BACKUP}" wrangler.toml
