@@ -322,6 +322,7 @@ function exitToView() {
                 role="button"
                 title="Drag to move"
                 aria-label="Drag widget"
+                @click.stop
               >
                 <span class="drag-grip"></span>
                 <span class="drag-grip"></span>

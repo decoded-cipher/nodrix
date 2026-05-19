@@ -261,6 +261,15 @@ export class IotChartElement extends HTMLElement {
         labels: {
           datetimeUTC: false,
           style: { fontSize: '10px' },
+          // Round time labels to the minute everywhere — no seconds clutter.
+          datetimeFormatter: {
+            year: 'yyyy',
+            month: "MMM 'yy",
+            day: 'dd MMM',
+            hour: 'HH:mm',
+            minute: 'HH:mm',
+            second: 'HH:mm',
+          },
         },
         axisBorder: { show: true, color: axisColor, height: 1 },
         axisTicks: { show: true, color: axisColor, height: 4 },
@@ -268,22 +277,19 @@ export class IotChartElement extends HTMLElement {
       yaxis: {
         labels: {
           style: { fontSize: '10px' },
+          // Round Y-axis ticks to integers when the value clearly is one,
+          // otherwise show enough precision to distinguish nearby ticks.
           formatter: (v: number) => formatNumber(v),
         },
         axisBorder: { show: true, color: axisColor, width: 1 },
         axisTicks: { show: true, color: axisColor, width: 4 },
       },
       tooltip: {
-        x: { format: 'HH:mm:ss' },
+        x: { format: 'HH:mm' },
+        y: { formatter: (v: number) => formatNumber(v) },
         theme: isDark() ? 'dark' : 'light',
       },
-      legend: {
-        show: this.#series.length > 1,
-        position: 'bottom',
-        fontSize: '11px',
-        markers: { size: 5 },
-        itemMargin: { horizontal: 8, vertical: 2 },
-      },
+      legend: { show: false },
       grid: {
         borderColor: 'var(--color-border, #e5e5e5)',
         strokeDashArray: 3,
@@ -313,11 +319,14 @@ export class IotChartElement extends HTMLElement {
 
 function formatNumber(v: number): string {
   if (!Number.isFinite(v)) return '';
+  // If apex picked a tick that's already an integer, render it as such —
+  // typical for "nice" ranges like 0/20/40/60/80/100.
+  if (Number.isInteger(v)) return v.toFixed(0);
   const abs = Math.abs(v);
-  if (abs >= 1000) return v.toFixed(0);
+  if (abs >= 100) return v.toFixed(0);
   if (abs >= 10) return v.toFixed(1);
-  if (abs >= 1) return v.toFixed(2);
-  return v.toFixed(3);
+  if (abs >= 1) return v.toFixed(1);
+  return v.toFixed(2);
 }
 
 function isDark(): boolean {
