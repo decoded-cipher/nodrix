@@ -1,186 +1,314 @@
-// <iot-chart> — multi-series line chart. SVG, no deps.
+// <iot-chart> — multi-series time-series chart, powered by ApexCharts.
 //
-// Properties set by the page:
-//   - series: Array<{ key: string; label?: string; color?: string; points: Array<{ ts: number; value: number }> }>
+// Attributes:
+//   - data-title
+//   - data-chart-type   'line' | 'area' | 'bar' | 'stepline'  (default 'line')
+//   - data-smooth       'true' | 'false'                       (default 'true' for line/area)
+//   - data-stacked      'true' | 'false'                       (default 'false')
+//   - data-zoom         'true' | 'false'                       (default 'false' — toolbar off)
 //
-// The page appends new points to the matching series on each update.
+// Properties:
+//   - series: Array<{ key, label?, color?, points: Array<{ ts, value }> }>
+//
+// The page calls appendPoint(key, {ts, value}) on each WS update; we feed
+// that into apex's appendData() so live ticks animate in.
+
+import ApexCharts from 'apexcharts';
+import apexCss from 'apexcharts/dist/apexcharts.css?raw';
 
 type SeriesPoint = { ts: number; value: number };
 type SeriesData = { key: string; label?: string; color?: string; points: SeriesPoint[] };
+type ChartType = 'line' | 'area' | 'bar' | 'stepline';
 
 const PALETTE = ['#ea580c', '#0ea5e9', '#10b981', '#a855f7', '#f59e0b', '#ef4444'];
 
-const TEMPLATE = `
-  <style>
-    :host {
-      display: block;
-      height: 100%;
-      width: 100%;
-      box-sizing: border-box;
-      container-type: size;
-      font-family: system-ui, sans-serif;
-      color: var(--color-text, #171717);
-    }
-    .card {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-      box-sizing: border-box;
-      padding: clamp(10px, 5cqmin, 18px);
-      background: var(--color-bg-elevated, white);
-      border: 1px solid var(--color-border, #e5e5e5);
-      border-radius: 10px;
-      transition: border-color 120ms ease;
-      overflow: hidden;
-      gap: clamp(4px, 2cqmin, 10px);
-    }
-    .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
-    .title {
-      font-size: clamp(10px, 4cqmin, 13px);
-      color: var(--color-text-muted, #525252);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex-shrink: 0;
-    }
-    .chart-area {
-      flex: 1;
-      min-height: 0;
-      width: 100%;
-      position: relative;
-    }
-    svg { width: 100%; height: 100%; display: block; }
-    svg .grid-line { stroke: var(--color-border, #e5e5e5); stroke-opacity: 0.4; stroke-dasharray: 2 3; }
-    svg .empty-text { fill: var(--color-text-faint, #a3a3a3); }
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.6em 0.9em;
-      font-size: clamp(9px, 3.5cqmin, 12px);
-      color: var(--color-text-muted, #525252);
-      flex-shrink: 0;
-    }
-    .legend-item { display: inline-flex; align-items: center; gap: 0.35em; }
-    .swatch {
-      width: 0.7em;
-      height: 0.7em;
-      border-radius: 2px;
-      flex-shrink: 0;
-    }
-    .footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75em;
-      flex-shrink: 0;
-    }
-    .ts {
-      font-size: 9px;
-      color: var(--color-text-faint, #a3a3a3);
-      font-variant-numeric: tabular-nums;
-      line-height: 1;
-      white-space: nowrap;
-    }
-  </style>
-  <div class="card">
-    <div class="title"></div>
-    <div class="chart-area">
-      <svg viewBox="0 0 400 200" preserveAspectRatio="none"></svg>
-    </div>
-    <div class="footer">
-      <div class="legend"></div>
-      <div class="ts"></div>
-    </div>
-  </div>
+const WIDGET_CSS = `
+  :host {
+    display: block;
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    container-type: size;
+    font-family: system-ui, sans-serif;
+    color: var(--color-text, #171717);
+  }
+  .card {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: clamp(4px, 2cqmin, 8px);
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    padding: clamp(10px, 4cqmin, 16px);
+    background: var(--color-bg-elevated, white);
+    border: 1px solid var(--color-border, #e5e5e5);
+    border-radius: 10px;
+    transition: border-color 120ms ease;
+    overflow: hidden;
+  }
+  .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
+  .title {
+    font-size: clamp(10px, min(8cqh, 4cqw), 14px);
+    color: var(--color-text-muted, #525252);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chart-host {
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+  }
+  .ts {
+    font-size: 9px;
+    color: var(--color-text-faint, #a3a3a3);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: right;
+    white-space: nowrap;
+  }
+  /* Bring ApexCharts text colors in line with the dashboard theme. */
+  :host .apexcharts-text,
+  :host .apexcharts-legend-text,
+  :host .apexcharts-tooltip-text,
+  :host .apexcharts-xaxistooltip-text {
+    fill: var(--color-text-muted, #525252) !important;
+    color: var(--color-text-muted, #525252) !important;
+  }
+  :host .apexcharts-tooltip {
+    background: var(--color-bg-elevated, white) !important;
+    border-color: var(--color-border, #e5e5e5) !important;
+    color: var(--color-text, #171717) !important;
+  }
+  :host .apexcharts-tooltip-title {
+    background: var(--color-bg, #fafafa) !important;
+    border-color: var(--color-border, #e5e5e5) !important;
+  }
+  :host .apexcharts-gridline { stroke: var(--color-border, #e5e5e5) !important; opacity: 0.45; }
 `;
 
 export class IotChartElement extends HTMLElement {
   #series: SeriesData[] = [];
   #maxPoints = 600;
+  #chart: ApexCharts | null = null;
+  #host: HTMLElement | null = null;
+  #pendingFrame: number | null = null;
 
-  static get observedAttributes() { return ['data-title']; }
+  static get observedAttributes() {
+    return ['data-title', 'data-chart-type', 'data-smooth', 'data-stacked', 'data-zoom'];
+  }
 
   constructor() {
     super();
     const shadow = this.attachShadow({ mode: 'open' });
-    shadow.innerHTML = TEMPLATE;
+    // Apex's stylesheet is injected into the document head by default —
+    // which can't reach into shadow DOM. Bundle it as raw text and put a
+    // copy inside the shadow root so legend / tooltip / axes look right.
+    shadow.innerHTML = `
+      <style>${WIDGET_CSS}</style>
+      <style>${apexCss}</style>
+      <div class="card">
+        <div class="title"></div>
+        <div class="chart-host"></div>
+        <div class="ts"></div>
+      </div>
+    `;
+    this.#host = shadow.querySelector('.chart-host');
   }
 
-  connectedCallback() { this.render(); }
-  attributeChangedCallback() { this.render(); }
+  connectedCallback() {
+    this.renderTitle();
+    this.scheduleRebuild();
+  }
+
+  disconnectedCallback() {
+    if (this.#pendingFrame !== null) {
+      cancelAnimationFrame(this.#pendingFrame);
+      this.#pendingFrame = null;
+    }
+    this.destroyChart();
+  }
+
+  attributeChangedCallback(name: string) {
+    if (name === 'data-title') {
+      this.renderTitle();
+      return;
+    }
+    // Anything that affects chart construction → rebuild.
+    this.scheduleRebuild();
+  }
 
   set series(s: SeriesData[]) {
     this.#series = s.map((row) => ({
       ...row,
       points: [...row.points].sort((a, b) => a.ts - b.ts),
     }));
-    this.render();
+    this.scheduleRebuild();
   }
   get series(): SeriesData[] { return this.#series; }
 
   appendPoint(key: string, point: SeriesPoint): void {
-    const s = this.#series.find((x) => x.key === key);
-    if (!s) return;
+    const idx = this.#series.findIndex((s) => s.key === key);
+    if (idx < 0) return;
+    const s = this.#series[idx]!;
     s.points.push(point);
     if (s.points.length > this.#maxPoints) s.points = s.points.slice(-this.#maxPoints);
-    this.render();
+
+    this.updateTs();
+    if (this.#chart) {
+      // Live push — keeps existing axes/animations rather than rebuilding.
+      this.#chart.appendData([{ data: [{ x: point.ts * 1000, y: point.value }] }]);
+    } else {
+      this.scheduleRebuild();
+    }
   }
 
-  private render() {
-    const shadow = this.shadowRoot!;
-    shadow.querySelector('.title')!.textContent = this.getAttribute('data-title') ?? '';
-    const svg = shadow.querySelector('svg')!;
-    const legend = shadow.querySelector('.legend')!;
-    const tsEl = shadow.querySelector('.ts')!;
-    svg.innerHTML = '';
-    legend.innerHTML = '';
-    tsEl.textContent = '';
+  private renderTitle() {
+    const t = this.shadowRoot!.querySelector('.title');
+    if (t) t.textContent = this.getAttribute('data-title') ?? '';
+  }
 
+  private updateTs() {
+    const tsEl = this.shadowRoot!.querySelector('.ts');
+    if (!tsEl) return;
     const all = this.#series.flatMap((s) => s.points);
     if (all.length === 0) {
-      svg.innerHTML = `<text x="200" y="100" text-anchor="middle" class="empty-text" font-size="12">No data yet</text>`;
+      tsEl.textContent = '';
       return;
     }
-
-    const minTs = Math.min(...all.map((p) => p.ts));
     const maxTs = Math.max(...all.map((p) => p.ts));
     tsEl.textContent = new Date(maxTs * 1000).toLocaleTimeString();
-    const minV = Math.min(...all.map((p) => p.value));
-    const maxV = Math.max(...all.map((p) => p.value));
-    const tSpan = Math.max(1, maxTs - minTs);
-    const vSpan = Math.max(0.0001, maxV - minV);
+  }
 
-    const W = 400, H = 200, PAD = 8;
-    const xs = (ts: number) => PAD + ((ts - minTs) / tSpan) * (W - 2 * PAD);
-    const ys = (v: number) => H - PAD - ((v - minV) / vSpan) * (H - 2 * PAD);
-
-    // Horizontal grid lines (3 of them, evenly spaced).
-    for (let i = 1; i <= 3; i++) {
-      const y = PAD + (i / 4) * (H - 2 * PAD);
-      svg.innerHTML += `<line class="grid-line" x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" />`;
+  private destroyChart() {
+    if (this.#chart) {
+      this.#chart.destroy();
+      this.#chart = null;
     }
+  }
 
-    this.#series.forEach((s, i) => {
-      if (s.points.length === 0) return;
-      const color = s.color ?? PALETTE[i % PALETTE.length]!;
-      const d = s.points
-        .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${xs(p.ts).toFixed(2)} ${ys(p.value).toFixed(2)}`)
-        .join(' ');
-      svg.innerHTML += `<path d="${d}" stroke="${color}" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />`;
-
-      const item = document.createElement('span');
-      item.className = 'legend-item';
-      const swatch = document.createElement('span');
-      swatch.className = 'swatch';
-      swatch.style.background = color;
-      const label = document.createElement('span');
-      label.textContent = s.label ?? s.key;
-      item.append(swatch, label);
-      legend.appendChild(item);
+  // Coalesce rapid rebuild requests (initial mount, attribute flurry,
+  // series push) into one paint.
+  private scheduleRebuild() {
+    if (this.#pendingFrame !== null) return;
+    this.#pendingFrame = requestAnimationFrame(() => {
+      this.#pendingFrame = null;
+      this.rebuild();
     });
   }
+
+  private rebuild() {
+    if (!this.#host) return;
+    this.destroyChart();
+    this.updateTs();
+
+    const type = this.chartType();
+    const smooth = this.boolAttr('data-smooth', type !== 'bar' && type !== 'stepline');
+    const stacked = this.boolAttr('data-stacked', false);
+    const zoom = this.boolAttr('data-zoom', false);
+
+    const apexType: 'line' | 'area' | 'bar' = type === 'bar' ? 'bar' : type === 'area' ? 'area' : 'line';
+    const curve: 'smooth' | 'straight' | 'stepline' =
+      type === 'stepline' ? 'stepline' : smooth ? 'smooth' : 'straight';
+
+    const seriesData = this.#series.map((s, i) => ({
+      name: s.label ?? s.key,
+      color: s.color ?? PALETTE[i % PALETTE.length]!,
+      data: s.points.map((p) => ({ x: p.ts * 1000, y: p.value })),
+    }));
+
+    const options: ApexCharts.ApexOptions = {
+      chart: {
+        type: apexType,
+        height: '100%',
+        stacked,
+        toolbar: { show: zoom, tools: { zoom: zoom, zoomin: zoom, zoomout: zoom, pan: zoom, reset: zoom, download: false, selection: false } },
+        zoom: { enabled: zoom, type: 'x' },
+        animations: { enabled: true, speed: 250 },
+        fontFamily: 'system-ui, sans-serif',
+        background: 'transparent',
+        foreColor: 'var(--color-text-muted, #525252)',
+      },
+      series: seriesData,
+      colors: seriesData.map((s) => s.color as string),
+      stroke: {
+        curve,
+        width: type === 'bar' ? 0 : 2,
+        lineCap: 'round',
+      },
+      fill: type === 'area'
+        ? { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] } }
+        : { type: 'solid', opacity: type === 'bar' ? 0.9 : 1 },
+      dataLabels: { enabled: false },
+      markers: {
+        size: 0,
+        hover: { size: 4 },
+      },
+      xaxis: {
+        type: 'datetime',
+        labels: {
+          datetimeUTC: false,
+          style: { fontSize: '10px' },
+        },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+      },
+      yaxis: {
+        labels: {
+          style: { fontSize: '10px' },
+          formatter: (v: number) => formatNumber(v),
+        },
+      },
+      tooltip: {
+        x: { format: 'HH:mm:ss' },
+        theme: isDark() ? 'dark' : 'light',
+      },
+      legend: {
+        show: this.#series.length > 1,
+        position: 'bottom',
+        fontSize: '11px',
+        markers: { size: 5 },
+        itemMargin: { horizontal: 8, vertical: 2 },
+      },
+      grid: {
+        borderColor: 'var(--color-border, #e5e5e5)',
+        strokeDashArray: 3,
+        padding: { left: 0, right: 0, top: 0, bottom: 0 },
+      },
+      noData: {
+        text: 'No data yet',
+        style: { fontSize: '12px', color: 'var(--color-text-faint, #a3a3a3)' },
+      },
+    };
+
+    this.#chart = new ApexCharts(this.#host, options);
+    this.#chart.render();
+  }
+
+  private chartType(): ChartType {
+    const t = (this.getAttribute('data-chart-type') ?? 'line').toLowerCase();
+    return t === 'area' || t === 'bar' || t === 'stepline' ? (t as ChartType) : 'line';
+  }
+
+  private boolAttr(name: string, dflt: boolean): boolean {
+    const v = this.getAttribute(name);
+    if (v === null) return dflt;
+    return v === 'true' || v === '1' || v === 'yes';
+  }
+}
+
+function formatNumber(v: number): string {
+  if (!Number.isFinite(v)) return '';
+  const abs = Math.abs(v);
+  if (abs >= 1000) return v.toFixed(0);
+  if (abs >= 10) return v.toFixed(1);
+  if (abs >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+
+function isDark(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 }
