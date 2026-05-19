@@ -65,7 +65,7 @@ const TEMPLATE = `
       font-weight: 500;
     }
     .ts {
-      font-size: clamp(9px, 4cqmin, 12px);
+      font-size: 9px;
       color: var(--color-text-faint, #a3a3a3);
       font-variant-numeric: tabular-nums;
       line-height: 1;

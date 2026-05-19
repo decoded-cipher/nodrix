@@ -169,7 +169,7 @@ const TEMPLATE = `
       gap: 0.4em;
     }
     .ts {
-      font-size: clamp(9px, min(6cqh, 3cqw), 12px);
+      font-size: 9px;
       color: var(--color-text-faint, #a3a3a3);
       white-space: nowrap;
     }

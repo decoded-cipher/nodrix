@@ -94,7 +94,7 @@ const TEMPLATE = `
     }
     .label:empty { display: none; }
     .ts {
-      font-size: clamp(9px, min(6cqh, 3cqw), 12px);
+      font-size: 9px;
       color: var(--color-text-faint, #a3a3a3);
       font-variant-numeric: tabular-nums;
       line-height: 1;
