@@ -322,13 +322,9 @@ function exitToView() {
 
 <style scoped>
 .canvas-dots {
-  background-color: #f5f5f5;
-  background-image: radial-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+  background-color: var(--canvas-bg);
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
   background-size: 16px 16px;
   background-position: 0 0;
-}
-:global(.dark) .canvas-dots {
-  background-color: #0a0a0a;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
 }
 </style>
