@@ -3,7 +3,7 @@
 
 import type { WidgetType } from '../types';
 
-export type FieldType = 'string' | 'number' | 'device' | 'select' | 'series';
+export type FieldType = 'string' | 'number' | 'boolean' | 'device' | 'select' | 'series';
 
 export type FieldDef = {
   key: string;
@@ -86,14 +86,12 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Plot trends for one or more metrics over a time window (15m to 24h). Good for spotting drift, spikes, or correlations.',
     icon: ICON_CHART,
     defaultSize: { w: 6, h: 3 },
-    defaultProps: { title: '', window: '1h', chartType: 'line', smooth: 'true', stacked: 'false', zoom: 'false', series: [] },
+    defaultProps: { title: '', window: '1h', chartType: 'line', zoom: false, series: [] },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
       { key: 'window', label: 'Window', type: 'select', options: ['15m', '1h', '6h', '24h'] },
       { key: 'chartType', label: 'Type', type: 'select', options: ['line', 'area', 'bar', 'stepline'] },
-      { key: 'smooth', label: 'Smooth curves', type: 'select', options: ['true', 'false'] },
-      { key: 'stacked', label: 'Stacked', type: 'select', options: ['true', 'false'] },
-      { key: 'zoom', label: 'Enable zoom', type: 'select', options: ['true', 'false'] },
+      { key: 'zoom', label: 'Enable zoom', type: 'boolean' },
       { key: 'series', label: 'Series', type: 'series' },
     ],
   },

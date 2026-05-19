@@ -76,9 +76,7 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
   if (typeof p['label'] === 'string') el.setAttribute('data-label', p['label']);
   if (typeof p['orientation'] === 'string') el.setAttribute('data-orientation', p['orientation']);
   if (typeof p['chartType'] === 'string') el.setAttribute('data-chart-type', p['chartType']);
-  if (typeof p['smooth'] === 'string') el.setAttribute('data-smooth', p['smooth']);
-  if (typeof p['stacked'] === 'string') el.setAttribute('data-stacked', p['stacked']);
-  if (typeof p['zoom'] === 'string') el.setAttribute('data-zoom', p['zoom']);
+  if (typeof p['zoom'] === 'boolean') el.setAttribute('data-zoom', p['zoom'] ? 'true' : 'false');
 
   if (item.type === 'iot-chart') {
     const series = (p['series'] as Array<Record<string, unknown>> | undefined) ?? [];

@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { specFor } from './widget-catalog';
 import { useProjectStore } from '../stores/project';
 import Dropdown from '../components/Dropdown.vue';
+import Toggle from '../components/Toggle.vue';
 import type { WidgetInstance } from '../types';
 
 const props = defineProps<{ item: WidgetInstance | null }>();
@@ -97,6 +98,15 @@ function removeSeries(idx: number) {
             @input="setProp(f.key, Number(($event.target as HTMLInputElement).value))"
           />
         </label>
+
+        <div v-else-if="f.type === 'boolean'" class="flex items-center justify-between">
+          <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</span>
+          <Toggle
+            :model-value="Boolean(item.props[f.key])"
+            :label="f.label"
+            @update:model-value="(v) => setProp(f.key, v)"
+          />
+        </div>
 
         <div v-else-if="f.type === 'device'" class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</span>

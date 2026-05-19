@@ -3,9 +3,11 @@
 // Attributes:
 //   - data-title
 //   - data-chart-type   'line' | 'area' | 'bar' | 'stepline'  (default 'line')
-//   - data-smooth       'true' | 'false'                       (default 'true' for line/area)
-//   - data-stacked      'true' | 'false'                       (default 'false')
-//   - data-zoom         'true' | 'false'                       (default 'false' — toolbar off)
+//   - data-zoom         'true' | 'false'                       (default 'false')
+//
+// Line and area always render with smooth curves. Bar and stepline keep
+// their natural shape. The toolbar is always hidden; zoom (when enabled)
+// uses drag-to-select and double-click to reset.
 //
 // Properties:
 //   - series: Array<{ key, label?, color?, points: Array<{ ts, value }> }>
@@ -48,7 +50,11 @@ const WIDGET_CSS = `
   }
   .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
   .title {
-    font-size: clamp(10px, min(8cqh, 4cqw), 14px);
+    /* Fixed size — apex's CSS bundle can interact unpredictably with
+       container-query units inside the shadow root, so don't gamble. */
+    font-size: 13px;
+    line-height: 1.2;
+    min-height: 16px;
     color: var(--color-text-muted, #525252);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -57,6 +63,7 @@ const WIDGET_CSS = `
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .title:empty { display: none; }
   .chart-host {
     min-height: 0;
     min-width: 0;
@@ -98,7 +105,7 @@ export class IotChartElement extends HTMLElement {
   #pendingFrame: number | null = null;
 
   static get observedAttributes() {
-    return ['data-title', 'data-chart-type', 'data-smooth', 'data-stacked', 'data-zoom'];
+    return ['data-title', 'data-chart-type', 'data-zoom'];
   }
 
   constructor() {
@@ -206,13 +213,12 @@ export class IotChartElement extends HTMLElement {
     this.updateTs();
 
     const type = this.chartType();
-    const smooth = this.boolAttr('data-smooth', type !== 'bar' && type !== 'stepline');
-    const stacked = this.boolAttr('data-stacked', false);
     const zoom = this.boolAttr('data-zoom', false);
 
     const apexType: 'line' | 'area' | 'bar' = type === 'bar' ? 'bar' : type === 'area' ? 'area' : 'line';
+    // Always smooth for line/area; stepline keeps its steps; bar has no stroke.
     const curve: 'smooth' | 'straight' | 'stepline' =
-      type === 'stepline' ? 'stepline' : smooth ? 'smooth' : 'straight';
+      type === 'stepline' ? 'stepline' : 'smooth';
 
     const seriesData = this.#series.map((s, i) => ({
       name: s.label ?? s.key,
@@ -220,12 +226,15 @@ export class IotChartElement extends HTMLElement {
       data: s.points.map((p) => ({ x: p.ts * 1000, y: p.value })),
     }));
 
+    const axisColor = isDark() ? '#3a3a3a' : '#d4d4d4';
+
     const options: ApexCharts.ApexOptions = {
       chart: {
         type: apexType,
         height: '100%',
-        stacked,
-        toolbar: { show: zoom, tools: { zoom: zoom, zoomin: zoom, zoomout: zoom, pan: zoom, reset: zoom, download: false, selection: false } },
+        // Toolbar always off — zoom (when enabled) is drag-to-select +
+        // double-click to reset.
+        toolbar: { show: false },
         zoom: { enabled: zoom, type: 'x' },
         animations: { enabled: true, speed: 250 },
         fontFamily: 'system-ui, sans-serif',
@@ -253,14 +262,16 @@ export class IotChartElement extends HTMLElement {
           datetimeUTC: false,
           style: { fontSize: '10px' },
         },
-        axisBorder: { show: false },
-        axisTicks: { show: false },
+        axisBorder: { show: true, color: axisColor, height: 1 },
+        axisTicks: { show: true, color: axisColor, height: 4 },
       },
       yaxis: {
         labels: {
           style: { fontSize: '10px' },
           formatter: (v: number) => formatNumber(v),
         },
+        axisBorder: { show: true, color: axisColor, width: 1 },
+        axisTicks: { show: true, color: axisColor, width: 4 },
       },
       tooltip: {
         x: { format: 'HH:mm:ss' },
@@ -276,7 +287,7 @@ export class IotChartElement extends HTMLElement {
       grid: {
         borderColor: 'var(--color-border, #e5e5e5)',
         strokeDashArray: 3,
-        padding: { left: 0, right: 0, top: 0, bottom: 0 },
+        padding: { left: 4, right: 4, top: 0, bottom: 0 },
       },
       noData: {
         text: 'No data yet',
