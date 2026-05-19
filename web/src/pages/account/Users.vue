@@ -116,26 +116,26 @@ async function save() {
   <div class="mx-auto max-w-4xl px-6 py-8">
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">Users</h1>
-      <p class="mt-1 text-sm text-neutral-600">
+      <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         People with access to this deployment. Sign-in is handled by Cloudflare Access — invite
         users by adding them to your Access policy.
       </p>
     </header>
 
-    <section class="rounded-lg border border-neutral-200 bg-white">
+    <section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <!-- Display row -->
       <div v-if="session.user && !editing" class="flex items-center justify-between px-4 py-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
             {{ initials }}
           </div>
 
           <div class="min-w-0">
             <div class="truncate text-sm font-medium">{{ displayName }}</div>
-            <div v-if="displayName !== session.user.email" class="truncate text-xs text-neutral-500">
+            <div v-if="displayName !== session.user.email" class="truncate text-xs text-neutral-500 dark:text-neutral-400">
               {{ session.user.email }}
             </div>
-            <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500">
+            <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
               <span>{{ session.user.role }}</span>
               <span>·</span>
               <span class="normal-case tracking-normal">last login: {{ fmt(session.user.last_login_at) }}</span>
@@ -143,10 +143,10 @@ async function save() {
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
-          <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700">You</span>
+          <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">You</span>
           <button
             type="button"
-            class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
+            class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             @click="startEdit"
           >Edit</button>
         </div>
@@ -155,12 +155,12 @@ async function save() {
       <!-- Edit form -->
       <form v-else-if="session.user" class="space-y-3 px-4 py-4" @submit.prevent="save">
         <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
+          <div class="grid h-10 w-10 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
             {{ initials }}
           </div>
           <div class="min-w-0">
-            <div class="text-xs text-neutral-500">{{ session.user.email }}</div>
-            <div class="mt-0.5 text-[11px] uppercase tracking-wide text-neutral-500">
+            <div class="text-xs text-neutral-500 dark:text-neutral-400">{{ session.user.email }}</div>
+            <div class="mt-0.5 text-[11px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
               {{ session.user.role }}
             </div>
           </div>
@@ -168,33 +168,33 @@ async function save() {
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label class="block">
-            <span class="block text-xs font-medium text-neutral-600">First name</span>
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
             <input
               v-model="form.first_name"
               type="text"
               maxlength="80"
-              class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
               placeholder="First"
             />
           </label>
           <label class="block">
-            <span class="block text-xs font-medium text-neutral-600">Last name</span>
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Last name</span>
             <input
               v-model="form.last_name"
               type="text"
               maxlength="80"
-              class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
               placeholder="Last"
             />
           </label>
         </div>
 
-        <p v-if="saveError" class="text-xs text-red-600">{{ saveError }}</p>
+        <p v-if="saveError" class="text-xs text-red-600 dark:text-red-400">{{ saveError }}</p>
 
         <div class="flex justify-end gap-2 pt-1">
           <button
             type="button"
-            class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100"
+            class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             @click="cancel"
           >Cancel</button>
           <button
@@ -207,9 +207,9 @@ async function save() {
     </section>
 
     <!-- Active sessions -->
-    <section class="mt-6 rounded-lg border border-neutral-200 bg-white">
-      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold">Active sessions</div>
-      <ul class="divide-y divide-neutral-100">
+    <section class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Active sessions</div>
+      <ul class="divide-y divide-neutral-100 dark:divide-neutral-800">
         <li
           v-for="s in session.activeSessions"
           :key="s.id"
@@ -220,10 +220,10 @@ async function save() {
               <span class="font-medium">{{ fmtAgent(s.user_agent) }}</span>
               <span
                 v-if="s.current"
-                class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700"
+                class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
               >This device</span>
             </div>
-            <div class="mt-0.5 text-xs text-neutral-500">
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
               <span v-if="s.ip_address" class="font-mono">{{ s.ip_address }}</span>
               <span v-if="s.ip_address"> · </span>
               <span>last seen {{ fmt(s.last_seen_at) }}</span>
@@ -232,19 +232,19 @@ async function save() {
           <button
             v-if="!s.current"
             type="button"
-            class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+            class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
             @click="revoke(s.id)"
           >Sign out</button>
         </li>
-        <li v-if="session.activeSessions.length === 0" class="px-4 py-6 text-sm text-neutral-500">
+        <li v-if="session.activeSessions.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">
           No active sessions.
         </li>
       </ul>
     </section>
 
-    <section class="mt-6 rounded-lg border border-dashed border-neutral-300 bg-white p-6">
+    <section class="mt-6 rounded-lg border border-dashed border-neutral-300 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
       <h3 class="text-sm font-semibold">Multi-user management is on the roadmap</h3>
-      <p class="mt-2 text-xs text-neutral-600">
+      <p class="mt-2 text-xs text-neutral-600 dark:text-neutral-400">
         For now, the owner is the only account. Per-user roles, per-project access, and
         invitations land in a future release.
       </p>

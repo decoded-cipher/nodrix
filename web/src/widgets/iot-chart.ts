@@ -18,16 +18,17 @@ const TEMPLATE = `
       height: 100%;
       padding: 1rem;
       box-sizing: border-box;
-      background: white;
-      border: 1px solid #e5e5e5;
+      background: var(--color-bg-elevated, white);
+      border: 1px solid var(--color-border, #e5e5e5);
       border-radius: 8px;
       font-family: system-ui, sans-serif;
     }
-    .title { font-size: 0.75rem; color: #525252; text-transform: uppercase; letter-spacing: 0.05em; }
+    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; }
     svg { flex: 1; width: 100%; min-height: 0; }
-    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.75rem; color: #525252; }
+    svg .empty-text { fill: var(--color-text-faint, #a3a3a3); }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.75rem; color: var(--color-text-muted, #525252); }
     .swatch { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; vertical-align: middle; margin-right: 0.25rem; }
-    .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #a3a3a3; font-size: 0.875rem; }
+    .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-text-faint, #a3a3a3); font-size: 0.875rem; }
   </style>
   <div class="title"></div>
   <svg viewBox="0 0 400 200" preserveAspectRatio="none"></svg>
@@ -76,7 +77,7 @@ export class IotChartElement extends HTMLElement {
 
     const all = this.#series.flatMap((s) => s.points);
     if (all.length === 0) {
-      svg.innerHTML = `<text x="200" y="100" text-anchor="middle" fill="#a3a3a3" font-size="12">No data yet</text>`;
+      svg.innerHTML = `<text x="200" y="100" text-anchor="middle" class="empty-text" font-size="12">No data yet</text>`;
       return;
     }
 

@@ -149,14 +149,14 @@ async function copyUrl(i: Integration) {
   <div class="mx-auto max-w-5xl px-6 py-8">
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">Integrations</h1>
-      <p class="mt-1 text-sm text-neutral-600">
+      <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         Reusable connectors to the outside world. Trigger them from automations, dashboard
         buttons, or the API.
       </p>
     </header>
 
     <!-- Tabs -->
-    <div class="mb-5 border-b border-neutral-200">
+    <div class="mb-5 border-b border-neutral-200 dark:border-neutral-800">
       <nav class="-mb-px flex gap-6 text-sm">
         <button
           v-for="t in tabs"
@@ -164,68 +164,68 @@ async function copyUrl(i: Integration) {
           type="button"
           class="border-b-2 px-1 pb-2.5 font-medium transition"
           :class="active === t.key
-            ? 'border-orange-600 text-orange-700'
-            : 'border-transparent text-neutral-500 hover:text-neutral-900'"
+            ? 'border-orange-600 text-orange-700 dark:text-orange-400'
+            : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'"
           @click="active = t.key; showForm = false"
         >
           {{ t.label }}
           <span
-            class="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600"
+            class="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
           >{{ byTab[t.key].length }}</span>
         </button>
       </nav>
     </div>
 
     <!-- Create form -->
-    <form v-if="showForm" class="mb-6 rounded-xl border border-neutral-200 bg-white p-5" @submit.prevent="submit">
+    <form v-if="showForm" class="mb-6 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900" @submit.prevent="submit">
       <div class="mb-3 text-sm font-semibold">New {{ KIND_LABEL[formKind] }}</div>
 
       <label class="block">
-        <span class="block text-xs font-medium text-neutral-600">Name</span>
+        <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name</span>
         <input
           v-model="formName"
           type="text"
           required
-          class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
           :placeholder="formKind === 'webhook' ? 'e.g. Notify Slack' : formKind === 'code_block' ? 'e.g. Convert °C to °F' : 'Name'"
         />
       </label>
 
       <label v-if="formKind === 'webhook'" class="mt-3 block">
-        <span class="block text-xs font-medium text-neutral-600">Target URL</span>
+        <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Target URL</span>
         <input
           v-model="formWebhookUrl"
           type="url"
           required
           placeholder="https://hooks.example.com/…"
-          class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs"
+          class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
         />
       </label>
 
       <label v-else-if="formKind === 'code_block'" class="mt-3 block">
-        <span class="block text-xs font-medium text-neutral-600">Source (JavaScript)</span>
+        <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Source (JavaScript)</span>
         <textarea
           v-model="formCode"
           rows="8"
-          class="mt-1 w-full rounded-md border border-neutral-300 bg-neutral-950 px-3 py-2 font-mono text-xs text-neutral-100"
+          class="mt-1 w-full rounded-md border border-neutral-300 bg-neutral-950 px-3 py-2 font-mono text-xs text-neutral-100 dark:border-neutral-700"
         />
       </label>
 
       <label v-else class="mt-3 block">
-        <span class="block text-xs font-medium text-neutral-600">Config (JSON)</span>
+        <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Config (JSON)</span>
         <textarea
           v-model="formServiceConfig"
           rows="6"
-          class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs"
+          class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
         />
       </label>
 
-      <p v-if="formError" class="mt-2 text-xs text-red-600">{{ formError }}</p>
+      <p v-if="formError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ formError }}</p>
 
       <div class="mt-4 flex justify-end gap-2">
         <button
           type="button"
-          class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100"
+          class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           @click="cancelCreate"
         >Cancel</button>
         <button
@@ -241,7 +241,7 @@ async function copyUrl(i: Integration) {
       <div class="mb-4 flex items-end justify-between">
         <div>
           <h2 class="text-sm font-semibold">Outgoing webhooks</h2>
-          <p class="mt-0.5 text-xs text-neutral-500">
+          <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
             POST device events, metric updates, or automation runs to an external URL.
           </p>
         </div>
@@ -252,31 +252,31 @@ async function copyUrl(i: Integration) {
         >Add webhook</button>
       </div>
 
-      <ul v-if="byTab.webhooks.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+      <ul v-if="byTab.webhooks.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <li v-for="i in byTab.webhooks" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <span class="truncate font-medium">{{ i.name }}</span>
               <span
                 v-if="!i.enabled"
-                class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
+                class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
               >disabled</span>
             </div>
             <div class="mt-0.5 flex min-w-0 items-center gap-1.5">
               <span
-                class="min-w-0 flex-1 truncate font-mono text-xs text-neutral-500"
+                class="min-w-0 flex-1 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400"
                 :title="webhookUrl(i)"
               >{{ webhookUrl(i) }}</span>
               <button
                 type="button"
-                class="shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                class="shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                 :title="copiedId === i.id ? 'Copied' : 'Copy URL'"
                 @click="copyUrl(i)"
               >
                 <svg v-if="copiedId !== i.id" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
                   <path d="M9 4h7a2 2 0 0 1 2 2v10M8 7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H8Z" />
                 </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 text-emerald-600">
+                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400">
                   <path d="M5 12l5 5L20 7" />
                 </svg>
               </button>
@@ -285,18 +285,18 @@ async function copyUrl(i: Integration) {
           <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
+              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
               @click="toggle(i)"
             >{{ i.enabled ? 'Disable' : 'Enable' }}</button>
             <button
               type="button"
-              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               @click="remove(i)"
             >Delete</button>
           </div>
         </li>
       </ul>
-      <div v-else class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-xs text-neutral-500">
+      <div v-else class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
         No webhooks yet.
       </div>
     </section>
@@ -306,7 +306,7 @@ async function copyUrl(i: Integration) {
       <div class="mb-4 flex items-end justify-between">
         <div>
           <h2 class="text-sm font-semibold">Code blocks</h2>
-          <p class="mt-0.5 text-xs text-neutral-500">
+          <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
             Snippets of JavaScript invoked as automation actions. Runtime is on the roadmap.
           </p>
         </div>
@@ -317,27 +317,27 @@ async function copyUrl(i: Integration) {
         >New code block</button>
       </div>
 
-      <ul v-if="byTab.code.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+      <ul v-if="byTab.code.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <li v-for="i in byTab.code" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
           <div class="min-w-0 flex-1">
             <div class="truncate font-medium">{{ i.name }}</div>
-            <div class="mt-0.5 truncate font-mono text-[11px] text-neutral-500">{{ i.id }}</div>
+            <div class="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ i.id }}</div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
+              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
               @click="toggle(i)"
             >{{ i.enabled ? 'Disable' : 'Enable' }}</button>
             <button
               type="button"
-              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               @click="remove(i)"
             >Delete</button>
           </div>
         </li>
       </ul>
-      <div v-else class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-xs text-neutral-500">
+      <div v-else class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
         No code blocks yet.
       </div>
     </section>
@@ -346,34 +346,34 @@ async function copyUrl(i: Integration) {
     <section v-else>
       <div class="mb-4">
         <h2 class="text-sm font-semibold">Services</h2>
-        <p class="mt-0.5 text-xs text-neutral-500">
+        <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
           Connectors for common destinations. Configure once, reference from automations.
         </p>
       </div>
 
-      <ul v-if="byTab.services.length > 0" class="mb-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+      <ul v-if="byTab.services.length > 0" class="mb-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <li v-for="i in byTab.services" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <span class="truncate font-medium">{{ i.name }}</span>
-              <span class="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600">
+              <span class="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                 {{ KIND_LABEL[i.kind] }}
               </span>
               <span
                 v-if="!i.enabled"
-                class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
+                class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
               >disabled</span>
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
+              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
               @click="toggle(i)"
             >{{ i.enabled ? 'Disable' : 'Enable' }}</button>
             <button
               type="button"
-              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               @click="remove(i)"
             >Delete</button>
           </div>
@@ -385,14 +385,14 @@ async function copyUrl(i: Integration) {
           v-for="svc in SERVICE_KINDS"
           :key="svc.kind"
           type="button"
-          class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4 text-left hover:border-orange-300 hover:shadow-sm"
+          class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4 text-left hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
           @click="openCreate(svc.kind)"
         >
           <div>
-            <div class="text-sm font-semibold text-neutral-900">{{ KIND_LABEL[svc.kind] }}</div>
-            <div class="mt-0.5 text-xs text-neutral-500">{{ svc.desc }}</div>
+            <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ KIND_LABEL[svc.kind] }}</div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{{ svc.desc }}</div>
           </div>
-          <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-orange-700">Add</span>
+          <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Add</span>
         </button>
       </div>
     </section>

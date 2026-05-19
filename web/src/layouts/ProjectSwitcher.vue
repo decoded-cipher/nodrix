@@ -33,18 +33,18 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   <div ref="rootEl" class="relative">
     <button
       type="button"
-      class="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:bg-neutral-50"
+      class="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
       @click="open = !open"
     >
       <div class="min-w-0">
-        <div class="text-[10px] font-medium uppercase tracking-wider text-neutral-500">Project</div>
+        <div class="text-[10px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Project</div>
         <div class="truncate text-sm font-medium">
           {{ current?.name ?? 'No project' }}
         </div>
       </div>
       <svg
         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-        stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-neutral-500"
+        stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-neutral-500 dark:text-neutral-400"
       >
         <path stroke-linecap="round" stroke-linejoin="round" d="m7 10 5 5 5-5" />
       </svg>
@@ -52,27 +52,27 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 
     <div
       v-if="open"
-      class="absolute left-0 right-0 z-20 mt-1 rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+      class="absolute left-0 right-0 z-20 mt-1 rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
     >
       <ul class="max-h-56 overflow-y-auto text-sm">
         <li v-for="p in others" :key="p.id">
           <button
             type="button"
-            class="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-neutral-50"
+            class="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800"
             @click="pick(p.id)"
           >
             <span class="truncate">{{ p.name }}</span>
-            <span class="ml-2 font-mono text-[10px] text-neutral-400">{{ p.id.slice(0, 6) }}</span>
+            <span class="ml-2 font-mono text-[10px] text-neutral-400 dark:text-neutral-500">{{ p.id.slice(0, 6) }}</span>
           </button>
         </li>
-        <li v-if="others.length === 0" class="px-3 py-2 text-xs text-neutral-500">
+        <li v-if="others.length === 0" class="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">
           No other projects
         </li>
       </ul>
-      <div class="border-t border-neutral-100">
+      <div class="border-t border-neutral-100 dark:border-neutral-800">
         <RouterLink
           to="/projects"
-          class="block px-3 py-2 text-xs text-orange-700 hover:bg-orange-50"
+          class="block px-3 py-2 text-xs text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
           @click="open = false"
         >Manage projects →</RouterLink>
       </div>

@@ -265,7 +265,7 @@ function exitToView() {
     <div class="relative flex flex-1 flex-col">
       <Teleport to="#topbar-actions" defer>
         <button
-          class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+          class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           @click="exitToView"
         >Done</button>
         <button
@@ -275,7 +275,7 @@ function exitToView() {
         >{{ saving ? 'Saving...' : 'Save' }}</button>
       </Teleport>
 
-      <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700">{{ err }}</div>
+      <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ err }}</div>
 
       <div class="canvas-dots flex-1 overflow-auto p-6 select-none" @click="selectedId = null">
         <GridLayout
@@ -303,7 +303,7 @@ function exitToView() {
               :class="selectedId === g.i ? 'border-orange-500' : 'border-transparent'"
               @click.stop="selectedId = g.i"
             >
-              <div class="drag-handle absolute inset-x-0 top-0 z-10 h-4 cursor-move bg-neutral-200/40"></div>
+              <div class="drag-handle absolute inset-x-0 top-0 z-10 h-4 cursor-move bg-neutral-200/40 dark:bg-neutral-700/40"></div>
               <div :data-host="g.i" class="h-full pt-4"></div>
             </div>
           </GridItem>
@@ -326,5 +326,9 @@ function exitToView() {
   background-image: radial-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px);
   background-size: 16px 16px;
   background-position: 0 0;
+}
+:global(.dark) .canvas-dots {
+  background-color: #0a0a0a;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
 }
 </style>

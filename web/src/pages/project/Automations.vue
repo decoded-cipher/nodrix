@@ -119,7 +119,7 @@ function triggerLabel(t: AutomationTriggerType): string {
     <header class="mb-6 flex items-start justify-between gap-4">
       <div>
         <h1 class="text-xl font-semibold tracking-tight">Automations</h1>
-        <p class="mt-1 text-sm text-neutral-600">
+        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
           Actions that fire when a trigger condition is met.
         </p>
       </div>
@@ -132,40 +132,40 @@ function triggerLabel(t: AutomationTriggerType): string {
 
     <!-- Existing automations -->
     <section v-if="!showPicker">
-      <ul v-if="project.automations.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+      <ul v-if="project.automations.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <li v-for="a in project.automations" :key="a.id" class="flex items-start justify-between gap-4 px-4 py-3">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium">{{ a.name }}</span>
-              <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600">
+              <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                 {{ triggerLabel(a.trigger_type) }}
               </span>
               <span
                 v-if="!a.enabled"
-                class="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600"
+                class="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
               >disabled</span>
             </div>
-            <div v-if="a.description" class="mt-0.5 truncate text-xs text-neutral-500">{{ a.description }}</div>
-            <div class="mt-1 text-[11px] text-neutral-500">{{ fmtStatus(a) }}</div>
+            <div v-if="a.description" class="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">{{ a.description }}</div>
+            <div class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">{{ fmtStatus(a) }}</div>
           </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
+              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
               @click="toggle(a)"
             >{{ a.enabled ? 'Disable' : 'Enable' }}</button>
             <button
               type="button"
-              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               @click="remove(a)"
             >Delete</button>
           </div>
         </li>
       </ul>
-      <div v-else-if="!loading" class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500">
+      <div v-else-if="!loading" class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
         No automations yet. Click <span class="font-semibold">New automation</span> to create one.
       </div>
-      <div v-else class="rounded-lg border border-neutral-200 bg-white p-10">
+      <div v-else class="rounded-lg border border-neutral-200 bg-white p-10 dark:border-neutral-800 dark:bg-neutral-900">
         <Spinner block />
       </div>
     </section>
@@ -173,58 +173,58 @@ function triggerLabel(t: AutomationTriggerType): string {
     <!-- Trigger picker / create form -->
     <section v-else>
       <div v-if="!pendingTrigger">
-        <h2 class="mb-3 text-sm font-medium text-neutral-900">Choose a trigger</h2>
+        <h2 class="mb-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">Choose a trigger</h2>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <button
             v-for="c in conditions"
             :key="c.key"
             type="button"
-            class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 text-left transition hover:border-orange-300 hover:shadow-sm"
+            class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 text-left transition hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
             @click="pick(c)"
           >
-            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-700">
+            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
               <component :is="icon(c.icon)" class="h-5 w-5" />
             </div>
             <div class="min-w-0">
-              <div class="text-base font-semibold text-neutral-900">{{ c.title }}</div>
-              <div class="mt-1 text-sm leading-relaxed text-neutral-600">{{ c.desc }}</div>
+              <div class="text-base font-semibold text-neutral-900 dark:text-neutral-100">{{ c.title }}</div>
+              <div class="mt-1 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{{ c.desc }}</div>
             </div>
           </button>
         </div>
       </div>
 
-      <form v-else class="rounded-xl border border-neutral-200 bg-white p-5" @submit.prevent="submitCreate">
-        <div class="mb-4 flex items-center gap-3 border-b border-neutral-100 pb-3">
-          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-700">
+      <form v-else class="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900" @submit.prevent="submitCreate">
+        <div class="mb-4 flex items-center gap-3 border-b border-neutral-100 pb-3 dark:border-neutral-800">
+          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
             <component :is="icon(pendingTrigger.icon)" class="h-5 w-5" />
           </div>
           <div>
             <div class="text-sm font-semibold">{{ pendingTrigger.title }}</div>
-            <div class="text-xs text-neutral-500">{{ pendingTrigger.desc }}</div>
+            <div class="text-xs text-neutral-500 dark:text-neutral-400">{{ pendingTrigger.desc }}</div>
           </div>
         </div>
 
         <label class="block">
-          <span class="block text-xs font-medium text-neutral-600">Name</span>
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name</span>
           <input
             v-model="newName"
             type="text"
             required
-            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
             placeholder="e.g. Lights off at sunset"
           />
         </label>
 
         <label class="mt-3 block">
-          <span class="block text-xs font-medium text-neutral-600">Description (optional)</span>
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Description (optional)</span>
           <textarea
             v-model="newDesc"
             rows="2"
-            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
           />
         </label>
 
-        <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
           Trigger config and actions can be edited after creation. The runtime that
           evaluates triggers and runs actions is on the roadmap.
         </p>
@@ -232,7 +232,7 @@ function triggerLabel(t: AutomationTriggerType): string {
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             type="button"
-            class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100"
+            class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             @click="cancelCreate"
           >Back</button>
           <button

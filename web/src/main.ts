@@ -5,6 +5,7 @@ import { router } from './router';
 import { registerWidgets } from './widgets/register';
 import { onUnauthorized } from './api';
 import { progress } from './lib/progress';
+import { useThemeStore } from './stores/theme';
 import './style.css';
 
 registerWidgets();
@@ -12,6 +13,8 @@ registerWidgets();
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);
+
+useThemeStore().init();
 
 // On any 401, bounce to /login (unless we're already there).
 onUnauthorized(() => {

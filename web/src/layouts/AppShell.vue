@@ -68,7 +68,7 @@ watch(
   <div v-else-if="session.error && session.error.status !== 401" class="grid h-full place-items-center">
     <div class="max-w-md text-center">
       <h2 class="text-lg font-semibold">Could not load session</h2>
-      <p class="mt-2 text-sm text-neutral-600">
+      <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
         Status {{ session.error.status }}<span v-if="session.error.reason">: {{ session.error.reason }}</span>
       </p>
     </div>
@@ -77,7 +77,7 @@ watch(
     <Sidebar />
     <div class="flex min-w-0 flex-1 flex-col">
       <Topbar />
-      <main class="flex-1 overflow-auto bg-neutral-50">
+      <main class="flex-1 overflow-auto bg-neutral-50 dark:bg-neutral-950">
         <RouterView />
       </main>
     </div>

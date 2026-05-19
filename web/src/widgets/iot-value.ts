@@ -12,15 +12,15 @@ const TEMPLATE = `
       height: 100%;
       padding: 1rem;
       box-sizing: border-box;
-      background: white;
-      border: 1px solid #e5e5e5;
+      background: var(--color-bg-elevated, white);
+      border: 1px solid var(--color-border, #e5e5e5);
       border-radius: 8px;
       font-family: system-ui, sans-serif;
     }
-    .title { font-size: 0.75rem; color: #525252; text-transform: uppercase; letter-spacing: 0.05em; }
-    .value { font-size: 2.5rem; font-weight: 600; line-height: 1; color: #171717; }
-    .unit  { font-size: 0.875rem; color: #737373; margin-left: 0.25rem; }
-    .ts    { font-size: 0.6875rem; color: #a3a3a3; font-variant-numeric: tabular-nums; }
+    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; }
+    .value { font-size: 2.5rem; font-weight: 600; line-height: 1; color: var(--color-text, #171717); }
+    .unit  { font-size: 0.875rem; color: var(--color-text-subtle, #737373); margin-left: 0.25rem; }
+    .ts    { font-size: 0.6875rem; color: var(--color-text-faint, #a3a3a3); font-variant-numeric: tabular-nums; }
   </style>
   <div class="title"></div>
   <div>

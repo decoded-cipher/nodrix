@@ -16,27 +16,28 @@ const TEMPLATE = `
       height: 100%;
       padding: 1rem;
       box-sizing: border-box;
-      background: white;
-      border: 1px solid #e5e5e5;
+      background: var(--color-bg-elevated, white);
+      border: 1px solid var(--color-border, #e5e5e5);
       border-radius: 8px;
       font-family: system-ui, sans-serif;
     }
-    .title { font-size: 0.75rem; color: #525252; text-transform: uppercase; letter-spacing: 0.05em; }
+    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; }
     .switch {
       align-self: flex-start;
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
       padding: 0.5rem 1rem;
-      border: 1px solid #d4d4d4;
+      border: 1px solid var(--color-border, #d4d4d4);
       border-radius: 9999px;
-      background: white;
+      background: var(--color-bg-elevated, white);
+      color: var(--color-text, #171717);
       cursor: pointer;
       font-size: 0.875rem;
       font-weight: 500;
     }
     .switch.on { background: #ea580c; color: white; border-color: #ea580c; }
-    .dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: #d4d4d4; }
+    .dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--color-text-faint, #d4d4d4); }
     .switch.on .dot { background: white; }
   </style>
   <div class="title"></div>

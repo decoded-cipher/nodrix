@@ -44,26 +44,26 @@ async function remove(id: string) {
   <main class="mx-auto max-w-4xl px-6 py-8">
     <h2 class="text-xl font-semibold tracking-tight">Dashboards</h2>
 
-    <ul class="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+    <ul class="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
       <li v-for="d in project.dashboards" :key="d.id" class="flex items-center justify-between px-4 py-3">
         <div>
           <RouterLink :to="`/p/${project.currentProjectId}/d/${d.id}`" class="text-sm font-medium hover:underline">
             {{ d.name }}
           </RouterLink>
-          <div class="font-mono text-xs text-neutral-500">{{ d.id }}</div>
+          <div class="font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ d.id }}</div>
         </div>
         <div class="flex items-center gap-2">
           <RouterLink
             :to="`/p/${project.currentProjectId}/d/${d.id}/edit`"
-            class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100"
+            class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           >Edit</RouterLink>
           <button
-            class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+            class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
             @click="remove(d.id)"
           >Delete</button>
         </div>
       </li>
-      <li v-if="project.dashboards.length === 0" class="px-4 py-6 text-sm text-neutral-500">
+      <li v-if="project.dashboards.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">
         No dashboards yet.
       </li>
     </ul>
@@ -73,7 +73,7 @@ async function remove(id: string) {
         v-model="newName"
         type="text"
         placeholder="New dashboard name"
-        class="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
       />
       <button
         type="submit"

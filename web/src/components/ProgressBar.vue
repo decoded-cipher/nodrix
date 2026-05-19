@@ -12,7 +12,7 @@ const width = computed(() => `${progress.value.value}%`);
     aria-hidden="true"
   >
     <div
-      class="h-full bg-neutral-900 shadow-[0_0_10px_rgba(23,23,23,0.45)] transition-[width] duration-200 ease-out"
+      class="h-full bg-neutral-900 shadow-[0_0_10px_rgba(23,23,23,0.45)] transition-[width] duration-200 ease-out dark:bg-neutral-100 dark:shadow-[0_0_10px_rgba(229,229,229,0.55)]"
       :style="{ width }"
     />
   </div>

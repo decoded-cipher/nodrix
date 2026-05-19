@@ -66,10 +66,10 @@ const projectQuickLinks = computed(() => {
 });
 
 const colorClasses: Record<string, string> = {
-  orange: 'bg-orange-50 text-orange-700',
-  sky: 'bg-sky-50 text-sky-700',
-  emerald: 'bg-emerald-50 text-emerald-700',
-  violet: 'bg-violet-50 text-violet-700',
+  orange: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  sky: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+  emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  violet: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
 };
 </script>
 
@@ -79,9 +79,9 @@ const colorClasses: Record<string, string> = {
       <h1 class="text-2xl font-semibold tracking-tight">
         {{ greeting }}{{ greetingName ? `, ${greetingName}` : '' }}
       </h1>
-      <p class="mt-1 text-sm text-neutral-600">
+      <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         Here's what's happening in
-        <span class="font-medium text-neutral-900">{{ ui.currentProject?.name ?? 'your workspace' }}</span>.
+        <span class="font-medium text-neutral-900 dark:text-neutral-100">{{ ui.currentProject?.name ?? 'your workspace' }}</span>.
       </p>
     </header>
 
@@ -91,22 +91,22 @@ const colorClasses: Record<string, string> = {
         v-for="s in stats"
         :key="s.label"
         :to="s.href"
-        class="rounded-lg border border-neutral-200 bg-white p-4 hover:border-orange-300"
+        class="rounded-lg border border-neutral-200 bg-white p-4 hover:border-orange-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
       >
-        <div class="text-xs uppercase tracking-wide text-neutral-500">{{ s.label }}</div>
+        <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ s.label }}</div>
         <div class="mt-1 text-2xl font-semibold tracking-tight">{{ s.value }}</div>
       </RouterLink>
     </section>
 
     <!-- Quick actions -->
     <section v-if="projectQuickLinks.length" class="mb-8">
-      <h2 class="mb-3 text-sm font-semibold text-neutral-900">Quick actions</h2>
+      <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Quick actions</h2>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <RouterLink
           v-for="q in projectQuickLinks"
           :key="q.label"
           :to="q.to"
-          class="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-orange-300 hover:shadow-sm"
+          class="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
         >
           <div
             class="grid h-9 w-9 place-items-center rounded-md"
@@ -117,15 +117,15 @@ const colorClasses: Record<string, string> = {
             </svg>
           </div>
           <div class="mt-3 text-sm font-medium">{{ q.label }}</div>
-          <div class="mt-1 text-xs text-neutral-500">{{ q.desc }}</div>
+          <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{{ q.desc }}</div>
         </RouterLink>
       </div>
     </section>
 
     <!-- Empty state for no projects -->
-    <section v-if="session.projects.length === 0" class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
+    <section v-if="session.projects.length === 0" class="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-900">
       <h3 class="text-base font-semibold">Create your first project</h3>
-      <p class="mx-auto mt-2 max-w-md text-sm text-neutral-600">
+      <p class="mx-auto mt-2 max-w-md text-sm text-neutral-600 dark:text-neutral-400">
         Projects are isolated workspaces. Each one holds its own devices, dashboards, and automations.
       </p>
       <RouterLink
@@ -135,16 +135,16 @@ const colorClasses: Record<string, string> = {
     </section>
 
     <!-- Recent dashboards -->
-    <section v-else-if="project.dashboards.length" class="rounded-lg border border-neutral-200 bg-white">
-      <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+    <section v-else-if="project.dashboards.length" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <h2 class="text-sm font-semibold">Recent dashboards</h2>
         <RouterLink
           v-if="ui.currentProject"
           :to="`/p/${ui.currentProject.id}/dashboards`"
-          class="text-xs text-orange-700 hover:underline"
+          class="text-xs text-orange-700 hover:underline dark:text-orange-400"
         >View all →</RouterLink>
       </div>
-      <ul class="divide-y divide-neutral-100">
+      <ul class="divide-y divide-neutral-100 dark:divide-neutral-800">
         <li
           v-for="d in project.dashboards.slice(0, 5)"
           :key="d.id"
@@ -154,7 +154,7 @@ const colorClasses: Record<string, string> = {
             :to="ui.currentProject ? `/p/${ui.currentProject.id}/d/${d.id}` : '/'"
             class="text-sm font-medium hover:underline"
           >{{ d.name }}</RouterLink>
-          <span class="font-mono text-[11px] text-neutral-400">{{ d.id.slice(0, 8) }}</span>
+          <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ d.id.slice(0, 8) }}</span>
         </li>
       </ul>
     </section>

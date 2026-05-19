@@ -10,19 +10,20 @@ const TEMPLATE = `
       height: 100%;
       padding: 1rem;
       box-sizing: border-box;
-      background: white;
-      border: 1px solid #e5e5e5;
+      background: var(--color-bg-elevated, white);
+      border: 1px solid var(--color-border, #e5e5e5);
       border-radius: 8px;
       font-family: system-ui, sans-serif;
     }
-    .title { font-size: 0.75rem; color: #525252; text-transform: uppercase; letter-spacing: 0.05em; align-self: flex-start; }
+    .title { font-size: 0.75rem; color: var(--color-text-muted, #525252); text-transform: uppercase; letter-spacing: 0.05em; align-self: flex-start; }
     svg { width: 100%; max-width: 180px; }
-    .value { font-size: 1.5rem; font-weight: 600; color: #171717; text-align: center; margin-top: -2rem; }
-    .bounds { font-size: 0.6875rem; color: #a3a3a3; display: flex; justify-content: space-between; width: 100%; max-width: 180px; }
+    svg .track { stroke: var(--color-border, #e5e5e5); }
+    .value { font-size: 1.5rem; font-weight: 600; color: var(--color-text, #171717); text-align: center; margin-top: -2rem; }
+    .bounds { font-size: 0.6875rem; color: var(--color-text-faint, #a3a3a3); display: flex; justify-content: space-between; width: 100%; max-width: 180px; }
   </style>
   <div class="title"></div>
   <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-    <path d="M 10 50 A 40 40 0 0 1 90 50" stroke="#e5e5e5" stroke-width="8" fill="none" stroke-linecap="round" />
+    <path class="track" d="M 10 50 A 40 40 0 0 1 90 50" stroke-width="8" fill="none" stroke-linecap="round" />
     <path class="arc" d="M 10 50 A 40 40 0 0 1 90 50" stroke="#ea580c" stroke-width="8" fill="none" stroke-linecap="round" />
   </svg>
   <div class="value">—</div>

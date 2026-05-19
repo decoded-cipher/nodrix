@@ -88,60 +88,60 @@ async function signInWith(provider: 'google' | 'github') {
 
 <template>
   <main class="mx-auto flex h-full max-w-md flex-col justify-center px-6 py-12">
-    <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <h1 class="text-xl font-semibold tracking-tight">
         {{ mode === 'register' ? 'Create owner account' : 'Sign in to nodrix' }}
       </h1>
-      <p v-if="mode === 'register'" class="mt-1 text-sm text-neutral-600">
+      <p v-if="mode === 'register'" class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         First account becomes the owner of this deployment.
       </p>
 
       <form class="mt-5 space-y-3" @submit.prevent="submit">
         <div v-if="mode === 'register'" class="grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="block text-xs font-medium text-neutral-600">First name</span>
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
             <input
               v-model="form.first_name"
               type="text"
               required
-              class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
             />
           </label>
           <label class="block">
-            <span class="block text-xs font-medium text-neutral-600">Last name</span>
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Last name</span>
             <input
               v-model="form.last_name"
               type="text"
-              class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
             />
           </label>
         </div>
 
         <label class="block">
-          <span class="block text-xs font-medium text-neutral-600">Email</span>
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Email</span>
           <input
             v-model="form.email"
             type="email"
             required
             autocomplete="email"
-            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
             placeholder="you@example.com"
           />
         </label>
 
         <label class="block">
-          <span class="block text-xs font-medium text-neutral-600">Password</span>
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Password</span>
           <input
             v-model="form.password"
             type="password"
             required
             minlength="8"
             :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
-            class="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
           />
         </label>
 
-        <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
+        <p v-if="error" class="text-xs text-red-600 dark:text-red-400">{{ error }}</p>
 
         <button
           type="submit"
@@ -152,15 +152,15 @@ async function signInWith(provider: 'google' | 'github') {
 
       <div v-if="mode === 'login' && providers.length > 0" class="mt-5">
         <div class="relative flex items-center">
-          <div class="flex-1 border-t border-neutral-200" />
-          <span class="px-2 text-[11px] uppercase tracking-wide text-neutral-400">or</span>
-          <div class="flex-1 border-t border-neutral-200" />
+          <div class="flex-1 border-t border-neutral-200 dark:border-neutral-800" />
+          <span class="px-2 text-[11px] uppercase tracking-wide text-neutral-400 dark:text-neutral-500">or</span>
+          <div class="flex-1 border-t border-neutral-200 dark:border-neutral-800" />
         </div>
         <div class="mt-4 space-y-2">
           <button
             v-if="providers.includes('google')"
             type="button"
-            class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+            class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
             @click="signInWith('google')"
           >
             <svg viewBox="0 0 48 48" class="h-4 w-4">
@@ -174,7 +174,7 @@ async function signInWith(provider: 'google' | 'github') {
           <button
             v-if="providers.includes('github')"
             type="button"
-            class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-300 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-300 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700"
             @click="signInWith('github')"
           >
             <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor">

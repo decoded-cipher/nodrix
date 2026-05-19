@@ -35,14 +35,14 @@ function hideTip() {
 </script>
 
 <template>
-  <aside class="w-60 shrink-0 border-r border-neutral-200 bg-white">
-    <div class="border-b border-neutral-200 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+  <aside class="w-60 shrink-0 border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <div class="border-b border-neutral-200 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
       Widgets
     </div>
 
     <div class="space-y-3 p-2">
       <section v-for="g in groups" :key="g.category">
-        <div class="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+        <div class="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
           {{ g.category }}
         </div>
         <div class="grid grid-cols-3 gap-1.5">
@@ -50,7 +50,7 @@ function hideTip() {
             v-for="w in g.items"
             :key="w.type"
             type="button"
-            class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"
+            class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:border-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-300"
             @click="$emit('add', w.type)"
             @mouseenter="showTip(w, $event)"
             @mouseleave="hideTip"
@@ -67,34 +67,34 @@ function hideTip() {
     <Teleport to="body">
       <div
         v-if="hovered"
-        class="pointer-events-none fixed z-50 w-72 rounded-lg border border-neutral-200 bg-white p-4 shadow-xl"
+        class="pointer-events-none fixed z-50 w-72 rounded-lg border border-neutral-200 bg-white p-4 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
         :style="{ top: `${tipPos.top}px`, left: `${tipPos.left}px` }"
         role="tooltip"
       >
         <div class="flex items-center gap-2">
-          <span class="h-5 w-5 text-orange-600" v-html="hovered.icon"></span>
-          <div class="text-sm font-semibold text-neutral-900">{{ hovered.label }}</div>
+          <span class="h-5 w-5 text-orange-600 dark:text-orange-400" v-html="hovered.icon"></span>
+          <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ hovered.label }}</div>
         </div>
-        <p class="mt-2 text-xs text-neutral-600">{{ hovered.description }}</p>
+        <p class="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{{ hovered.description }}</p>
 
         <div class="mt-3">
-          <div class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+          <div class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             Data types
           </div>
           <div class="mt-1 flex flex-wrap gap-1">
             <span
               v-for="t in hovered.dataTypes"
               :key="t"
-              class="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700"
+              class="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
             >{{ t }}</span>
           </div>
         </div>
 
         <div class="mt-3">
-          <div class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+          <div class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             When to use
           </div>
-          <p class="mt-1 text-xs leading-relaxed text-neutral-600">{{ hovered.whenToUse }}</p>
+          <p class="mt-1 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">{{ hovered.whenToUse }}</p>
         </div>
       </div>
     </Teleport>

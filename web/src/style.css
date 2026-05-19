@@ -1,8 +1,35 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* Theme tokens consumed by shadow-DOM widgets and a few inline styles.
+   Tailwind classes still handle the bulk; these exist where the dark: variant
+   can't reach (web components, programmatic styles). */
+:root {
+  --color-bg: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-border: #e5e5e5;
+  --color-text: #171717;
+  --color-text-muted: #525252;
+  --color-text-subtle: #737373;
+  --color-text-faint: #a3a3a3;
+}
+
+.dark {
+  --color-bg: #181818;
+  --color-bg-elevated: #1f1f1f;
+  --color-border: #2a2a2a;
+  --color-text: #e5e5e5;
+  --color-text-muted: #a3a3a3;
+  --color-text-subtle: #737373;
+  --color-text-faint: #525252;
+  color-scheme: dark;
+}
+
 html, body, #app { height: 100%; }
+body { background: var(--color-bg); color: var(--color-text); }

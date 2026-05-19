@@ -5,7 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>nodrix</title>
   </head>
-  <body class="h-full bg-neutral-50 text-neutral-900 antialiased">
+  <body class="h-full bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-900 dark:text-neutral-100">
+    <!-- Inline theme bootstrap: applies the .dark class synchronously to avoid
+         a light-mode flash before the JS bundle loads and Pinia takes over. -->
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem('nodrix:theme');
+          var dark = v === 'dark' || ((v === 'system' || v === null) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (_) {}
+      })();
+    </script>
     <div id="app" class="h-full"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

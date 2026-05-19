@@ -101,32 +101,30 @@ const initials = computed(() => {
 
 <template>
   <aside
-    class="flex h-full flex-col border-r border-neutral-200 bg-white transition-[width] duration-150"
+    class="flex h-full flex-col border-r border-neutral-200 bg-white transition-[width] duration-150 dark:border-neutral-800 dark:bg-neutral-900"
     :class="ui.sidebarCollapsed ? 'w-16' : 'w-60'"
   >
     <!-- Brand -->
     <div
-      class="flex h-14 items-center border-b border-neutral-200"
+      class="flex h-14 items-center border-b border-neutral-200 dark:border-neutral-800"
       :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'px-4'"
     >
       <!-- Collapsed: white logo on a dark square -->
       <div
         v-if="ui.sidebarCollapsed"
-        class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-neutral-900"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-neutral-900 dark:bg-neutral-800"
       >
         <img src="/white_logo.png" alt="nodrix" class="h-6 w-6 object-contain" />
       </div>
-      <!-- Expanded: full dark logo on the white sidebar -->
-      <img
-        v-else
-        src="/dark_logo.png"
-        alt="nodrix"
-        class="h-7 w-auto"
-      />
+      <!-- Expanded: dark logo in light mode, white logo in dark mode -->
+      <template v-else>
+        <img src="/dark_logo.png" alt="nodrix" class="h-7 w-auto dark:hidden" />
+        <img src="/white_logo.png" alt="nodrix" class="hidden h-7 w-auto dark:block" />
+      </template>
     </div>
 
     <!-- Project switcher -->
-    <div v-if="!ui.sidebarCollapsed" class="border-b border-neutral-200 p-3">
+    <div v-if="!ui.sidebarCollapsed" class="border-b border-neutral-200 p-3 dark:border-neutral-800">
       <ProjectSwitcher />
     </div>
 
@@ -136,9 +134,9 @@ const initials = computed(() => {
         <li v-for="item in globalTop" :key="item.to">
           <RouterLink
             :to="item.to"
-            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100"
+            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            active-class="bg-orange-50 text-orange-700 font-medium"
+            active-class="bg-orange-50 text-orange-700 font-medium dark:bg-orange-900/30 dark:text-orange-300"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -150,18 +148,18 @@ const initials = computed(() => {
       <div class="mt-5 mb-1.5 px-2.5">
         <div
           v-if="!ui.sidebarCollapsed"
-          class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400"
+          class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500"
         >Project</div>
-        <div v-else class="h-px bg-neutral-200" />
+        <div v-else class="h-px bg-neutral-200 dark:bg-neutral-800" />
       </div>
       <ul class="space-y-0.5">
         <li v-for="item in projectScoped" :key="item.label">
           <RouterLink
             v-if="!item.disabled"
             :to="item.to"
-            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100"
+            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            active-class="bg-orange-50 text-orange-700 font-medium"
+            active-class="bg-orange-50 text-orange-700 font-medium dark:bg-orange-900/30 dark:text-orange-300"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -169,7 +167,7 @@ const initials = computed(() => {
           </RouterLink>
           <span
             v-else
-            class="flex cursor-not-allowed items-center rounded-md py-2 text-neutral-400"
+            class="flex cursor-not-allowed items-center rounded-md py-2 text-neutral-400 dark:text-neutral-600"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
             :title="ui.sidebarCollapsed ? `${item.label} — select a project first` : 'Select a project first'"
           >
@@ -182,17 +180,17 @@ const initials = computed(() => {
       <div class="mt-5 mb-1.5 px-2.5">
         <div
           v-if="!ui.sidebarCollapsed"
-          class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400"
+          class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500"
         >Account</div>
-        <div v-else class="h-px bg-neutral-200" />
+        <div v-else class="h-px bg-neutral-200 dark:bg-neutral-800" />
       </div>
       <ul class="space-y-0.5">
         <li v-for="item in globalBottom" :key="item.to">
           <RouterLink
             :to="item.to"
-            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100"
+            class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            active-class="bg-orange-50 text-orange-700 font-medium"
+            active-class="bg-orange-50 text-orange-700 font-medium dark:bg-orange-900/30 dark:text-orange-300"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -203,18 +201,18 @@ const initials = computed(() => {
     </nav>
 
     <!-- Footer: user + sign out + collapse toggle -->
-    <div class="border-t border-neutral-200 p-3">
+    <div class="border-t border-neutral-200 p-3 dark:border-neutral-800">
       <div v-if="!ui.sidebarCollapsed" class="mb-2 flex items-center gap-2 px-1">
-        <div class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700">
+        <div class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
           {{ initials }}
         </div>
         <div class="min-w-0 flex-1">
           <div class="truncate text-xs font-medium">{{ displayName }}</div>
-          <div class="text-[10px] uppercase tracking-wide text-neutral-500">{{ session.user?.role ?? '' }}</div>
+          <div class="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ session.user?.role ?? '' }}</div>
         </div>
         <button
           type="button"
-          class="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          class="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
           title="Sign out"
           aria-label="Sign out"
           @click="signOut"
@@ -229,14 +227,14 @@ const initials = computed(() => {
       <div v-else class="mb-2 flex flex-col items-center gap-1">
         <button
           type="button"
-          class="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 hover:ring-2 hover:ring-orange-200"
+          class="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 hover:ring-2 hover:ring-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:hover:ring-orange-700"
           title="Sign out"
           aria-label="Sign out"
           @click="signOut"
         >{{ initials }}</button>
         <button
           type="button"
-          class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
           title="Sign out"
           aria-label="Sign out"
           @click="signOut"
@@ -249,7 +247,7 @@ const initials = computed(() => {
 
       <button
         type="button"
-        class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
+        class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800"
         @click="ui.toggleSidebar()"
       >
         <svg
