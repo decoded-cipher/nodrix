@@ -37,7 +37,7 @@ async function fetchUpstreamCommit(repo: string): Promise<UpstreamCommit> {
   // GitHub API requires a User-Agent header. Worker fetch sets a default but
   // it's friendlier to identify ourselves so anyone tracing the request can
   // tell what's making it.
-  const res = await fetch(`https://api.github.com/repos/${repo}/commits/main`, {
+  const res = await fetch(`https://api.github.com/repos/${repo}/commits/master`, {
     headers: {
       'User-Agent': 'nodrix-update-check',
       Accept: 'application/vnd.github+json',
