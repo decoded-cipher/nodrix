@@ -161,7 +161,8 @@ function applyUpdate(u: UpdateMsg) {
         }).appendPoint?.(sk, { ts: u.ts, value: Number(u.value) });
       }
     } else if (el.tagName === 'IOT-TOGGLE') {
-      (el as HTMLElement & { current?: unknown }).current = u.value;
+      (el as HTMLElement & { current?: unknown; ts?: number }).current = u.value;
+      (el as HTMLElement & { current?: unknown; ts?: number }).ts = u.ts;
     } else {
       (el as HTMLElement & { value?: unknown; ts?: number }).value = u.value;
       (el as HTMLElement & { value?: unknown; ts?: number }).ts = u.ts;

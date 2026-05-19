@@ -71,13 +71,30 @@ const TEMPLATE = `
       border-radius: 2px;
       flex-shrink: 0;
     }
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75em;
+      flex-shrink: 0;
+    }
+    .ts {
+      font-size: clamp(9px, min(6cqh, 3cqw), 12px);
+      color: var(--color-text-faint, #a3a3a3);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      white-space: nowrap;
+    }
   </style>
   <div class="card">
     <div class="title"></div>
     <div class="chart-area">
       <svg viewBox="0 0 400 200" preserveAspectRatio="none"></svg>
     </div>
-    <div class="legend"></div>
+    <div class="footer">
+      <div class="legend"></div>
+      <div class="ts"></div>
+    </div>
   </div>
 `;
 
@@ -118,8 +135,10 @@ export class IotChartElement extends HTMLElement {
     shadow.querySelector('.title')!.textContent = this.getAttribute('data-title') ?? '';
     const svg = shadow.querySelector('svg')!;
     const legend = shadow.querySelector('.legend')!;
+    const tsEl = shadow.querySelector('.ts')!;
     svg.innerHTML = '';
     legend.innerHTML = '';
+    tsEl.textContent = '';
 
     const all = this.#series.flatMap((s) => s.points);
     if (all.length === 0) {
@@ -129,6 +148,7 @@ export class IotChartElement extends HTMLElement {
 
     const minTs = Math.min(...all.map((p) => p.ts));
     const maxTs = Math.max(...all.map((p) => p.ts));
+    tsEl.textContent = new Date(maxTs * 1000).toLocaleTimeString();
     const minV = Math.min(...all.map((p) => p.value));
     const maxV = Math.max(...all.map((p) => p.value));
     const tSpan = Math.max(1, maxTs - minTs);

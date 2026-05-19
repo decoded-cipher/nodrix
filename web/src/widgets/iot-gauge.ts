@@ -13,7 +13,7 @@ const TEMPLATE = `
     }
     .card {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto 1fr auto;
       height: 100%;
       width: 100%;
       box-sizing: border-box;
@@ -23,6 +23,13 @@ const TEMPLATE = `
       border-radius: 10px;
       transition: border-color 120ms ease;
       overflow: hidden;
+    }
+    .ts {
+      font-size: clamp(9px, min(6cqh, 3cqw), 12px);
+      color: var(--color-text-faint, #a3a3a3);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      white-space: nowrap;
     }
     .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
     .title {
@@ -100,11 +107,13 @@ const TEMPLATE = `
       <div class="center"><div class="value">—</div></div>
       <div class="bounds"><span class="min"></span><span class="max"></span></div>
     </div>
+    <div class="ts"></div>
   </div>
 `;
 
 export class IotGaugeElement extends HTMLElement {
   #value: number | null = null;
+  #ts: number | null = null;
 
   static get observedAttributes() { return ['data-title', 'data-min', 'data-max']; }
 
@@ -120,9 +129,12 @@ export class IotGaugeElement extends HTMLElement {
   set value(v: unknown) {
     const n = typeof v === 'number' ? v : Number(v);
     this.#value = Number.isFinite(n) ? n : null;
+    this.#ts = Math.floor(Date.now() / 1000);
     this.render();
   }
   get value(): number | null { return this.#value; }
+
+  set ts(t: number) { this.#ts = t; this.render(); }
 
   private render() {
     const shadow = this.shadowRoot!;
@@ -134,6 +146,7 @@ export class IotGaugeElement extends HTMLElement {
     shadow.querySelector('.min')!.textContent = String(min);
     shadow.querySelector('.max')!.textContent = String(max);
     shadow.querySelector('.value')!.textContent = value === null ? '—' : value.toFixed(1);
+    shadow.querySelector('.ts')!.textContent = this.#ts ? new Date(this.#ts * 1000).toLocaleTimeString() : '';
 
     // Arc length: full semicircle is ~125.66 (π * 40). Compute fraction filled.
     const arc = shadow.querySelector('.arc') as SVGPathElement;
