@@ -277,12 +277,16 @@ export class IotChartElement extends HTMLElement {
       yaxis: {
         labels: {
           style: { fontSize: '10px' },
+          // Negative offset pushes the numbers further left so there's
+          // visible breathing room between them and the axis line.
+          offsetX: -4,
           // Round Y-axis ticks to integers when the value clearly is one,
           // otherwise show enough precision to distinguish nearby ticks.
           formatter: (v: number) => formatNumber(v),
         },
         axisBorder: { show: true, color: axisColor, width: 1 },
-        axisTicks: { show: true, color: axisColor, width: 4 },
+        // Longer tick stubs that sit right at the start of the plot area.
+        axisTicks: { show: true, color: axisColor, width: 6 },
       },
       tooltip: {
         x: { format: 'HH:mm' },
@@ -293,7 +297,9 @@ export class IotChartElement extends HTMLElement {
       grid: {
         borderColor: 'var(--color-border, #e5e5e5)',
         strokeDashArray: 3,
-        padding: { left: 4, right: 4, top: 0, bottom: 0 },
+        // Zero left padding so the Y-axis line sits flush against the
+        // first data point rather than floating inside the plot area.
+        padding: { left: 0, right: 4, top: 0, bottom: 0 },
       },
       noData: {
         text: 'No data yet',
