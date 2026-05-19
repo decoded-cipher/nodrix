@@ -55,17 +55,18 @@ UPSTREAM_SHA=$(cd "${UPSTREAM_DIR}" && git rev-parse HEAD)
 export WORKERS_CI_COMMIT_SHA="${UPSTREAM_SHA}"
 echo "[build-from-upstream] upstream HEAD: ${UPSTREAM_SHA}"
 
-# 3. Wipe local working tree (except wrangler.toml and .git), copy upstream
-#    in over the top. The find expression keeps wrangler.toml AND any dotfile
-#    Cloudflare Workers Builds leaves around (e.g. .git for state, env files).
-find . -mindepth 1 -maxdepth 1 \
-  ! -name 'wrangler.toml' \
-  ! -name '.git' \
-  ! -name '.cf' \
-  -exec rm -rf {} +
+# 3. Overlay upstream onto the local working tree IN-PLACE. Critical: do NOT
+#    rm-rf and recreate directories. The outer `bun run --filter @nodrix/worker
+#    build` process is holding a CWD inside worker/, and the wrangler subprocess
+#    it spawned is what's running THIS script. If we wipe worker/ and recreate
+#    it, those processes end up with a CWD pointing to a deleted inode — wrangler
+#    silently hangs on its next filesystem op. `cp -R src/. dst` overwrites
+#    files in place without touching the parent inode. We don't bother removing
+#    files that exist locally but not upstream — they just sit there unused
+#    (wrangler only bundles what wrangler.toml's `main` + assets dir reference).
 cp -R "${UPSTREAM_DIR}"/. .
 
-# 4. Restore user's wrangler.toml in case upstream had its own committed.
+# 4. Restore user's wrangler.toml in case upstream had its own (which it does).
 cp "${WRANGLER_BACKUP}" wrangler.toml
 
 # 5. Run the standard build chain on the now-upstream source. Invoke the
