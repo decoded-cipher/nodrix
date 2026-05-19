@@ -136,7 +136,7 @@ const initials = computed(() => {
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            active-class="bg-orange-50 text-orange-700 font-medium dark:bg-orange-900/30 dark:text-orange-300"
+            active-class="bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -159,7 +159,7 @@ const initials = computed(() => {
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            active-class="bg-orange-50 text-orange-700 font-medium dark:bg-orange-900/30 dark:text-orange-300"
+            active-class="bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
@@ -190,7 +190,7 @@ const initials = computed(() => {
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            active-class="bg-orange-50 text-orange-700 font-medium dark:bg-orange-900/30 dark:text-orange-300"
+            active-class="bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20"
             :title="ui.sidebarCollapsed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
