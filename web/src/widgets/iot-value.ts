@@ -15,9 +15,8 @@ const TEMPLATE = `
       color: var(--color-text, #171717);
     }
     .card {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
       height: 100%;
       width: 100%;
       box-sizing: border-box;
@@ -42,9 +41,11 @@ const TEMPLATE = `
     }
     .reading {
       display: flex;
-      align-items: baseline;
+      align-items: center;
+      justify-content: center;
       gap: 0.25em;
       min-width: 0;
+      min-height: 0;
       line-height: 1;
     }
     .value {
