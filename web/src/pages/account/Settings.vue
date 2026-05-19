@@ -43,6 +43,8 @@ type VersionInfo = {
   } | null;
   status: 'up_to_date' | 'behind' | 'unknown';
   compare_url: string | null;
+  dashboard_url: string;
+  script_name: string;
 };
 const versionInfo = ref<VersionInfo | null>(null);
 const versionLoading = ref(false);
@@ -72,95 +74,22 @@ function fmtDate(unix: number | null): string {
   return new Date(unix * 1000).toLocaleString();
 }
 
-// Update flow state — configured token, in-flight build, and polling.
-type UpdateConfig = {
-  configured: boolean;
-  account_id: string | null;
-  account_name: string | null;
-  script_name: string | null;
-  last_build_id: string | null;
-  dismissed_at: number | null;
-};
-type BuildStatus = {
-  build_id?: string;
-  status: 'idle' | 'queued' | 'running' | 'success' | 'failure' | 'unknown';
-  logs_url?: string;
-  error?: unknown;
-};
-
-const updateConfig = ref<UpdateConfig>({
-  configured: false,
-  account_id: null,
-  account_name: null,
-  script_name: null,
-  last_build_id: null,
-  dismissed_at: null,
-});
-const buildStatus = ref<BuildStatus>({ status: 'idle' });
-const updateTriggering = ref(false);
-const updateError = ref<string | null>(null);
-let buildPollTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function refreshUpdateConfig() {
-  try {
-    updateConfig.value = await api.get<UpdateConfig>('/v1/admin/update');
-  } catch {
-    // Owner-only endpoint; failures are tolerated.
-  }
-}
-
-async function refreshBuildStatus() {
-  try {
-    buildStatus.value = await api.get<BuildStatus>('/v1/admin/update/status');
-  } catch {
-    buildStatus.value = { status: 'unknown' };
-  }
-}
-
-function isBuildInFlight(s: BuildStatus['status']): boolean {
-  return s === 'queued' || s === 'running';
-}
-
-function schedulePoll() {
-  if (buildPollTimer) clearTimeout(buildPollTimer);
-  buildPollTimer = setTimeout(async () => {
-    await refreshBuildStatus();
-    if (isBuildInFlight(buildStatus.value.status)) {
-      schedulePoll();
-    } else if (buildStatus.value.status === 'success') {
-      // New build finished → fetch the freshly-baked version info.
-      await refreshVersion();
-    }
-  }, 5000);
-}
-
 // Tracks the post-click prompt that asks the owner to hit "Retry deployment"
-// over in the Cloudflare dashboard tab we just opened.
+// over in the Cloudflare dashboard tab we just opened. Cloudflare doesn't
+// expose a token-authed "trigger build" endpoint, so this is as automated
+// as the flow can get — open the dashboard, then poll for the new SHA.
 const updateDispatched = ref(false);
 
-async function triggerUpdate() {
-  updateTriggering.value = true;
-  updateError.value = null;
-  try {
-    const res = await api.post<{ dashboard_url: string }>('/v1/admin/update/trigger');
-    // Open the dashboard's Workers Builds tab in a new tab. Cloudflare's
-    // public API doesn't expose a token-authed "trigger build" endpoint yet,
-    // so the owner clicks "Retry deployment" there. We start lightweight
-    // polling here so we auto-detect when the new SHA lands.
-    window.open(res.dashboard_url, '_blank', 'noopener,noreferrer');
-    updateDispatched.value = true;
-    scheduleVersionRecheck();
-  } catch (e) {
-    updateError.value = (e as Error).message;
-  } finally {
-    updateTriggering.value = false;
-  }
+function openCloudflareDashboard() {
+  if (!versionInfo.value?.dashboard_url) return;
+  window.open(versionInfo.value.dashboard_url, '_blank', 'noopener,noreferrer');
+  updateDispatched.value = true;
+  scheduleVersionRecheck();
 }
 
-// After "Update now" opens the dashboard, poll /v1/admin/version every 10s
+// After the owner opens the dashboard, poll /v1/admin/version every 10s
 // for up to 10 min so the UI flips from "Update available" → "Up to date"
-// without the owner having to refresh manually. Stops early once we detect
-// the deployed SHA caught up.
+// without a manual refresh. Stops early once the deployed SHA catches up.
 let versionRecheckTimer: ReturnType<typeof setTimeout> | null = null;
 let versionRecheckCount = 0;
 const VERSION_RECHECK_MAX = 60; // 60 * 10s = 10 min
@@ -180,23 +109,6 @@ function scheduleVersionRecheck() {
   versionRecheckTimer = setTimeout(tick, 10_000);
 }
 
-async function disconnectUpdateToken() {
-  const ok = await confirm({
-    title: 'Disconnect Cloudflare API token?',
-    message: 'The stored token will be deleted from this deployment’s database. Your deployment keeps running normally — only the in-app update flow stops.',
-    details: [
-      'The "Update now" button will disappear from this page',
-      'You can re-enable updates anytime by pasting a new token',
-      'No Cloudflare resources are deleted or changed',
-    ],
-    confirmLabel: 'Disconnect token',
-    cancelLabel: 'Keep it',
-  });
-  if (!ok) return;
-  await api.del<void>('/v1/admin/update/config');
-  await refreshUpdateConfig();
-}
-
 onMounted(async () => {
   if (session.user) isOwner.value = session.user.role === 'owner';
   if (isOwner.value) {
@@ -206,12 +118,7 @@ onMounted(async () => {
     } catch {
       providers.value = [];
     }
-    await Promise.all([
-      refreshVersion(),
-      refreshUpdateConfig(),
-      refreshBuildStatus(),
-    ]);
-    if (isBuildInFlight(buildStatus.value.status)) schedulePoll();
+    await refreshVersion();
   }
 });
 
@@ -553,94 +460,11 @@ const PROVIDER_META = {
           </div>
         </div>
 
-        <!-- Behind: show 'See diff' link -->
+        <!-- Update dispatched: owner clicked the button, we opened the
+             Cloudflare dashboard for them; now waiting for the deployed
+             SHA to catch up. -->
         <div
-          v-if="versionInfo?.status === 'behind' && versionInfo.compare_url"
-          class="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
-        >
-          <div class="font-semibold text-orange-900 dark:text-orange-300">A newer version is on upstream</div>
-          <p class="mt-1 text-orange-800 dark:text-orange-300/80">
-            See what changed:
-            <a :href="versionInfo.compare_url" target="_blank" rel="noreferrer" class="underline">
-              {{ versionInfo.current.short_commit }} … {{ versionInfo.upstream!.commit.short_sha }}
-            </a>
-          </p>
-        </div>
-
-        <!-- Action row: depends on whether the CF API token is configured -->
-
-        <!-- Token NOT configured → CTA to onboarding wizard -->
-        <div
-          v-if="!updateConfig.configured"
-          class="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950"
-        >
-          <div class="font-semibold text-neutral-700 dark:text-neutral-200">One-click updates aren't set up yet</div>
-          <p class="mt-1 text-neutral-600 dark:text-neutral-400">
-            Connect a Cloudflare API token so this deployment can redeploy itself when new versions land upstream.
-            Setup takes about 2 minutes and the token stays encrypted at rest.
-          </p>
-          <RouterLink
-            to="/onboarding"
-            class="mt-2 inline-block rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
-          >Set up one-click updates →</RouterLink>
-        </div>
-
-        <!-- Token configured + build in flight → polling state -->
-        <div
-          v-else-if="isBuildInFlight(buildStatus.status)"
-          class="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950"
-        >
-          <div class="flex items-center gap-2 font-semibold text-neutral-700 dark:text-neutral-200">
-            <svg class="h-3.5 w-3.5 animate-spin text-orange-600" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.2" stroke-width="3" />
-              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" />
-            </svg>
-            <span>Build {{ buildStatus.status }}…</span>
-          </div>
-          <p class="mt-1 text-neutral-600 dark:text-neutral-400">
-            Cloudflare Workers Builds is pulling the latest upstream code and redeploying.
-            This page will update when the build finishes (~1–2 minutes).
-          </p>
-          <a
-            v-if="buildStatus.logs_url"
-            :href="buildStatus.logs_url"
-            target="_blank"
-            rel="noreferrer"
-            class="mt-2 inline-block text-orange-700 hover:underline dark:text-orange-400"
-          >View build logs ↗</a>
-        </div>
-
-        <!-- Token configured + last build failed -->
-        <div
-          v-else-if="buildStatus.status === 'failure'"
-          class="rounded-md border border-red-200 bg-red-50 p-3 text-xs dark:border-red-900/60 dark:bg-red-950/30"
-        >
-          <div class="font-semibold text-red-900 dark:text-red-300">Last update build failed</div>
-          <p class="mt-1 text-red-800 dark:text-red-300/80">
-            Check the build logs for details. You can retry once you've fixed the issue.
-          </p>
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <a
-              v-if="buildStatus.logs_url"
-              :href="buildStatus.logs_url"
-              target="_blank"
-              rel="noreferrer"
-              class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-100 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-            >View logs ↗</a>
-            <button
-              type="button"
-              :disabled="updateTriggering"
-              class="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-              @click="triggerUpdate"
-            >{{ updateTriggering ? 'Retrying…' : 'Retry build' }}</button>
-          </div>
-        </div>
-
-        <!-- Token configured + update dispatched: owner clicked the button,
-             we opened the Cloudflare dashboard for them; now waiting for the
-             deployed SHA to catch up to upstream. -->
-        <div
-          v-else-if="updateDispatched"
+          v-if="updateDispatched"
           class="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
         >
           <div class="flex items-center gap-2 font-semibold text-orange-900 dark:text-orange-300">
@@ -658,61 +482,39 @@ const PROVIDER_META = {
           <button
             type="button"
             class="mt-2 text-[11px] text-orange-700 underline hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
-            @click="triggerUpdate"
+            @click="openCloudflareDashboard"
           >Reopen Cloudflare dashboard</button>
         </div>
 
-        <!-- Token configured + behind upstream → real Update button -->
+        <!-- Behind upstream → Update button -->
         <div
           v-else-if="versionInfo?.status === 'behind'"
           class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
         >
           <div class="min-w-0 text-orange-900 dark:text-orange-300">
             <span class="font-semibold">Update available.</span>
-            Opens the Cloudflare Builds page where you click <span class="font-medium">Retry deployment</span> to pull the latest upstream code.
+            <span v-if="versionInfo.compare_url">
+              <a :href="versionInfo.compare_url" target="_blank" rel="noreferrer" class="underline">See what changed</a>,
+            </span>
+            then open Cloudflare and click <span class="font-medium">Retry deployment</span>.
           </div>
           <button
             type="button"
-            :disabled="updateTriggering"
-            class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-            @click="triggerUpdate"
-          >{{ updateTriggering ? 'Opening…' : 'Update now ↗' }}</button>
+            class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+            @click="openCloudflareDashboard"
+          >Update now ↗</button>
         </div>
 
-        <!-- Token configured + up to date → quiet confirmation -->
+        <!-- Up to date → quiet confirmation -->
         <div
           v-else-if="versionInfo?.status === 'up_to_date'"
           class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/30"
         >
           <div class="font-semibold text-emerald-900 dark:text-emerald-300">You're on the latest version</div>
-          <p class="mt-1 text-emerald-800 dark:text-emerald-300/80">
-            One-click updates are wired up — you'll see a button here when new versions land upstream.
-          </p>
         </div>
 
-        <p v-if="updateError" class="text-xs text-red-600 dark:text-red-400">{{ updateError }}</p>
-
-        <!-- Configured-state footer with tracking info + disconnect action -->
-        <div
-          v-if="updateConfig.configured"
-          class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-3 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400"
-        >
-          <div>
-            Tracking upstream <span class="font-mono">{{ versionInfo?.upstream_repo ?? '…' }}</span>
-            ·
-            Account
-            <span class="font-mono">{{ updateConfig.account_name ?? updateConfig.account_id }}</span>
-          </div>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 rounded-md border border-red-300 px-2.5 py-1 text-[11px] font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-            @click="disconnectUpdateToken"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3">
-              <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />
-            </svg>
-            Disconnect token
-          </button>
+        <div class="border-t border-neutral-100 pt-3 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+          Tracking upstream <span class="font-mono">{{ versionInfo?.upstream_repo ?? '…' }}</span>
         </div>
       </div>
     </section>

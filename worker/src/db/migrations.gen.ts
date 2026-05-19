@@ -107,5 +107,11 @@ export const MIGRATIONS: Migration[] = [
     "statements": [
       "CREATE TABLE IF NOT EXISTS deployment_settings (\n  key        TEXT PRIMARY KEY,\n  value      TEXT NOT NULL,\n  updated_at INTEGER NOT NULL\n)"
     ]
+  },
+  {
+    "name": "0006_drop_update_settings",
+    "statements": [
+      "DELETE FROM deployment_settings WHERE key IN (\n  'cf.api_token_enc',\n  'cf.account_id',\n  'cf.account_name',\n  'cf.script_name',\n  'cf.last_build_id',\n  'onboarding.dismissed_at'\n)"
+    ]
   }
 ];

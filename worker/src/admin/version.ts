@@ -20,6 +20,22 @@ version.use('*', requireSession);
 const DEFAULT_UPSTREAM = 'decoded-cipher/nodrix';
 const UPSTREAM_TTL_SECONDS = 3600;
 
+// Cloudflare's dashboard URL takes a `?to=/:account/...` path; CF substitutes
+// the account selector at sign-in time, so we don't need to know the owner's
+// account_id. If they have multiple accounts, CF prompts them to pick.
+function buildDashboardUrl(scriptName: string): string {
+  const path = `/:account/workers/services/view/${encodeURIComponent(scriptName)}/production/builds`;
+  return `https://dash.cloudflare.com/?to=${encodeURIComponent(path)}`;
+}
+
+function scriptNameFromHost(host: string): string {
+  if (host.endsWith('.workers.dev')) {
+    const label = host.slice(0, host.indexOf('.'));
+    if (label) return label;
+  }
+  return 'nodrix';
+}
+
 type UpstreamCommit = {
   sha: string;
   short_sha: string;
@@ -111,6 +127,9 @@ version.get('/', async (c) => {
       ? `https://github.com/${upstreamRepo}/compare/${current.commit}...${upstream!.commit.sha}`
       : null;
 
+  const scriptName = scriptNameFromHost(new URL(c.req.url).host);
+  const dashboard_url = buildDashboardUrl(scriptName);
+
   return c.json({
     current,
     upstream_repo: upstreamRepo,
@@ -122,6 +141,8 @@ version.get('/', async (c) => {
       : null,
     status,
     compare_url,
+    dashboard_url,
+    script_name: scriptName,
   });
 });
 
