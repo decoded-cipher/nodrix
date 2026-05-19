@@ -7,6 +7,7 @@ import {
   buildDataIndex,
   applyProps,
   createWidgetElement,
+  subscriptionMetric,
   type DataIndex,
 } from '../../builder/render-widget';
 import type {
@@ -126,7 +127,8 @@ function applySnapshot(snap: SnapshotMsg) {
       (el as HTMLElement & { series?: unknown }).series = built;
     } else {
       const device = String(item.props['device'] ?? '');
-      const metric = String(item.props['metric'] ?? '');
+      const metric = subscriptionMetric(item);
+      if (!device || !metric) continue;
       const latest = snap.devices[device]?.state[metric];
       if (latest !== undefined) {
         (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;

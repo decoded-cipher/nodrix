@@ -40,9 +40,14 @@ export function buildDataIndex(layout: Layout, els: Map<string, HTMLElement>): D
         addSub(el, device, metric);
       }
       chartKeys.set(item.id, m);
-    } else if (item.type !== 'iot-toggle' && item.type !== 'iot-push') {
+    } else if (item.type !== 'iot-push') {
+      // iot-push is fire-and-forget — no state to subscribe to.
+      // Everything else subscribes to (device, subscriptionMetric):
+      //   value / gauge → the explicit `metric` prop
+      //   toggle / slider → the `command` prop, so the device echoes state
+      //     under the same name it receives commands on.
       const device = String(item.props['device'] ?? '');
-      const metric = String(item.props['metric'] ?? '');
+      const metric = subscriptionMetric(item);
       if (device && metric) addSub(el, device, metric);
     }
   }
@@ -84,4 +89,14 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
 
 export function seriesKey(device: string, metric: string): string {
   return `${device}|${metric}`;
+}
+
+// Which metric name a widget subscribes to for state. Control widgets
+// (toggle/slider) reuse their `command` name so the device can echo state
+// under the same name it receives commands on — no separate field needed.
+export function subscriptionMetric(item: WidgetInstance): string {
+  if (item.type === 'iot-toggle' || item.type === 'iot-slider') {
+    return String(item.props['command'] ?? '');
+  }
+  return String(item.props['metric'] ?? '');
 }

@@ -138,12 +138,11 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Set a continuous numeric value — brightness, fan speed, setpoint, volume. Sends the command on release; reflects reported state via the chosen metric.',
     icon: ICON_SLIDER,
     defaultSize: { w: 4, h: 2 },
-    defaultProps: { title: '', device: '', command: '', metric: '', orientation: 'horizontal', min: 0, max: 100, step: 1, unit: '' },
+    defaultProps: { title: '', device: '', command: '', orientation: 'horizontal', min: 0, max: 100, step: 1, unit: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
       { key: 'device', label: 'Device', type: 'device' },
       { key: 'command', label: 'Command name', type: 'string' },
-      { key: 'metric', label: 'State metric (optional)', type: 'string' },
       { key: 'orientation', label: 'Orientation', type: 'select', options: ['horizontal', 'vertical'] },
       { key: 'min', label: 'Min', type: 'number' },
       { key: 'max', label: 'Max', type: 'number' },

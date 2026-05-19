@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/project';
 import { specFor } from '../../builder/widget-catalog';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
-import { applyProps, createWidgetElement, buildDataIndex } from '../../builder/render-widget';
+import { applyProps, createWidgetElement, buildDataIndex, subscriptionMetric } from '../../builder/render-widget';
 import { DashboardWs } from '../../ws';
 import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../../types';
 
@@ -135,9 +135,10 @@ function applySnapshot(snap: SnapshotMsg) {
           points: pts,
         };
       });
-    } else if (item.type !== 'iot-toggle') {
+    } else {
       const device = String(item.props['device'] ?? '');
-      const metric = String(item.props['metric'] ?? '');
+      const metric = subscriptionMetric(item);
+      if (!device || !metric) continue;
       const latest = snap.devices[device]?.state[metric];
       if (latest !== undefined) {
         (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;

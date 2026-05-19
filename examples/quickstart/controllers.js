@@ -1,11 +1,14 @@
-// Controller side — WebSocket commands.
+// Controller side — WebSocket commands + state echo.
 //
 // Connects to the worker's device WS and prints (i.e. "applies") whatever
-// commands come in from dashboard widgets. Demonstrates the three control
-// widget types:
+// commands come in from dashboard widgets. After applying, POSTs the new
+// state back as telemetry under the SAME name as the command — that's how
+// toggles and sliders subscribe for state, so retention works on refresh.
+//
+// Demonstrates the three control widget types:
 //
 //   power      — iot-toggle  ("on" / "off")
-//   push       — iot-push    (one-shot, no value)
+//   push       — iot-push    (one-shot, no value — no echo)
 //   brightness — iot-slider  (numeric)
 //
 // The keys in `handlers` below must match the "Command name" field of the
@@ -14,10 +17,12 @@
 // device. Acks each command so the worker stops retrying.
 
 import WebSocket from 'ws';
+import axios from 'axios';
 
 const HOST = required('NODRIX_HOST');
 const TOKEN = required('CONTROLLER_TOKEN');
 const URL = `wss://${HOST}/v1/devices/ws?token=${encodeURIComponent(TOKEN)}`;
+const TELEMETRY = `https://${HOST}/v1/telemetry`;
 
 function required(name) {
   const v = process.env[name];
@@ -25,29 +30,41 @@ function required(name) {
   return v;
 }
 
-// Local mirror of "device" state. Just enough so we can show the effect of
-// each command in the log. To close the loop with the slider's State Metric
-// subscription, POST the new value back as telemetry after applying — e.g.
-// after a brightness command, POST `{ metrics: { brightness: <value> } }`.
+// Local mirror of "device" state. Echoed back as telemetry after each
+// command so the dashboard's State Metric stays in sync.
 const device = {
   power: 'off',
   brightness: 0,
 };
 
+async function echo(metrics) {
+  try {
+    await axios.post(TELEMETRY, { metrics }, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+      timeout: 10_000,
+    });
+  } catch (e) {
+    const err = e.response ? `${e.response.status} ${JSON.stringify(e.response.data)}` : e.message;
+    console.error(`  ✗ echo telemetry failed: ${err}`);
+  }
+}
+
 const handlers = {
   power(value) {
     device.power = String(value);
     console.log(`  → power = ${device.power}`);
+    echo({ power: device.power });
   },
   push() {
+    // One-shot — no state to echo.
     console.log(`  → push! (e.g. trigger a scene, reset a counter, kick a script)`);
   },
   brightness(value) {
     const n = Number(value);
-    if (Number.isFinite(n)) {
-      device.brightness = Math.round(n);
-      console.log(`  → brightness = ${device.brightness}`);
-    }
+    if (!Number.isFinite(n)) return;
+    device.brightness = Math.round(n);
+    console.log(`  → brightness = ${device.brightness}`);
+    echo({ brightness: device.brightness });
   },
 };
 

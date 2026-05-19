@@ -75,13 +75,17 @@ export function devicesAndMetricsFromLayout(layout: Layout): Array<{ device: str
           push(s['device'], s['metric']);
         }
       }
-    } else if (item.type === 'iot-toggle') {
-      // Toggles write commands but also need device for the command target.
-      // No metric subscription needed.
+    } else if (item.type === 'iot-push') {
+      // Push is fire-and-forget — no metric subscription.
     } else {
-      if (typeof props['device'] === 'string' && typeof props['metric'] === 'string') {
-        push(props['device'], props['metric']);
-      }
+      // value / gauge subscribe to their `metric` prop.
+      // toggle / slider reuse their `command` prop as the metric name —
+      // the device echoes state under the same name it receives commands.
+      const device = typeof props['device'] === 'string' ? props['device'] : null;
+      const metric = item.type === 'iot-toggle' || item.type === 'iot-slider'
+        ? (typeof props['command'] === 'string' ? props['command'] : null)
+        : (typeof props['metric'] === 'string' ? props['metric'] : null);
+      if (device && metric) push(device, metric);
     }
   }
   return out;
