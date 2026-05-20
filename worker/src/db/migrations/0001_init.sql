@@ -196,7 +196,10 @@ CREATE TABLE IF NOT EXISTS integrations (
   created_by  TEXT REFERENCES users(id),
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL,
-  archived_at INTEGER
+  archived_at INTEGER,
+  last_run_at     INTEGER,                                     -- last delivery attempt
+  last_run_status TEXT CHECK (last_run_status IN ('ok','error','skipped')),
+  last_error      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_integrations_project ON integrations(project_id);
 

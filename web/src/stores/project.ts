@@ -11,6 +11,7 @@ import type {
   ProjectTokenWithSecret,
   Integration,
   IntegrationKind,
+  IntegrationTestResult,
   Layout,
   UserToken,
 } from '../types';
@@ -283,6 +284,22 @@ export const useProjectStore = defineStore('project', () => {
     integrations.value = integrations.value.filter((i) => i.id !== id);
   }
 
+  // Fires a connection once with a synthetic context. Returns the delivery
+  // result and refreshes the row's last-run status from the response.
+  async function testIntegration(id: string): Promise<IntegrationTestResult> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const res = await api.post<IntegrationTestResult>(
+      `/v1/admin/projects/${currentProjectId.value}/integrations/${id}/test`
+    );
+    const now = Math.floor(Date.now() / 1000);
+    integrations.value = integrations.value.map((i) =>
+      i.id === id
+        ? { ...i, last_run_at: now, last_run_status: res.status, last_error: res.status === 'error' ? (res.detail ?? 'error') : null }
+        : i
+    );
+    return res;
+  }
+
   return {
     currentProjectId,
     variables,
@@ -316,5 +333,6 @@ export const useProjectStore = defineStore('project', () => {
     createIntegration,
     updateIntegration,
     deleteIntegration,
+    testIntegration,
   };
 });

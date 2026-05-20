@@ -4,6 +4,8 @@ import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
+import { executeIntegration, recordIntegrationRun } from '../engine/integrations';
+import type { AutomationContext } from '../engine/types';
 
 const integrations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
@@ -23,6 +25,9 @@ type IntegrationRow = {
   created_at: number;
   updated_at: number;
   archived_at: number | null;
+  last_run_at: number | null;
+  last_run_status: 'ok' | 'error' | 'skipped' | null;
+  last_error: string | null;
 };
 
 function shape(r: IntegrationRow) {
@@ -36,6 +41,9 @@ function shape(r: IntegrationRow) {
     created_at: r.created_at,
     updated_at: r.updated_at,
     archived_at: r.archived_at,
+    last_run_at: r.last_run_at,
+    last_run_status: r.last_run_status,
+    last_error: r.last_error,
   };
 }
 
@@ -49,7 +57,8 @@ integrations.get('/', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT id, project_id, name, kind, config, enabled,
-              created_at, updated_at, archived_at
+              created_at, updated_at, archived_at,
+              last_run_at, last_run_status, last_error
          FROM integrations
         WHERE project_id = ? AND archived_at IS NULL
         ORDER BY created_at DESC`
@@ -115,6 +124,52 @@ integrations.post('/', async (c) => {
     .bind(id)
     .first<IntegrationRow>();
   return c.json(shape(row!), 201);
+});
+
+// POST /v1/admin/projects/:proj/integrations/:id/test
+// Fires the connection once with a synthetic context so users can verify
+// delivery without wiring up an automation. Records the outcome on the row.
+integrations.post('/:id/test', async (c) => {
+  const project = c.get('project');
+  const user = c.get('user');
+  const id = c.req.param('id');
+
+  const row = await c.env.DB
+    .prepare(
+      `SELECT id, project_id, name, kind, config, enabled
+         FROM integrations
+        WHERE id = ? AND project_id = ? AND archived_at IS NULL`
+    )
+    .bind(id, project.id)
+    .first<{ id: string; project_id: string; name: string; kind: string; config: string; enabled: number }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  const ctx: AutomationContext = {
+    source: 'manual',
+    projectId: project.id,
+    ts: Math.floor(Date.now() / 1000),
+    variable: 'test_variable',
+    value: 42,
+    event: 'test',
+    depth: 0,
+  };
+
+  // Force-enable for the test so users can verify config before flipping it on.
+  const result = await executeIntegration(c.env, { ...row, enabled: 1 }, ctx, { test: true });
+  await recordIntegrationRun(c.env, id, result).catch(() => {});
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'integration.test',
+      targetType: 'integration',
+      targetId: id,
+      metadata: { status: result.status, ...(result.detail ? { detail: result.detail } : {}) },
+    })
+  );
+
+  return c.json(result);
 });
 
 // PATCH /v1/admin/projects/:proj/integrations/:id

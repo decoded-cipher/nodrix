@@ -163,6 +163,14 @@ export type Integration = {
   created_at: number;
   updated_at: number;
   archived_at: number | null;
+  last_run_at: number | null;
+  last_run_status: 'ok' | 'error' | 'skipped' | null;
+  last_error: string | null;
+};
+
+export type IntegrationTestResult = {
+  status: 'ok' | 'error' | 'skipped';
+  detail?: string;
 };
 
 export type AuditLogEntry = {
