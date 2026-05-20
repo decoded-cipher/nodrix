@@ -82,9 +82,7 @@ async function save() {
   }
 }
 
-async function deleteFromModal() {
-  if (!editing.value) return;
-  const p = editing.value;
+async function removeProject(p: Project) {
   const ok = await confirm({
     title: `Delete project "${p.name}"?`,
     message: 'This permanently removes everything in this project. It cannot be undone.',
@@ -100,7 +98,18 @@ async function deleteFromModal() {
   if (ui.currentProject?.id === p.id && session.projects[0]) {
     ui.setCurrentProject(session.projects[0].id);
   }
-  editing.value = null;
+  if (editing.value?.id === p.id) editing.value = null;
+}
+
+function deleteFromMenu(p: Project, event: Event) {
+  event.stopPropagation();
+  openMenuFor.value = null;
+  void removeProject(p);
+}
+
+function deleteFromModal() {
+  if (!editing.value) return;
+  void removeProject(editing.value);
 }
 
 function fmt(ts: number): string {
@@ -173,22 +182,21 @@ watch(
           class="w-full text-left"
           @click="open(p.id)"
         >
-          <div class="flex items-center justify-between">
-            <div class="grid h-9 w-9 place-items-center rounded-md bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
-                <path d="M3.75 9.75h16.5M3.75 9.75A1.5 1.5 0 0 1 5.25 8.25h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.121a1.5 1.5 0 0 0 1.06.44h6.379a1.5 1.5 0 0 1 1.5 1.5v6.75a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V9.75Z" />
-              </svg>
-            </div>
-            <span
-              v-if="ui.currentProject?.id === p.id"
-              class="rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
-            >Current</span>
+          <div class="grid h-9 w-9 place-items-center rounded-md bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
+              <path d="M3.75 9.75h16.5M3.75 9.75A1.5 1.5 0 0 1 5.25 8.25h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.121a1.5 1.5 0 0 0 1.06.44h6.379a1.5 1.5 0 0 1 1.5 1.5v6.75a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V9.75Z" />
+            </svg>
           </div>
           <div class="mt-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ p.name }}</div>
           <div v-if="p.description" class="mt-1 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{{ p.description }}</div>
           <div class="mt-1 font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ p.id }}</div>
           <div class="mt-3 text-xs text-neutral-500 dark:text-neutral-400">Created {{ fmt(p.created_at) }}</div>
         </button>
+
+        <span
+          v-if="ui.currentProject?.id === p.id"
+          class="pointer-events-none absolute bottom-3 right-3 rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
+        >Current</span>
 
         <!-- Kebab menu -->
         <div class="absolute right-2 top-2">
@@ -218,9 +226,9 @@ watch(
             >Edit project</button>
             <button
               type="button"
-              class="block w-full px-3 py-1.5 text-left text-xs text-accent-700 hover:bg-accent-50 dark:text-accent-400 dark:hover:bg-accent-900/20"
-              @click="open(p.id); openMenuFor = null"
-            >Open</button>
+              class="block w-full px-3 py-1.5 text-left text-xs text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+              @click="deleteFromMenu(p, $event)"
+            >Delete project</button>
           </div>
         </div>
       </div>
