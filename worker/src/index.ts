@@ -141,12 +141,12 @@ app.route('/v1/admin/audit-log', auditLog);
 
 // Hardware-facing (Bearer project-token auth, see the route modules):
 app.route('/v1/telemetry', telemetry);
-app.route('/v1/control', control);
-app.route('/v1/events', events);
-
 // Control WebSocket: hibernated push channel for cloud->hardware variable
 // writes. Bearer token may arrive in Authorization OR ?token=... (WS clients
-// can't set headers on the upgrade request). Routed to the Project DO.
+// can't set headers on the upgrade request). Registered BEFORE the /v1/control
+// mount: that mount's requireProjectToken middleware only reads the Authorization
+// header, so if it ran first it would 401 the header-less WS upgrade. Routed to
+// the Project DO.
 app.get('/v1/control/ws', async (c) => {
   const headerToken = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim();
   const queryToken = c.req.query('token');
@@ -180,6 +180,9 @@ app.get('/v1/control/ws', async (c) => {
   const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(row.project_id));
   return stub.fetch(c.req.raw);
 });
+
+app.route('/v1/control', control);
+app.route('/v1/events', events);
 
 // Public read API (user/API token auth):
 app.route('/v1/projects/:proj/variables', readList);
