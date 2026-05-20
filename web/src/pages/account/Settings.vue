@@ -567,13 +567,6 @@ const PROVIDER_META = {
         </li>
         <li class="flex items-center justify-between px-4 py-3">
           <div>
-            <div class="font-medium">Branding</div>
-            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Logo and favicon for white-labeled deployments.</div>
-          </div>
-          <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">Soon</span>
-        </li>
-        <li class="flex items-center justify-between px-4 py-3">
-          <div>
             <div class="font-medium">Telemetry retention &amp; export</div>
             <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Coming soon.</div>
           </div>
