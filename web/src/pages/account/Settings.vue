@@ -3,17 +3,32 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../../stores/session';
 import { useThemeStore, type ThemeMode } from '../../stores/theme';
+import { useAccentStore, type Accent } from '../../stores/accent';
 import { api } from '../../api';
 import { confirm } from '../../lib/confirm';
 
 const session = useSessionStore();
 const theme = useThemeStore();
+const accent = useAccentStore();
 const router = useRouter();
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'system', label: 'System' },
+];
+
+// Literal class strings so Tailwind's source scan generates these utilities
+// (dynamic `bg-${name}` would be missed). `ring` is the selected-state outline.
+const accentOptions: { value: Accent; label: string; swatch: string; ring: string }[] = [
+  { value: 'orange', label: 'Orange', swatch: 'bg-orange-500', ring: 'ring-orange-500' },
+  { value: 'rose', label: 'Rose', swatch: 'bg-rose-500', ring: 'ring-rose-500' },
+  { value: 'amber', label: 'Amber', swatch: 'bg-amber-500', ring: 'ring-amber-500' },
+  { value: 'emerald', label: 'Emerald', swatch: 'bg-emerald-500', ring: 'ring-emerald-500' },
+  { value: 'teal', label: 'Teal', swatch: 'bg-teal-500', ring: 'ring-teal-500' },
+  { value: 'blue', label: 'Blue', swatch: 'bg-blue-500', ring: 'ring-blue-500' },
+  { value: 'indigo', label: 'Indigo', swatch: 'bg-indigo-500', ring: 'ring-indigo-500' },
+  { value: 'violet', label: 'Violet', swatch: 'bg-violet-500', ring: 'ring-violet-500' },
 ];
 
 type ProviderRow = {
@@ -321,7 +336,7 @@ const PROVIDER_META = {
                   :href="PROVIDER_META[kind].docsUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-[11px] text-orange-700 hover:underline dark:text-orange-400"
+                  class="text-[11px] text-accent-700 hover:underline dark:text-accent-400"
                 >Open {{ PROVIDER_META[kind].name }} OAuth console →</a>
               </div>
             </div>
@@ -367,7 +382,7 @@ const PROVIDER_META = {
               <button
                 type="submit"
                 :disabled="submitting"
-                class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
               >{{ submitting ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
@@ -405,6 +420,26 @@ const PROVIDER_META = {
             >{{ opt.label }}</button>
           </div>
         </li>
+        <li class="flex items-center justify-between gap-4 px-4 py-3">
+          <div class="min-w-0">
+            <div class="font-medium">Accent color</div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 capitalize">{{ accent.accent }}</div>
+          </div>
+          <div role="radiogroup" aria-label="Accent color" class="flex items-center gap-2">
+            <button
+              v-for="opt in accentOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="accent.accent === opt.value"
+              :aria-label="opt.label"
+              :title="opt.label"
+              class="h-6 w-6 rounded-full ring-offset-2 ring-offset-white transition dark:ring-offset-neutral-900"
+              :class="[opt.swatch, accent.accent === opt.value ? `ring-2 ${opt.ring}` : 'hover:scale-110']"
+              @click="accent.setAccent(opt.value)"
+            />
+          </div>
+        </li>
       </ul>
     </section>
 
@@ -414,7 +449,7 @@ const PROVIDER_META = {
         <div class="text-sm font-semibold">Version &amp; updates</div>
         <span
           v-if="versionInfo?.status === 'behind'"
-          class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+          class="rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
         >Update available</span>
         <span
           v-else-if="versionInfo?.status === 'up_to_date'"
@@ -446,7 +481,7 @@ const PROVIDER_META = {
                 :href="versionInfo.upstream.commit.html_url"
                 target="_blank"
                 rel="noreferrer"
-                class="font-mono text-sm text-orange-700 hover:underline dark:text-orange-400"
+                class="font-mono text-sm text-accent-700 hover:underline dark:text-accent-400"
               >{{ versionInfo.upstream.commit.short_sha }} ↗</a>
               <div class="mt-0.5 max-w-[260px] truncate text-[11px] text-neutral-500 dark:text-neutral-400" :title="versionInfo.upstream.commit.message">
                 {{ versionInfo.upstream.commit.message }}
@@ -465,23 +500,23 @@ const PROVIDER_META = {
              SHA to catch up. -->
         <div
           v-if="updateDispatched"
-          class="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
+          class="rounded-md border border-accent-200 bg-accent-50 p-3 text-xs dark:border-accent-900/60 dark:bg-accent-900/20"
         >
-          <div class="flex items-center gap-2 font-semibold text-orange-900 dark:text-orange-300">
+          <div class="flex items-center gap-2 font-semibold text-accent-900 dark:text-accent-300">
             <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" stroke-width="3" />
               <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" />
             </svg>
             <span>Cloudflare dashboard opened in a new tab</span>
           </div>
-          <ol class="mt-2 list-decimal space-y-1 pl-4 text-orange-900/90 dark:text-orange-300/80">
+          <ol class="mt-2 list-decimal space-y-1 pl-4 text-accent-900/90 dark:text-accent-300/80">
             <li>In the Cloudflare tab: click <span class="font-medium">Retry deployment</span> on the latest build (or <span class="font-medium">Trigger Deploy</span> if no recent build is shown).</li>
             <li>Wait ~1 minute for the build to finish.</li>
             <li>This page auto-refreshes when the new version goes live.</li>
           </ol>
           <button
             type="button"
-            class="mt-2 text-[11px] text-orange-700 underline hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
+            class="mt-2 text-[11px] text-accent-700 underline hover:text-accent-900 dark:text-accent-400 dark:hover:text-accent-300"
             @click="openCloudflareDashboard"
           >Reopen Cloudflare dashboard</button>
         </div>
@@ -489,9 +524,9 @@ const PROVIDER_META = {
         <!-- Behind upstream → Update button -->
         <div
           v-else-if="versionInfo?.status === 'behind'"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-900/60 dark:bg-orange-900/20"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-accent-200 bg-accent-50 p-3 text-xs dark:border-accent-900/60 dark:bg-accent-900/20"
         >
-          <div class="min-w-0 text-orange-900 dark:text-orange-300">
+          <div class="min-w-0 text-accent-900 dark:text-accent-300">
             <span class="font-semibold">Update available.</span>
             <span v-if="versionInfo.compare_url">
               <a :href="versionInfo.compare_url" target="_blank" rel="noreferrer" class="underline">See what changed</a>,
@@ -500,7 +535,7 @@ const PROVIDER_META = {
           </div>
           <button
             type="button"
-            class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+            class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700"
             @click="openCloudflareDashboard"
           >Update now ↗</button>
         </div>
@@ -533,7 +568,7 @@ const PROVIDER_META = {
         <li class="flex items-center justify-between px-4 py-3">
           <div>
             <div class="font-medium">Branding</div>
-            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Logo, favicon, and accent color for white-labeled deployments.</div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Logo and favicon for white-labeled deployments.</div>
           </div>
           <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">Soon</span>
         </li>

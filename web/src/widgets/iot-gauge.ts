@@ -62,6 +62,7 @@ const TEMPLATE = `
       opacity: 0.6;
     }
     svg .arc {
+      stroke: var(--accent-600, #ea580c);
       transition: stroke-dasharray 280ms ease;
     }
     .center {
@@ -102,7 +103,7 @@ const TEMPLATE = `
     <div class="gauge">
       <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
         <path class="track" d="M 10 50 A 40 40 0 0 1 90 50" stroke-width="8" fill="none" stroke-linecap="round" />
-        <path class="arc" d="M 10 50 A 40 40 0 0 1 90 50" stroke="#ea580c" stroke-width="8" fill="none" stroke-linecap="round" />
+        <path class="arc" d="M 10 50 A 40 40 0 0 1 90 50" stroke-width="8" fill="none" stroke-linecap="round" />
       </svg>
       <div class="center"><div class="value">—</div></div>
       <div class="bounds"><span class="min"></span><span class="max"></span></div>

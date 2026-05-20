@@ -7,6 +7,92 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* Runtime-swappable accent scale. `inline` makes `bg-accent-600` emit
+   var(--accent-600) directly (instead of baking the value at build time), so
+   overriding --accent-* on <html data-accent="…"> re-themes the app live. */
+@theme inline {
+  --color-accent-50:  var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+  --color-accent-950: var(--accent-950);
+}
+
+/* Accent palettes — each maps the scale to a built-in Tailwind palette.
+   Default is orange (no data-accent attribute needed). The accent store sets
+   document.documentElement.dataset.accent to switch. */
+:root,
+[data-accent='orange'] {
+  --accent-50: var(--color-orange-50);   --accent-100: var(--color-orange-100);
+  --accent-200: var(--color-orange-200); --accent-300: var(--color-orange-300);
+  --accent-400: var(--color-orange-400); --accent-500: var(--color-orange-500);
+  --accent-600: var(--color-orange-600); --accent-700: var(--color-orange-700);
+  --accent-800: var(--color-orange-800); --accent-900: var(--color-orange-900);
+  --accent-950: var(--color-orange-950);
+}
+[data-accent='rose'] {
+  --accent-50: var(--color-rose-50);   --accent-100: var(--color-rose-100);
+  --accent-200: var(--color-rose-200); --accent-300: var(--color-rose-300);
+  --accent-400: var(--color-rose-400); --accent-500: var(--color-rose-500);
+  --accent-600: var(--color-rose-600); --accent-700: var(--color-rose-700);
+  --accent-800: var(--color-rose-800); --accent-900: var(--color-rose-900);
+  --accent-950: var(--color-rose-950);
+}
+[data-accent='amber'] {
+  --accent-50: var(--color-amber-50);   --accent-100: var(--color-amber-100);
+  --accent-200: var(--color-amber-200); --accent-300: var(--color-amber-300);
+  --accent-400: var(--color-amber-400); --accent-500: var(--color-amber-500);
+  --accent-600: var(--color-amber-600); --accent-700: var(--color-amber-700);
+  --accent-800: var(--color-amber-800); --accent-900: var(--color-amber-900);
+  --accent-950: var(--color-amber-950);
+}
+[data-accent='emerald'] {
+  --accent-50: var(--color-emerald-50);   --accent-100: var(--color-emerald-100);
+  --accent-200: var(--color-emerald-200); --accent-300: var(--color-emerald-300);
+  --accent-400: var(--color-emerald-400); --accent-500: var(--color-emerald-500);
+  --accent-600: var(--color-emerald-600); --accent-700: var(--color-emerald-700);
+  --accent-800: var(--color-emerald-800); --accent-900: var(--color-emerald-900);
+  --accent-950: var(--color-emerald-950);
+}
+[data-accent='teal'] {
+  --accent-50: var(--color-teal-50);   --accent-100: var(--color-teal-100);
+  --accent-200: var(--color-teal-200); --accent-300: var(--color-teal-300);
+  --accent-400: var(--color-teal-400); --accent-500: var(--color-teal-500);
+  --accent-600: var(--color-teal-600); --accent-700: var(--color-teal-700);
+  --accent-800: var(--color-teal-800); --accent-900: var(--color-teal-900);
+  --accent-950: var(--color-teal-950);
+}
+[data-accent='blue'] {
+  --accent-50: var(--color-blue-50);   --accent-100: var(--color-blue-100);
+  --accent-200: var(--color-blue-200); --accent-300: var(--color-blue-300);
+  --accent-400: var(--color-blue-400); --accent-500: var(--color-blue-500);
+  --accent-600: var(--color-blue-600); --accent-700: var(--color-blue-700);
+  --accent-800: var(--color-blue-800); --accent-900: var(--color-blue-900);
+  --accent-950: var(--color-blue-950);
+}
+[data-accent='indigo'] {
+  --accent-50: var(--color-indigo-50);   --accent-100: var(--color-indigo-100);
+  --accent-200: var(--color-indigo-200); --accent-300: var(--color-indigo-300);
+  --accent-400: var(--color-indigo-400); --accent-500: var(--color-indigo-500);
+  --accent-600: var(--color-indigo-600); --accent-700: var(--color-indigo-700);
+  --accent-800: var(--color-indigo-800); --accent-900: var(--color-indigo-900);
+  --accent-950: var(--color-indigo-950);
+}
+[data-accent='violet'] {
+  --accent-50: var(--color-violet-50);   --accent-100: var(--color-violet-100);
+  --accent-200: var(--color-violet-200); --accent-300: var(--color-violet-300);
+  --accent-400: var(--color-violet-400); --accent-500: var(--color-violet-500);
+  --accent-600: var(--color-violet-600); --accent-700: var(--color-violet-700);
+  --accent-800: var(--color-violet-800); --accent-900: var(--color-violet-900);
+  --accent-950: var(--color-violet-950);
+}
+
 /* Theme tokens consumed by shadow-DOM widgets and a few inline styles.
    Tailwind classes still handle the bulk; these exist where the dark: variant
    can't reach (web components, programmatic styles). */

@@ -126,7 +126,7 @@ async function save() {
       <!-- Display row -->
       <div v-if="session.user && !editing" class="flex items-center justify-between px-4 py-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
             {{ initials }}
           </div>
 
@@ -155,7 +155,7 @@ async function save() {
       <!-- Edit form -->
       <form v-else-if="session.user" class="space-y-3 px-4 py-4" @submit.prevent="save">
         <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+          <div class="grid h-10 w-10 place-items-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
             {{ initials }}
           </div>
           <div class="min-w-0">
@@ -200,7 +200,7 @@ async function save() {
           <button
             type="submit"
             :disabled="saving"
-            class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+            class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
           >{{ saving ? 'Saving…' : 'Save' }}</button>
         </div>
       </form>

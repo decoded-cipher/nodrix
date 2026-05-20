@@ -146,7 +146,7 @@ async function signInWith(provider: 'google' | 'github') {
         <button
           type="submit"
           :disabled="submitting"
-          class="w-full rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+          class="w-full rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
         >{{ submitting ? '...' : mode === 'register' ? 'Create account' : 'Sign in' }}</button>
       </form>
 

@@ -79,12 +79,12 @@ const TEMPLATE = `
     .switch:hover { border-color: var(--color-border-strong, #a3a3a3); }
     .switch:active { transform: scale(0.96); }
     .switch.on {
-      background: #ea580c;
+      background: var(--accent-600, #ea580c);
       color: white;
-      border-color: #ea580c;
-      box-shadow: 0 0 0 6px rgba(234, 88, 12, 0.18);
+      border-color: var(--accent-600, #ea580c);
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-600, #ea580c) 18%, transparent);
     }
-    .switch.on:hover { background: #c2410c; border-color: #c2410c; }
+    .switch.on:hover { background: var(--accent-700, #c2410c); border-color: var(--accent-700, #c2410c); }
     .dot {
       width: 0.6em;
       height: 0.6em;

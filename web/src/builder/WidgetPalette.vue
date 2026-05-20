@@ -50,7 +50,7 @@ function hideTip() {
             v-for="w in g.items"
             :key="w.type"
             type="button"
-            class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:border-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-300"
+            class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-900/30 dark:hover:text-accent-300"
             @click="$emit('add', w.type)"
             @mouseenter="showTip(w, $event)"
             @mouseleave="hideTip"
@@ -72,7 +72,7 @@ function hideTip() {
         role="tooltip"
       >
         <div class="flex items-center gap-2">
-          <span class="h-5 w-5 text-orange-600 dark:text-orange-400" v-html="hovered.icon"></span>
+          <span class="h-5 w-5 text-accent-600 dark:text-accent-400" v-html="hovered.icon"></span>
           <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ hovered.label }}</div>
         </div>
         <p class="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{{ hovered.description }}</p>

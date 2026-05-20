@@ -110,9 +110,9 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
       ref="buttonEl"
       type="button"
       :class="[
-        'flex w-full items-center justify-between gap-2 rounded-md border border-neutral-300 bg-white text-left text-neutral-900 hover:border-neutral-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:hover:border-neutral-600',
+        'flex w-full items-center justify-between gap-2 rounded-md border border-neutral-300 bg-white text-left text-neutral-900 hover:border-neutral-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:hover:border-neutral-600',
         sizeCls,
-        open ? 'border-orange-500 ring-2 ring-orange-500/30 dark:border-orange-500' : '',
+        open ? 'border-accent-500 ring-2 ring-accent-500/30 dark:border-accent-500' : '',
       ]"
       :aria-haspopup="'listbox'"
       :aria-expanded="open"
@@ -156,7 +156,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
             @click="clear"
           >
             <span>{{ placeholder }}</span>
-            <span v-if="!selected" class="text-orange-500">●</span>
+            <span v-if="!selected" class="text-accent-500">●</span>
           </button>
         </li>
         <li
@@ -170,7 +170,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
             :data-idx="idx"
             :class="[
               'flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm',
-              activeIdx === idx ? 'bg-orange-50 text-orange-900 dark:bg-orange-950/40 dark:text-orange-100' : 'text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800',
+              activeIdx === idx ? 'bg-accent-50 text-accent-900 dark:bg-accent-950/40 dark:text-accent-100' : 'text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800',
               selected?.value === o.value ? 'font-semibold' : '',
             ]"
             @click="select(o)"
@@ -182,7 +182,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
             </span>
             <svg
               v-if="selected?.value === o.value"
-              class="h-4 w-4 shrink-0 text-orange-500"
+              class="h-4 w-4 shrink-0 text-accent-500"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

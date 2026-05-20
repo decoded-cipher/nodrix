@@ -78,7 +78,7 @@ async function remove(id: string) {
       <button
         type="submit"
         :disabled="creating"
-        class="rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+        class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
       >Create</button>
     </form>
   </main>

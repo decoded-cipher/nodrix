@@ -201,7 +201,7 @@ async function copyUrl(i: Integration) {
           type="button"
           class="border-b-2 px-1 pb-2.5 font-medium transition"
           :class="active === t.key
-            ? 'border-orange-600 text-orange-700 dark:text-orange-400'
+            ? 'border-accent-600 text-accent-700 dark:text-accent-400'
             : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'"
           @click="active = t.key; showForm = false"
         >
@@ -321,7 +321,7 @@ async function copyUrl(i: Integration) {
         <button
           type="submit"
           :disabled="submitting || !formName.trim()"
-          class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+          class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
         >{{ submitting ? 'Creating…' : 'Create' }}</button>
       </div>
     </form>
@@ -337,7 +337,7 @@ async function copyUrl(i: Integration) {
         </div>
         <button
           type="button"
-          class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+          class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700"
           @click="openCreate('webhook')"
         >Add webhook</button>
       </div>
@@ -402,7 +402,7 @@ async function copyUrl(i: Integration) {
         </div>
         <button
           type="button"
-          class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+          class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700"
           @click="openCreate('code_block')"
         >New code block</button>
       </div>
@@ -483,14 +483,14 @@ async function copyUrl(i: Integration) {
           v-for="svc in SERVICE_KINDS"
           :key="svc.kind"
           type="button"
-          class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4 text-left hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
+          class="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4 text-left hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
           @click="openCreate(svc.kind)"
         >
           <div>
             <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ KIND_LABEL[svc.kind] }}</div>
             <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{{ svc.desc }}</div>
           </div>
-          <span class="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Add</span>
+          <span class="rounded-full bg-accent-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">Add</span>
         </button>
       </div>
     </section>

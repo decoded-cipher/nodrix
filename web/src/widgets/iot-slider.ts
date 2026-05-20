@@ -101,7 +101,7 @@ const TEMPLATE = `
     .fill {
       position: absolute;
       inset: 0 auto 0 0;
-      background: #ea580c;
+      background: var(--accent-600, #ea580c);
       transition: width 80ms linear, height 80ms linear;
     }
     .range {
@@ -126,15 +126,15 @@ const TEMPLATE = `
       height: clamp(18px, min(14cqh, 7cqw), 28px);
       border-radius: 9999px;
       background: white;
-      border: 2px solid #ea580c;
-      box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.15), 0 0 0 0 rgba(234, 88, 12, 0);
+      border: 2px solid var(--accent-600, #ea580c);
+      box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.15), 0 0 0 0 color-mix(in srgb, var(--accent-600, #ea580c) 0%, transparent);
       transform: translate(-50%, -50%);
       pointer-events: none;
       transition: box-shadow 140ms ease, transform 80ms ease;
     }
-    .range:hover ~ .thumb { box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.18), 0 0 0 4px rgba(234, 88, 12, 0.16); }
-    .range:active ~ .thumb { transform: translate(-50%, -50%) scale(1.08); box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.2), 0 0 0 6px rgba(234, 88, 12, 0.22); }
-    .range:focus-visible ~ .thumb { box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.18), 0 0 0 4px rgba(234, 88, 12, 0.3); }
+    .range:hover ~ .thumb { box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.18), 0 0 0 4px color-mix(in srgb, var(--accent-600, #ea580c) 16%, transparent); }
+    .range:active ~ .thumb { transform: translate(-50%, -50%) scale(1.08); box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.2), 0 0 0 6px color-mix(in srgb, var(--accent-600, #ea580c) 22%, transparent); }
+    .range:focus-visible ~ .thumb { box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.18), 0 0 0 4px color-mix(in srgb, var(--accent-600, #ea580c) 30%, transparent); }
 
     /* Vertical orientation. Tracks the modern CSS standard for vertical
        range inputs (Chromium 115+, Safari 17+, Firefox 121+). */

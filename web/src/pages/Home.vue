@@ -66,7 +66,7 @@ const projectQuickLinks = computed(() => {
 });
 
 const colorClasses: Record<string, string> = {
-  orange: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  orange: 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300',
   sky: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
   emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
   violet: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
@@ -91,7 +91,7 @@ const colorClasses: Record<string, string> = {
         v-for="s in stats"
         :key="s.label"
         :to="s.href"
-        class="rounded-lg border border-neutral-200 bg-white p-4 hover:border-orange-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
+        class="rounded-lg border border-neutral-200 bg-white p-4 hover:border-accent-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
       >
         <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ s.label }}</div>
         <div class="mt-1 text-2xl font-semibold tracking-tight">{{ s.value }}</div>
@@ -106,7 +106,7 @@ const colorClasses: Record<string, string> = {
           v-for="q in projectQuickLinks"
           :key="q.label"
           :to="q.to"
-          class="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
+          class="rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
         >
           <div
             class="grid h-9 w-9 place-items-center rounded-md"
@@ -130,7 +130,7 @@ const colorClasses: Record<string, string> = {
       </p>
       <RouterLink
         to="/projects"
-        class="mt-4 inline-block rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+        class="mt-4 inline-block rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700"
       >Go to Projects</RouterLink>
     </section>
 
@@ -141,7 +141,7 @@ const colorClasses: Record<string, string> = {
         <RouterLink
           v-if="ui.currentProject"
           :to="`/p/${ui.currentProject.id}/dashboards`"
-          class="text-xs text-orange-700 hover:underline dark:text-orange-400"
+          class="text-xs text-accent-700 hover:underline dark:text-accent-400"
         >View all →</RouterLink>
       </div>
       <ul class="divide-y divide-neutral-100 dark:divide-neutral-800">

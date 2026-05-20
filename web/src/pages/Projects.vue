@@ -159,12 +159,12 @@ watch(
         v-model="newName"
         type="text"
         placeholder="New project name (e.g. Home, Greenhouse, Office)"
-        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-orange-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
       />
       <button
         type="submit"
         :disabled="creating"
-        class="rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+        class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
       >
         Create project
       </button>
@@ -175,7 +175,7 @@ watch(
       <div
         v-for="p in session.projects"
         :key="p.id"
-        class="group relative rounded-lg border border-neutral-200 bg-white p-4 text-left transition hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
+        class="group relative rounded-lg border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
       >
         <button
           type="button"
@@ -186,7 +186,7 @@ watch(
             <div
               class="grid h-9 w-9 place-items-center rounded-md text-sm font-semibold"
               :style="p.color ? { backgroundColor: p.color + '20', color: p.color } : {}"
-              :class="p.color ? '' : 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'"
+              :class="p.color ? '' : 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'"
             >
               <span v-if="p.icon">{{ p.icon }}</span>
               <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
@@ -195,7 +195,7 @@ watch(
             </div>
             <span
               v-if="ui.currentProject?.id === p.id"
-              class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+              class="rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
             >Current</span>
           </div>
           <div class="mt-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ p.name }}</div>
@@ -232,7 +232,7 @@ watch(
             >Edit project</button>
             <button
               type="button"
-              class="block w-full px-3 py-1.5 text-left text-xs text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
+              class="block w-full px-3 py-1.5 text-left text-xs text-accent-700 hover:bg-accent-50 dark:text-accent-400 dark:hover:bg-accent-900/20"
               @click="open(p.id); openMenuFor = null"
             >Open</button>
           </div>
@@ -345,7 +345,7 @@ watch(
             <button
               type="submit"
               :disabled="saving || !form.name.trim()"
-              class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+              class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
             >{{ saving ? 'Saving…' : 'Save changes' }}</button>
           </div>
         </form>

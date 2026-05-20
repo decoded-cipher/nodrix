@@ -63,7 +63,7 @@ const TEMPLATE = `
       padding: 0;
       border: none;
       border-radius: 50%;
-      background: #ea580c;
+      background: var(--accent-600, #ea580c);
       color: white;
       cursor: pointer;
       font-family: inherit;
@@ -71,20 +71,20 @@ const TEMPLATE = `
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      box-shadow: 0 6px 18px -4px rgba(234, 88, 12, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
+      box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--accent-600, #ea580c) 55%, transparent), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
       transition: transform 80ms ease, background 140ms ease, box-shadow 140ms ease;
       max-width: 100%;
       max-height: 100%;
     }
-    .button:hover { background: #f97316; }
+    .button:hover { background: var(--accent-500, #f97316); }
     .button:active,
     .button.pressing {
       transform: translateY(1px) scale(0.97);
-      background: #c2410c;
-      box-shadow: 0 2px 6px -1px rgba(234, 88, 12, 0.5), inset 0 3px 0 rgba(0, 0, 0, 0.18);
+      background: var(--accent-700, #c2410c);
+      box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent-600, #ea580c) 50%, transparent), inset 0 3px 0 rgba(0, 0, 0, 0.18);
     }
     .button.flashed {
-      box-shadow: 0 0 0 8px rgba(234, 88, 12, 0.22), 0 6px 18px -4px rgba(234, 88, 12, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
+      box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-600, #ea580c) 22%, transparent), 0 6px 18px -4px color-mix(in srgb, var(--accent-600, #ea580c) 55%, transparent), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
     }
     .label {
       max-width: 80%;

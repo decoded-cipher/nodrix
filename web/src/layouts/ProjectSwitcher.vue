@@ -72,7 +72,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
       <div class="border-t border-neutral-100 dark:border-neutral-800">
         <RouterLink
           to="/projects"
-          class="block px-3 py-2 text-xs text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
+          class="block px-3 py-2 text-xs text-accent-700 hover:bg-accent-50 dark:text-accent-400 dark:hover:bg-accent-900/20"
           @click="open = false"
         >Manage projects →</RouterLink>
       </div>

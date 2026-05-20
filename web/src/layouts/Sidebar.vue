@@ -62,7 +62,7 @@ const globalBottom = computed<NavItem[]>(() => [
 ]);
 
 const ACTIVE_CLASSES =
-  'bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 dark:bg-orange-500/15 dark:text-orange-400 dark:hover:bg-orange-500/20';
+  'bg-accent-50 text-accent-700 font-medium hover:bg-accent-100 dark:bg-accent-500/15 dark:text-accent-400 dark:hover:bg-accent-500/20';
 
 function isActive(item: NavItem): boolean {
   if (item.matchPath) return item.matchPath(route.path);
@@ -231,7 +231,7 @@ const initials = computed(() => {
     <!-- Footer: user + sign out + collapse toggle -->
     <div class="border-t border-neutral-200 p-3 dark:border-neutral-800">
       <div v-if="!ui.sidebarCollapsed" class="mb-2 flex items-center gap-2 px-1">
-        <div class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+        <div class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
           {{ initials }}
         </div>
         <div class="min-w-0 flex-1">
@@ -255,7 +255,7 @@ const initials = computed(() => {
       <div v-else class="mb-2 flex flex-col items-center gap-1">
         <button
           type="button"
-          class="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-xs font-semibold text-orange-700 hover:ring-2 hover:ring-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:hover:ring-orange-700"
+          class="grid h-7 w-7 place-items-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700 hover:ring-2 hover:ring-accent-200 dark:bg-accent-900/40 dark:text-accent-300 dark:hover:ring-accent-700"
           title="Sign out"
           aria-label="Sign out"
           @click="signOut"

@@ -12,7 +12,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
     :class="[
       'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-transparent transition-colors',
       modelValue
-        ? 'bg-orange-600 hover:bg-orange-700'
+        ? 'bg-accent-600 hover:bg-accent-700'
         : 'bg-neutral-300 hover:bg-neutral-400 dark:bg-neutral-700 dark:hover:bg-neutral-600',
     ]"
     @click="emit('update:modelValue', !modelValue)"

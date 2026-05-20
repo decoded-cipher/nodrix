@@ -77,7 +77,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey));
             <button
               type="button"
               class="rounded-md px-3 py-1.5 text-xs font-semibold text-white"
-              :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'"
+              :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-accent-600 hover:bg-accent-700'"
               @click="resolveConfirm(true)"
             >{{ opts.confirmLabel ?? 'Delete' }}</button>
           </div>

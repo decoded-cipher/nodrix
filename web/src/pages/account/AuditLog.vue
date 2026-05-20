@@ -31,7 +31,7 @@ function actionTone(action: string): string {
   if (action.endsWith('.enable') || action.endsWith('.disable'))
     return 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800';
   if (action.endsWith('.update')) return 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800';
-  if (action.endsWith('.revoke')) return 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:ring-orange-800';
+  if (action.endsWith('.revoke')) return 'bg-accent-50 text-accent-700 ring-accent-200 dark:bg-accent-900/30 dark:text-accent-300 dark:ring-accent-800';
   return 'bg-neutral-100 text-neutral-700 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700';
 }
 
@@ -84,7 +84,7 @@ const rangeEnd = computed(() =>
         v-model="filter"
         type="text"
         placeholder="Filter the current page by action, project, target, user…"
-        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-orange-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
       />
     </div>
 
@@ -163,7 +163,7 @@ const rangeEnd = computed(() =>
             type="button"
             class="min-w-[2rem] rounded-md px-2 py-1"
             :class="p === session.auditLogPage
-              ? 'bg-orange-600 text-white font-semibold'
+              ? 'bg-accent-600 text-white font-semibold'
               : 'border border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800'"
             :disabled="loading || p === session.auditLogPage"
             @click="goto(p)"

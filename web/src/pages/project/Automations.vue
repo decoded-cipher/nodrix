@@ -285,7 +285,7 @@ function conditionFor(t: AutomationTriggerType): Condition {
       <button
         v-if="!editing"
         type="button"
-        class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+        class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700"
         @click="showPicker = !showPicker"
       >{{ showPicker ? 'Close' : 'New automation' }}</button>
     </header>
@@ -354,10 +354,10 @@ function conditionFor(t: AutomationTriggerType): Condition {
           v-for="c in conditions"
           :key="c.key"
           type="button"
-          class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 text-left transition hover:border-orange-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-orange-700"
+          class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 text-left transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
           @click="pick(c)"
         >
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
             <component :is="icon(c.icon)" class="h-5 w-5" />
           </div>
           <div class="min-w-0">
@@ -372,7 +372,7 @@ function conditionFor(t: AutomationTriggerType): Condition {
     <section v-else>
       <form class="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900" @submit.prevent="save">
         <div class="mb-4 flex items-center gap-3 border-b border-neutral-100 pb-3 dark:border-neutral-800">
-          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
             <component :is="icon(conditionFor(draft.trigger_type).icon)" class="h-5 w-5" />
           </div>
           <div>
@@ -440,7 +440,7 @@ function conditionFor(t: AutomationTriggerType): Condition {
                 type="button"
                 class="rounded-md border px-2.5 py-1 text-xs"
                 :class="(draft.trigger_config.days ?? []).includes(d.n)
-                  ? 'border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                  ? 'border-accent-500 bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'
                   : 'border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300'"
                 @click="toggleDay(d.n)"
               >{{ d.label }}</button>
@@ -519,7 +519,7 @@ function conditionFor(t: AutomationTriggerType): Condition {
           <button
             type="submit"
             :disabled="saving || !draft.name.trim()"
-            class="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+            class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
           >{{ saving ? 'Saving…' : draft.id ? 'Save changes' : 'Create automation' }}</button>
         </div>
       </form>

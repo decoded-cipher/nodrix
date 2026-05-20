@@ -280,7 +280,7 @@ function exitToView() {
           @click="exitToView"
         >Done</button>
         <button
-          class="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+          class="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
           :disabled="!dirty || saving"
           @click="save"
         >{{ saving ? 'Saving...' : 'Save' }}</button>

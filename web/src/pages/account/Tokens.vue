@@ -110,7 +110,7 @@ function expiryLabel(ts: number | null | undefined): string {
       </div>
       <div class="mt-3 flex justify-end">
         <button
-          class="rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+          class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700"
           @click="create"
         >Create token</button>
       </div>
