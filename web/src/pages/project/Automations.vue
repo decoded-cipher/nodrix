@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { h, onMounted, reactive, ref, type FunctionalComponent } from 'vue';
+import { computed, h, onMounted, reactive, ref, type FunctionalComponent } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import { confirm } from '../../lib/confirm';
 import Spinner from '../../components/Spinner.vue';
+import Dropdown from '../../components/Dropdown.vue';
 import type { Automation, AutomationTriggerType, VariableOperator } from '../../types';
 
 const project = useProjectStore();
@@ -51,6 +52,23 @@ const OPERATORS: { value: VariableOperator; label: string }[] = [
   { value: '==', label: 'equals' },
   { value: '!=', label: 'does not equal' },
   { value: 'changed', label: 'changes' },
+];
+
+// Dropdown option lists.
+const variableOptions = computed(() =>
+  project.variables.map((v) => ({ value: v.key, label: v.name || v.key }))
+);
+const integrationOptions = computed(() =>
+  project.integrations.map((i) => ({ value: i.id, label: `${i.name} (${i.kind})` }))
+);
+const solarEventOptions = [
+  { value: 'sunrise', label: 'Sunrise' },
+  { value: 'sunset', label: 'Sunset' },
+];
+const actionTypeOptions = [
+  { value: 'set_variable', label: 'Set variable' },
+  { value: 'call_integration', label: 'Call integration' },
+  { value: 'emit_event', label: 'Emit event' },
 ];
 
 const WEEKDAYS = [
@@ -389,13 +407,8 @@ function conditionFor(t: AutomationTriggerType): Condition {
 
           <!-- variable -->
           <div v-if="draft.trigger_type === 'variable'" class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-            <select v-model="draft.trigger_config.variable" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-              <option v-for="v in project.variables" :key="v.id" :value="v.key">{{ v.name || v.key }}</option>
-              <option v-if="project.variables.length === 0" value="">No variables yet</option>
-            </select>
-            <select v-model="draft.trigger_config.operator" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-              <option v-for="op in OPERATORS" :key="op.value" :value="op.value">{{ op.label }}</option>
-            </select>
+            <Dropdown v-model="draft.trigger_config.variable" :options="variableOptions" placeholder="Variable" size="sm" class="w-40" />
+            <Dropdown v-model="draft.trigger_config.operator" :options="OPERATORS" size="sm" class="w-48" />
             <input
               v-if="draft.trigger_config.operator !== 'changed'"
               v-model="draft.trigger_config.value"
@@ -437,10 +450,7 @@ function conditionFor(t: AutomationTriggerType): Condition {
 
           <!-- sunset_sunrise -->
           <div v-else-if="draft.trigger_type === 'sunset_sunrise'" class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-            <select v-model="draft.trigger_config.event" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-              <option value="sunrise">Sunrise</option>
-              <option value="sunset">Sunset</option>
-            </select>
+            <Dropdown v-model="draft.trigger_config.event" :options="solarEventOptions" size="sm" class="w-32" />
             <input v-model.number="draft.trigger_config.lat" type="number" step="any" class="w-28 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="lat" />
             <input v-model.number="draft.trigger_config.lng" type="number" step="any" class="w-28 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="lng" />
             <label class="inline-flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
@@ -466,25 +476,22 @@ function conditionFor(t: AutomationTriggerType): Condition {
 
           <ul v-if="draft.actions.length > 0" class="space-y-2">
             <li v-for="(a, i) in draft.actions" :key="i" class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-              <select v-model="a.type" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" @change="onActionTypeChange(a)">
-                <option value="set_variable">Set variable</option>
-                <option value="call_integration">Call integration</option>
-                <option value="emit_event">Emit event</option>
-              </select>
+              <Dropdown
+                :model-value="a.type"
+                :options="actionTypeOptions"
+                size="sm"
+                class="w-40"
+                @update:model-value="(v) => { a.type = v; onActionTypeChange(a); }"
+              />
 
               <template v-if="a.type === 'set_variable'">
-                <select v-model="a.variable" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-                  <option v-for="v in project.variables" :key="v.id" :value="v.key">{{ v.name || v.key }}</option>
-                </select>
+                <Dropdown v-model="a.variable" :options="variableOptions" placeholder="Variable" size="sm" class="w-40" />
                 <span class="text-xs text-neutral-500">to</span>
                 <input v-model="a.value" type="text" class="w-28 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="value" />
               </template>
 
               <template v-else-if="a.type === 'call_integration'">
-                <select v-model="a.integration_id" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-                  <option v-for="ig in project.integrations" :key="ig.id" :value="ig.id">{{ ig.name }} ({{ ig.kind }})</option>
-                  <option v-if="project.integrations.length === 0" value="">No integrations yet</option>
-                </select>
+                <Dropdown v-model="a.integration_id" :options="integrationOptions" placeholder="Integration" size="sm" class="min-w-0 flex-1" />
               </template>
 
               <template v-else-if="a.type === 'emit_event'">

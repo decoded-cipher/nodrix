@@ -2,7 +2,10 @@
 import { computed, onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import { confirm } from '../../lib/confirm';
+import Dropdown from '../../components/Dropdown.vue';
 import type { Integration, IntegrationKind } from '../../types';
+
+const HTTP_METHOD_OPTIONS = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ value: m, label: m }));
 
 const project = useProjectStore();
 
@@ -265,12 +268,7 @@ async function copyUrl(i: Integration) {
       <!-- http_service -->
       <div v-else-if="formKind === 'http_service'" class="mt-3 space-y-3">
         <div class="flex gap-2">
-          <select
-            v-model="formHttpMethod"
-            class="rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-          >
-            <option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
-          </select>
+          <Dropdown v-model="formHttpMethod" :options="HTTP_METHOD_OPTIONS" class="w-28 shrink-0" />
           <input
             v-model="formHttpUrl"
             type="url"
