@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
@@ -19,13 +19,9 @@ const openMenuFor = ref<string | null>(null);
 
 // Edit modal state.
 const editing = ref<Project | null>(null);
-const form = ref({ name: '', description: '', icon: '', color: '' });
+const form = ref({ name: '', description: '' });
 const saving = ref(false);
 const saveError = ref<string | null>(null);
-
-const COLOR_SWATCHES = ['#f97316', '#ef4444', '#10b981', '#0ea5e9', '#6366f1', '#a855f7', '#64748b'];
-
-const canDelete = computed(() => session.projects.length > 1);
 
 async function create() {
   const n = newName.value.trim();
@@ -61,8 +57,6 @@ function startEdit(p: Project, event: Event) {
   form.value = {
     name: p.name ?? '',
     description: p.description ?? '',
-    icon: p.icon ?? '',
-    color: p.color ?? '',
   };
   saveError.value = null;
 }
@@ -79,8 +73,6 @@ async function save() {
     await session.updateProject(editing.value.id, {
       name: form.value.name.trim(),
       description: form.value.description.trim() || null,
-      icon: form.value.icon.trim() || null,
-      color: form.value.color.trim() || null,
     });
     editing.value = null;
   } catch (e) {
@@ -93,7 +85,6 @@ async function save() {
 async function deleteFromModal() {
   if (!editing.value) return;
   const p = editing.value;
-  if (!canDelete.value) return;
   const ok = await confirm({
     title: `Delete project "${p.name}"?`,
     message: 'This permanently removes everything in this project. It cannot be undone.',
@@ -183,13 +174,8 @@ watch(
           @click="open(p.id)"
         >
           <div class="flex items-center justify-between">
-            <div
-              class="grid h-9 w-9 place-items-center rounded-md text-sm font-semibold"
-              :style="p.color ? { backgroundColor: p.color + '20', color: p.color } : {}"
-              :class="p.color ? '' : 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'"
-            >
-              <span v-if="p.icon">{{ p.icon }}</span>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
+            <div class="grid h-9 w-9 place-items-center rounded-md bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
                 <path d="M3.75 9.75h16.5M3.75 9.75A1.5 1.5 0 0 1 5.25 8.25h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.121a1.5 1.5 0 0 0 1.06.44h6.379a1.5 1.5 0 0 1 1.5 1.5v6.75a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V9.75Z" />
               </svg>
             </div>
@@ -285,39 +271,6 @@ watch(
             />
           </label>
 
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Icon</span>
-              <input
-                v-model="form.icon"
-                type="text"
-                maxlength="4"
-                class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-                placeholder="🏠 or HQ"
-              />
-            </label>
-            <div>
-              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Color</span>
-              <div class="mt-1 flex flex-wrap items-center gap-2">
-                <button
-                  v-for="c in COLOR_SWATCHES"
-                  :key="c"
-                  type="button"
-                  class="h-6 w-6 rounded-full ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900"
-                  :style="{ backgroundColor: c }"
-                  :class="form.color === c ? 'ring-neutral-900 dark:ring-neutral-100' : 'ring-transparent'"
-                  @click="form.color = c"
-                />
-                <button
-                  v-if="form.color"
-                  type="button"
-                  class="text-xs text-neutral-500 hover:underline dark:text-neutral-400"
-                  @click="form.color = ''"
-                >Clear</button>
-              </div>
-            </div>
-          </div>
-
           <p v-if="saveError" class="text-xs text-red-600 dark:text-red-400">{{ saveError }}</p>
 
           <div class="-mx-5 mt-2 border-t border-neutral-100 dark:border-neutral-800"></div>
@@ -330,10 +283,9 @@ watch(
             </p>
             <button
               type="button"
-              :disabled="!canDelete"
-              class="mt-2 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-neutral-900 dark:text-red-300 dark:hover:bg-red-950/50"
+              class="mt-2 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-neutral-900 dark:text-red-300 dark:hover:bg-red-950/50"
               @click="deleteFromModal"
-            >{{ canDelete ? 'Delete project' : 'Cannot delete the last project' }}</button>
+            >Delete project</button>
           </div>
 
           <div class="flex justify-end gap-2 pt-2">

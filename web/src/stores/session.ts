@@ -61,7 +61,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function updateProject(
     id: string,
-    patch: { name?: string; description?: string | null; icon?: string | null; color?: string | null }
+    patch: { name?: string; description?: string | null }
   ): Promise<void> {
     const updated = await api.patch<Project>(`/v1/admin/projects/${id}`, patch);
     projects.value = projects.value.map((p) => (p.id === id ? { ...p, ...updated } : p));

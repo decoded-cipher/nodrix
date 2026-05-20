@@ -16,8 +16,6 @@ export type Project = {
   name: string;
   created_at: number;
   description?: string | null;
-  icon?: string | null;
-  color?: string | null;
   updated_at?: number;
   archived_at?: number | null;
 };

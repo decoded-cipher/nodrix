@@ -13,7 +13,7 @@ projects.get('/', async (c) => {
   const user = c.get('user');
   const rows = await c.env.DB
     .prepare(
-      `SELECT p.id, p.name, p.description, p.icon, p.color,
+      `SELECT p.id, p.name, p.description,
               p.created_at, p.updated_at, p.archived_at
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id
@@ -25,8 +25,6 @@ projects.get('/', async (c) => {
       id: string;
       name: string;
       description: string | null;
-      icon: string | null;
-      color: string | null;
       created_at: number;
       updated_at: number;
       archived_at: number | null;
@@ -72,7 +70,7 @@ projects.post('/', async (c) => {
   return c.json({ id, name, created_at: now, updated_at: now }, 201);
 });
 
-// PATCH /v1/admin/projects/:proj  body: { name?, description?, icon?, color? }
+// PATCH /v1/admin/projects/:proj  body: { name?, description? }
 projects.patch('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
@@ -86,8 +84,6 @@ projects.patch('/:proj', async (c) => {
   const body = await c.req.json<{
     name?: string;
     description?: string | null;
-    icon?: string | null;
-    color?: string | null;
   }>();
 
   const sets: string[] = [];
@@ -96,8 +92,6 @@ projects.patch('/:proj', async (c) => {
     sets.push('name = ?'); vals.push(body.name.trim());
   }
   if ('description' in body) { sets.push('description = ?'); vals.push(body.description ?? null); }
-  if ('icon' in body)        { sets.push('icon = ?');        vals.push(body.icon ?? null); }
-  if ('color' in body)       { sets.push('color = ?');       vals.push(body.color ?? null); }
   if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
 
   const now = Math.floor(Date.now() / 1000);
@@ -122,7 +116,7 @@ projects.patch('/:proj', async (c) => {
 
   const row = await c.env.DB
     .prepare(
-      `SELECT id, name, description, icon, color, created_at, updated_at, archived_at
+      `SELECT id, name, description, created_at, updated_at, archived_at
          FROM projects WHERE id = ?`
     )
     .bind(projId)
@@ -160,18 +154,6 @@ projects.delete('/:proj', async (c) => {
     .bind(user.id, projId)
     .first<{ role: string }>();
   if (!member || member.role !== 'owner') return c.json({ error: 'forbidden' }, 403);
-
-  const count = await c.env.DB
-    .prepare(
-      `SELECT COUNT(*) AS n FROM projects p
-        JOIN project_members pm ON pm.project_id = p.id
-        WHERE pm.user_id = ?`
-    )
-    .bind(user.id)
-    .first<{ n: number }>();
-  if ((count?.n ?? 0) <= 1) {
-    return c.json({ error: 'conflict', reason: 'last_project' }, 409);
-  }
 
   // Gather dashboard DO IDs to destroy BEFORE the D1 delete cascades rows away.
   const dashboardRows = await c.env.DB

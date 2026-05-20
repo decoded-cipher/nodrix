@@ -30,7 +30,7 @@ me.get('/', async (c) => {
 
   const projects = await c.env.DB
     .prepare(
-      `SELECT p.id, p.name, p.description, p.icon, p.color,
+      `SELECT p.id, p.name, p.description,
               p.created_at, p.updated_at, p.archived_at
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id
@@ -42,8 +42,6 @@ me.get('/', async (c) => {
       id: string;
       name: string;
       description: string | null;
-      icon: string | null;
-      color: string | null;
       created_at: number;
       updated_at: number;
       archived_at: number | null;
