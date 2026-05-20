@@ -6,12 +6,12 @@ import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { runAutomation } from '../engine/run';
 import type { AutomationContext } from '../engine/types';
-import { pokeScheduler, ensureScheduler } from '../workflows/scheduler';
+import { rescheduleScheduler, ensureScheduler } from '../do/scheduler-do';
 
 const automations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
-// schedule + sunset/sunrise automations are driven by the SchedulerWorkflow;
-// changes to them poke the scheduler to recompute its next fire time.
+// schedule + sunset/sunrise automations are driven by the SchedulerDO alarm;
+// changes to them re-arm the alarm to the new next fire time.
 function isScheduled(triggerType: string | undefined): boolean {
   return triggerType === 'schedule' || triggerType === 'sunset_sunrise';
 }
@@ -154,7 +154,7 @@ automations.post('/', async (c) => {
     })
   );
   c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
-  if (isScheduled(body.trigger_type)) c.executionCtx.waitUntil(pokeScheduler(c.env));
+  if (isScheduled(body.trigger_type)) c.executionCtx.waitUntil(rescheduleScheduler(c.env));
 
   const row = await c.env.DB
     .prepare(`SELECT * FROM automations WHERE id = ?`)
@@ -250,7 +250,7 @@ automations.patch('/:id', async (c) => {
     })
   );
   c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
-  if (isScheduled(existing.trigger_type)) c.executionCtx.waitUntil(pokeScheduler(c.env));
+  if (isScheduled(existing.trigger_type)) c.executionCtx.waitUntil(rescheduleScheduler(c.env));
 
   const row = await c.env.DB
     .prepare(`SELECT * FROM automations WHERE id = ?`)
@@ -286,7 +286,7 @@ automations.delete('/:id', async (c) => {
     })
   );
   c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
-  if (isScheduled(existing?.trigger_type)) c.executionCtx.waitUntil(pokeScheduler(c.env));
+  if (isScheduled(existing?.trigger_type)) c.executionCtx.waitUntil(rescheduleScheduler(c.env));
   return c.body(null, 204);
 });
 

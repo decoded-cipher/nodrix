@@ -32,7 +32,7 @@
 
 ## 🏗️ Architecture
 
-- **Worker** ([worker/](worker/)) — single Hono app, two Durable Object classes (Project, Dashboard), one Workflow (provisioning), D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
+- **Worker** ([worker/](worker/)) — single Hono app, three Durable Object classes (Project, Dashboard, Scheduler), one Workflow (provisioning), D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
 - **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder. Built and served as Worker static assets.
 - **Promo site** ([promo/](promo/)) — Astro static site. Deploys independently to Cloudflare Pages.
 
@@ -45,6 +45,7 @@
 | D1 | Users, sessions, accounts, projects, variables, dashboards, tokens, automations, integrations, audit log, OAuth provider config (metadata only — never any telemetry point) |
 | KV | Cached `/state` responses |
 | Dashboard DO | Per-dashboard subscription + hibernated WebSockets |
+| Scheduler DO | One alarm at the next schedule/sunset automation fire time |
 
 ## 🔐 Authentication
 

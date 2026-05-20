@@ -1,9 +1,9 @@
-// Scheduling math for the SchedulerWorkflow: compute the next fire time for
-// schedule + sunset/sunrise automations, and run a planned set when due.
+// Scheduling math for the SchedulerDO: compute the next fire time for schedule +
+// sunset/sunrise automations, and run a planned set when due.
 //
-// The workflow sleeps until `computeNextScheduled().fireAt`, then runs exactly
-// the `dueIds` planned for that instant — so it's robust to wake-up drift (we
-// fire the ids that were due at the planned time, not whatever the clock says).
+// The DO alarm fires at `computeNextScheduled().fireAt`, then runs exactly the
+// `dueIds` planned for that instant — so it's robust to wake-up drift (we fire
+// the ids that were due at the planned time, not whatever the clock says).
 
 import type { Env } from '../env';
 import type {

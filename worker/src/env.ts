@@ -14,11 +14,10 @@ export interface Env {
   ASSETS: Fetcher;
   PROJECT_DO: DurableObjectNamespace;
   DASHBOARD_DO: DurableObjectNamespace;
+  // Singleton scheduler DO: one alarm set to the next schedule/sunset automation
+  // fire time. Re-armed when automations change. Replaces the every-minute cron.
+  SCHEDULER_DO: DurableObjectNamespace;
   PROVISION: Workflow;
-  // Scheduler workflow: sleeps until the next schedule/sunset automation fire
-  // time (waking early on a 'reschedule' event when automations change). Replaces
-  // the every-minute cron poll.
-  SCHEDULER: Workflow;
 
   // Legacy: the signing secret is now auto-generated on first boot and
   // stored in deployment_settings (see lib/auth-secret.ts). Still honored

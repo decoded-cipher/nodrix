@@ -1,5 +1,5 @@
 // Drizzle schema for the tables Better Auth's drizzleAdapter manages.
-// Keep names + columns aligned with worker/src/db/schema.sql.
+// Keep names + columns aligned with worker/src/db/migrations/0001_init.sql.
 //
 // Property names are snake_case to match the column names AND what Better
 // Auth's `fields` mapping resolves to. Better Auth's TS API still uses

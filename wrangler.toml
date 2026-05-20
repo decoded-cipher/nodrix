@@ -59,25 +59,21 @@ class_name = "ProjectDO"
 name = "DASHBOARD_DO"
 class_name = "DashboardDO"
 
+# Singleton scheduler: one alarm at the next schedule/sunset fire time.
+[[durable_objects.bindings]]
+name = "SCHEDULER_DO"
+class_name = "SchedulerDO"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["ProjectDO", "DashboardDO"]
+new_sqlite_classes = ["ProjectDO", "DashboardDO", "SchedulerDO"]
 
-# Workflows. Never on the hot path. See plan §10.
-#  - Provision: durable provisioning/migration tasks.
-#  - SchedulerWorkflow: event-driven scheduler for schedule + sunset/sunrise
-#    automations. It sleeps until the next fire time (no polling) and wakes early
-#    on a 'reschedule' event when automations change. Replaces the old
-#    every-minute cron trigger.
+# Workflows — provisioning only. Never on the hot path. See plan §10.
+# (Schedule/sunset automations are driven by the SchedulerDO alarm, not a Workflow.)
 [[workflows]]
 name = "nodrix-provision"
 binding = "PROVISION"
 class_name = "Provision"
-
-[[workflows]]
-name = "nodrix-scheduler"
-binding = "SCHEDULER"
-class_name = "SchedulerWorkflow"
 
 # Plaintext vars. Settings → Version & updates polls the upstream repo to
 # tell owners when a new commit is on main. Fork the upstream and override

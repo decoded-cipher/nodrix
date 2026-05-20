@@ -25,8 +25,8 @@ import { sha256Hex } from './lib/ids';
 
 export { ProjectDO } from './do/project-do';
 export { DashboardDO } from './do/dashboard-do';
+export { SchedulerDO } from './do/scheduler-do';
 export { Provision } from './workflows/provision';
-export { SchedulerWorkflow } from './workflows/scheduler';
 
 const app = new Hono<{ Bindings: Env }>();
 
