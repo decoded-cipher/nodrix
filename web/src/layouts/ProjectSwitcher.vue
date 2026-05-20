@@ -17,7 +17,7 @@ const others = computed(() => session.projects.filter((p) => p.id !== current.va
 function pick(id: string): void {
   ui.setCurrentProject(id);
   open.value = false;
-  router.push(`/p/${id}/dashboards`);
+  router.push(`/p/${id}/variables`);
 }
 
 function onDocClick(e: MouseEvent): void {

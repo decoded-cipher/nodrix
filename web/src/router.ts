@@ -22,7 +22,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'p/:proj',
         children: [
-          { path: '', redirect: (to) => `/p/${to.params['proj'] as string}/dashboards` },
+          { path: '', redirect: (to) => `/p/${to.params['proj'] as string}/variables` },
           { path: 'dashboards', name: 'dashboards', component: () => import('./pages/project/Dashboards.vue') },
           { path: 'd/:dash', name: 'dashboard-view', component: () => import('./pages/project/DashboardView.vue') },
           { path: 'd/:dash/edit', name: 'dashboard-edit', component: () => import('./pages/project/DashboardEdit.vue') },

@@ -36,7 +36,7 @@ async function create() {
     const p = await session.createProject(n);
     newName.value = '';
     ui.setCurrentProject(p.id);
-    router.push(`/p/${p.id}/dashboards`);
+    router.push(`/p/${p.id}/variables`);
   } catch (e) {
     err.value = (e as Error).message;
   } finally {
@@ -46,7 +46,7 @@ async function create() {
 
 function open(id: string) {
   ui.setCurrentProject(id);
-  router.push(`/p/${id}/dashboards`);
+  router.push(`/p/${id}/variables`);
 }
 
 function toggleMenu(id: string, event: Event) {

@@ -35,7 +35,7 @@ const crumbs = computed<Crumb[]>(() => {
   const projId = route.params['proj'] as string | undefined;
   if (projId) {
     const proj = ui.currentProject;
-    out.push({ label: proj?.name ?? 'Project', to: `/p/${projId}/dashboards` });
+    out.push({ label: proj?.name ?? 'Project', to: `/p/${projId}/variables` });
 
     if (path.includes('/dashboards') || /\/d\//.test(path)) {
       out.push({ label: 'Dashboards', to: `/p/${projId}/dashboards` });
