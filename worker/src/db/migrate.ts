@@ -85,21 +85,20 @@ const STATEMENTS = [
     added_by   TEXT REFERENCES users(id),
     PRIMARY KEY (user_id, project_id)
   )`,
-  `CREATE TABLE IF NOT EXISTS devices (
+  `CREATE TABLE IF NOT EXISTS project_variables (
     id          TEXT PRIMARY KEY,
     project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,
-    description TEXT,
-    created_by  TEXT REFERENCES users(id),
+    key         TEXT NOT NULL,
+    name        TEXT,
+    unit        TEXT,
     created_at  INTEGER NOT NULL,
     updated_at  INTEGER NOT NULL,
-    last_seen   INTEGER,
-    archived_at INTEGER
+    last_seen   INTEGER
   )`,
-  `CREATE INDEX IF NOT EXISTS idx_devices_project ON devices(project_id)`,
-  `CREATE TABLE IF NOT EXISTS device_tokens (
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_variables_key ON project_variables(project_id, key)`,
+  `CREATE TABLE IF NOT EXISTS project_tokens (
     id           TEXT PRIMARY KEY,
-    device_id    TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name         TEXT,
     hash         TEXT NOT NULL UNIQUE,
     created_by   TEXT REFERENCES users(id),
@@ -107,7 +106,7 @@ const STATEMENTS = [
     last_used_at INTEGER,
     revoked_at   INTEGER
   )`,
-  `CREATE INDEX IF NOT EXISTS idx_device_tokens_device ON device_tokens(device_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_project_tokens_project ON project_tokens(project_id)`,
   `CREATE TABLE IF NOT EXISTS user_tokens (
     id           TEXT PRIMARY KEY,
     project_id   TEXT REFERENCES projects(id) ON DELETE CASCADE,

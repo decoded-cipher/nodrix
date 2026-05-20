@@ -4,7 +4,7 @@ import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
-import { validateLayout, devicesFromLayout } from '../lib/layout';
+import { validateLayout } from '../lib/layout';
 
 const dashboards = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
@@ -73,9 +73,6 @@ dashboards.post('/', async (c) => {
   const v = validateLayout(layout);
   if (!v.ok) return c.json({ error: 'bad_request', reason: v.reason }, 400);
 
-  const crossProject = await containsForeignDevice(c.env.DB, project.id, devicesFromLayout(v.value));
-  if (crossProject) return c.json({ error: 'bad_request', reason: 'cross_project_device' }, 400);
-
   const id = newId('dashboard');
   const user = c.get('user');
   const now = Math.floor(Date.now() / 1000);
@@ -128,8 +125,6 @@ dashboards.put('/:id', async (c) => {
   if (body.layout !== undefined) {
     const v = validateLayout(body.layout);
     if (!v.ok) return c.json({ error: 'bad_request', reason: v.reason }, 400);
-    const crossProject = await containsForeignDevice(c.env.DB, project.id, devicesFromLayout(v.value));
-    if (crossProject) return c.json({ error: 'bad_request', reason: 'cross_project_device' }, 400);
     nextLayoutJson = JSON.stringify(v.value);
   }
 
@@ -197,19 +192,5 @@ dashboards.delete('/:id', async (c) => {
 
   return c.body(null, 204);
 });
-
-async function containsForeignDevice(
-  db: Env['DB'],
-  projectId: string,
-  deviceIds: string[]
-): Promise<boolean> {
-  if (deviceIds.length === 0) return false;
-  const placeholders = deviceIds.map(() => '?').join(',');
-  const rows = await db
-    .prepare(`SELECT id FROM devices WHERE id IN (${placeholders}) AND project_id = ?`)
-    .bind(...deviceIds, projectId)
-    .all<{ id: string }>();
-  return rows.results.length !== deviceIds.length;
-}
 
 export default dashboards;

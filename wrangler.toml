@@ -32,7 +32,7 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
-# D1 — metadata only (users, projects, devices, dashboards, tokens).
+# D1 — metadata only (users, projects, variables, dashboards, tokens).
 # NEVER any telemetry point. See plan §3.
 [[d1_databases]]
 binding = "DB"
@@ -40,7 +40,7 @@ database_name = "nodrix"
 database_id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
 migrations_dir = "worker/src/db/migrations"
 
-# R2 — cold telemetry history, NDJSON partitioned by device + hour.
+# R2 — cold telemetry history, NDJSON partitioned by project + hour.
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "nodrix-telemetry"
@@ -52,8 +52,8 @@ id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
 
 # Durable Objects.
 [[durable_objects.bindings]]
-name = "DEVICE_DO"
-class_name = "DeviceDO"
+name = "PROJECT_DO"
+class_name = "ProjectDO"
 
 [[durable_objects.bindings]]
 name = "DASHBOARD_DO"
@@ -61,7 +61,7 @@ class_name = "DashboardDO"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["DeviceDO", "DashboardDO"]
+new_sqlite_classes = ["ProjectDO", "DashboardDO"]
 
 # Workflows — provisioning only. Never on the hot path. See plan §10.
 [[workflows]]

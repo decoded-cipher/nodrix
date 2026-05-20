@@ -7,7 +7,7 @@ import {
   buildDataIndex,
   applyProps,
   createWidgetElement,
-  subscriptionMetric,
+  subscriptionVariable,
   type DataIndex,
 } from '../../builder/render-widget';
 import type {
@@ -100,7 +100,7 @@ function handleMessage(msg: WsServerMsg) {
 
 function applySnapshot(snap: SnapshotMsg) {
   // The page-side authoritative layout already came from the REST fetch.
-  // Use the snapshot's per-device state + series to populate widgets.
+  // Use the snapshot's variable state + series to populate widgets.
   if (!idx.value || !dashboard.value) return;
 
   for (const item of dashboard.value.layout.items) {
@@ -111,25 +111,23 @@ function applySnapshot(snap: SnapshotMsg) {
     if (item.type === 'iot-chart') {
       const seriesArr = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
       const built = seriesArr.map((s) => {
-        const device = String(s['device'] ?? '');
-        const metric = String(s['metric'] ?? '');
-        const pts = (snap.devices[device]?.series ?? [])
-          .filter((p) => p.metric === metric)
+        const variable = String(s['variable'] ?? '');
+        const pts = snap.series
+          .filter((p) => p.variable === variable)
           .map((p) => ({ ts: p.ts, value: numericOrNaN(p.value) }))
           .filter((p) => Number.isFinite(p.value));
         return {
-          key: `${device}|${metric}`,
-          label: typeof s['label'] === 'string' ? s['label'] : `${device}.${metric}`,
+          key: variable,
+          label: typeof s['label'] === 'string' ? s['label'] : variable,
           color: typeof s['color'] === 'string' ? s['color'] : undefined,
           points: pts,
         };
       });
       (el as HTMLElement & { series?: unknown }).series = built;
     } else {
-      const device = String(item.props['device'] ?? '');
-      const metric = subscriptionMetric(item);
-      if (!device || !metric) continue;
-      const latest = snap.devices[device]?.state[metric];
+      const variable = subscriptionVariable(item);
+      if (!variable) continue;
+      const latest = snap.variables[variable];
       if (latest !== undefined) {
         (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;
         (el as HTMLElement & { value?: unknown; ts?: number }).ts = latest.received_at;
@@ -140,7 +138,7 @@ function applySnapshot(snap: SnapshotMsg) {
 
 function applyUpdate(u: UpdateMsg) {
   if (!idx.value) return;
-  const key = `${u.device}|${u.metric}`;
+  const key = u.variable;
   const targets = idx.value.byKey.get(key);
   if (!targets) return;
   for (const el of targets) {
@@ -177,12 +175,11 @@ function numericOrNaN(v: unknown): number {
 }
 
 function onCommand(e: Event) {
-  const detail = (e as CustomEvent<{ device: string; name: string; value: unknown }>).detail;
-  if (!detail?.device || !detail?.name) return;
+  const detail = (e as CustomEvent<{ variable: string; value: unknown }>).detail;
+  if (!detail?.variable) return;
   ws?.send({
-    type: 'command',
-    device: detail.device,
-    name: detail.name,
+    type: 'control',
+    variable: detail.variable,
     value: detail.value,
   });
 }

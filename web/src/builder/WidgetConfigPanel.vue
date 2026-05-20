@@ -16,8 +16,12 @@ const emit = defineEmits<{
 const project = useProjectStore();
 const spec = computed(() => (props.item ? specFor(props.item.type) : null));
 
-const deviceOptions = computed(() =>
-  project.devices.map((d) => ({ value: d.id, label: d.name, hint: d.id }))
+const variableOptions = computed(() =>
+  project.variables.map((v) => ({
+    value: v.key,
+    label: v.name ? `${v.name} (${v.key})` : v.key,
+    hint: v.unit ?? undefined,
+  }))
 );
 
 function setProp(key: string, v: unknown) {
@@ -35,7 +39,7 @@ function updateSeries(idx: number, key: string, v: unknown) {
 function addSeries() {
   if (!props.item) return;
   const series = [...((props.item.props['series'] as Array<Record<string, unknown>>) ?? [])];
-  series.push({ device: '', metric: '', label: '' });
+  series.push({ variable: '', label: '' });
   setProp('series', series);
 }
 
@@ -108,13 +112,13 @@ function removeSeries(idx: number) {
           />
         </div>
 
-        <div v-else-if="f.type === 'device'" class="block">
+        <div v-else-if="f.type === 'variable'" class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</span>
           <Dropdown
             class="mt-1"
             :model-value="(item.props[f.key] as string) ?? ''"
-            :options="deviceOptions"
-            placeholder="Select a device"
+            :options="variableOptions"
+            placeholder="Select a variable"
             @update:model-value="(v) => setProp(f.key, v)"
           />
         </div>
@@ -137,18 +141,11 @@ function removeSeries(idx: number) {
             class="space-y-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800"
           >
             <Dropdown
-              :model-value="(s['device'] as string) ?? ''"
-              :options="deviceOptions"
-              placeholder="device"
+              :model-value="(s['variable'] as string) ?? ''"
+              :options="variableOptions"
+              placeholder="variable"
               size="sm"
-              @update:model-value="(v) => updateSeries(idx, 'device', v)"
-            />
-            <input
-              :value="s['metric'] ?? ''"
-              type="text"
-              placeholder="metric"
-              class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-              @input="updateSeries(idx, 'metric', ($event.target as HTMLInputElement).value)"
+              @update:model-value="(v) => updateSeries(idx, 'variable', v)"
             />
             <input
               :value="s['label'] ?? ''"

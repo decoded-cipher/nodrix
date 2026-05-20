@@ -113,5 +113,16 @@ export const MIGRATIONS: Migration[] = [
     "statements": [
       "DELETE FROM deployment_settings WHERE key IN (\n  'cf.api_token_enc',\n  'cf.account_id',\n  'cf.account_name',\n  'cf.script_name',\n  'cf.last_build_id',\n  'onboarding.dismissed_at'\n)"
     ]
+  },
+  {
+    "name": "0007_project_variables",
+    "statements": [
+      "DROP TABLE IF EXISTS device_tokens",
+      "DROP TABLE IF EXISTS devices",
+      "CREATE TABLE IF NOT EXISTS project_variables (\n  id          TEXT PRIMARY KEY,\n  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  key         TEXT NOT NULL,            \n  name        TEXT,                     \n  unit        TEXT,                     \n  created_at  INTEGER NOT NULL,\n  updated_at  INTEGER NOT NULL,\n  last_seen   INTEGER                   \n)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_project_variables_key\n  ON project_variables(project_id, key)",
+      "CREATE TABLE IF NOT EXISTS project_tokens (\n  id           TEXT PRIMARY KEY,\n  project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name         TEXT,\n  hash         TEXT NOT NULL UNIQUE,    \n  created_by   TEXT REFERENCES users(id),\n  created_at   INTEGER NOT NULL,\n  last_used_at INTEGER,\n  revoked_at   INTEGER\n)",
+      "CREATE INDEX IF NOT EXISTS idx_project_tokens_project ON project_tokens(project_id)"
+    ]
   }
 ];

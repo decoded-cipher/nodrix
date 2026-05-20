@@ -6,19 +6,27 @@ const list = new Hono<{ Bindings: Env; Variables: UserTokenContextVars }>();
 
 list.use('*', requireUserToken);
 
-// GET /v1/projects/:proj/devices
+// GET /v1/projects/:proj/variables
 list.get('/', async (c) => {
   const proj = c.req.param('proj')!;
   const rows = await c.env.DB
     .prepare(
-      `SELECT id, name, created_at, last_seen
-         FROM devices
+      `SELECT id, key, name, unit, created_at, updated_at, last_seen
+         FROM project_variables
         WHERE project_id = ?
-        ORDER BY created_at ASC`
+        ORDER BY key ASC`
     )
     .bind(proj)
-    .all<{ id: string; name: string; created_at: number; last_seen: number | null }>();
-  return c.json({ devices: rows.results });
+    .all<{
+      id: string;
+      key: string;
+      name: string | null;
+      unit: string | null;
+      created_at: number;
+      updated_at: number;
+      last_seen: number | null;
+    }>();
+  return c.json({ variables: rows.results });
 });
 
 export default list;

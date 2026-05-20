@@ -1,34 +1,26 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireUserToken, type UserTokenContextVars } from '../middleware/require-user-token';
-import type { DeviceDO } from '../do/device-do';
+import type { ProjectDO } from '../do/project-do';
 
 const series = new Hono<{ Bindings: Env; Variables: UserTokenContextVars }>();
 
 series.use('*', requireUserToken);
 
-// GET /v1/projects/:proj/devices/:id/series?metric=temperature&window=1h
+// GET /v1/projects/:proj/variables/:key/series?window=1h
 //
-// Recent-only. Reads from the Device DO ring buffer. NEVER touches R2.
-// See plan §7.2 + invariant #5.
+// Recent-only. Reads from the Project DO ring buffer. NEVER touches R2.
 series.get('/', async (c) => {
   const proj = c.req.param('proj')!;
-  const deviceId = c.req.param('id')!;
-  const metric = c.req.query('metric') ?? null;
+  const key = c.req.param('key')!;
   const windowStr = c.req.query('window') ?? '1h';
 
   const sinceTs = computeSinceTs(windowStr);
 
-  const row = await c.env.DB
-    .prepare(`SELECT id FROM devices WHERE id = ? AND project_id = ?`)
-    .bind(deviceId, proj)
-    .first<{ id: string }>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
+  const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(proj)) as unknown as ProjectDO;
+  const points = await stub.getSeries(key, sinceTs);
 
-  const stub = c.env.DEVICE_DO.get(c.env.DEVICE_DO.idFromName(deviceId)) as unknown as DeviceDO;
-  const points = await stub.getSeries(metric, sinceTs);
-
-  return c.json({ device: deviceId, metric, window: windowStr, points });
+  return c.json({ project: proj, variable: key, window: windowStr, points });
 });
 
 function computeSinceTs(windowStr: string): number {

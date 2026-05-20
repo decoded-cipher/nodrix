@@ -6,8 +6,9 @@ import type {
   AutomationTriggerType,
   Dashboard,
   DashboardMeta,
-  Device,
-  DeviceWithToken,
+  Variable,
+  ProjectToken,
+  ProjectTokenWithSecret,
   Integration,
   IntegrationKind,
   Layout,
@@ -16,42 +17,89 @@ import type {
 
 export const useProjectStore = defineStore('project', () => {
   const currentProjectId = ref<string | null>(null);
-  const devices = ref<Device[]>([]);
+  const variables = ref<Variable[]>([]);
+  const projectTokens = ref<ProjectToken[]>([]);
   const dashboards = ref<DashboardMeta[]>([]);
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
   const integrations = ref<Integration[]>([]);
 
   async function switchTo(projectId: string): Promise<void> {
-    if (currentProjectId.value === projectId && devices.value.length + dashboards.value.length > 0) {
+    if (currentProjectId.value === projectId && variables.value.length + dashboards.value.length > 0) {
       return;
     }
     currentProjectId.value = projectId;
-    await Promise.all([loadDevices(), loadDashboards()]);
+    await Promise.all([loadVariables(), loadDashboards()]);
   }
 
-  async function loadDevices(): Promise<void> {
+  async function loadVariables(): Promise<void> {
     if (!currentProjectId.value) return;
-    const data = await api.get<{ devices: Device[] }>(
-      `/v1/admin/projects/${currentProjectId.value}/devices`
+    const data = await api.get<{ variables: Variable[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/variables`
     );
-    devices.value = data.devices;
+    variables.value = data.variables;
   }
 
-  async function createDevice(name: string): Promise<DeviceWithToken> {
+  async function createVariable(input: { key: string; name?: string | null; unit?: string | null }): Promise<Variable> {
     if (!currentProjectId.value) throw new Error('no project');
-    const d = await api.post<DeviceWithToken>(
-      `/v1/admin/projects/${currentProjectId.value}/devices`,
-      { name }
+    const v = await api.post<Variable>(
+      `/v1/admin/projects/${currentProjectId.value}/variables`,
+      input
     );
-    devices.value = [...devices.value, { id: d.id, name: d.name, created_at: d.created_at, last_seen: null }];
-    return d;
+    variables.value = [...variables.value, v];
+    return v;
   }
 
-  async function deleteDevice(id: string): Promise<void> {
+  async function updateVariable(
+    id: string,
+    patch: { name?: string | null; unit?: string | null }
+  ): Promise<Variable> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const v = await api.patch<Variable>(
+      `/v1/admin/projects/${currentProjectId.value}/variables/${id}`,
+      patch
+    );
+    variables.value = variables.value.map((x) => (x.id === id ? v : x));
+    return v;
+  }
+
+  async function deleteVariable(id: string): Promise<void> {
     if (!currentProjectId.value) return;
-    await api.del<void>(`/v1/admin/projects/${currentProjectId.value}/devices/${id}`);
-    devices.value = devices.value.filter((d) => d.id !== id);
+    await api.del<void>(`/v1/admin/projects/${currentProjectId.value}/variables/${id}`);
+    variables.value = variables.value.filter((v) => v.id !== id);
+  }
+
+  // ─── Project tokens (hardware credentials) ───────────────────────────────────
+
+  async function loadProjectTokens(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ tokens: ProjectToken[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/variables/tokens`
+    );
+    projectTokens.value = data.tokens;
+  }
+
+  async function createProjectToken(name?: string | null): Promise<ProjectTokenWithSecret> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const t = await api.post<ProjectTokenWithSecret>(
+      `/v1/admin/projects/${currentProjectId.value}/variables/tokens`,
+      { name: name ?? null }
+    );
+    projectTokens.value = [
+      { id: t.id, name: t.name, created_at: t.created_at, last_used_at: null, revoked_at: null },
+      ...projectTokens.value,
+    ];
+    return t;
+  }
+
+  async function revokeProjectToken(id: string): Promise<void> {
+    if (!currentProjectId.value) return;
+    await api.post<{ id: string; revoked_at: number }>(
+      `/v1/admin/projects/${currentProjectId.value}/variables/tokens/${id}/revoke`
+    );
+    projectTokens.value = projectTokens.value.map((t) =>
+      t.id === id ? { ...t, revoked_at: Math.floor(Date.now() / 1000) } : t
+    );
   }
 
   async function loadDashboards(): Promise<void> {
@@ -225,15 +273,20 @@ export const useProjectStore = defineStore('project', () => {
 
   return {
     currentProjectId,
-    devices,
+    variables,
+    projectTokens,
     dashboards,
     tokens,
     automations,
     integrations,
     switchTo,
-    loadDevices,
-    createDevice,
-    deleteDevice,
+    loadVariables,
+    createVariable,
+    updateVariable,
+    deleteVariable,
+    loadProjectTokens,
+    createProjectToken,
+    revokeProjectToken,
     loadDashboards,
     createDashboard,
     fetchDashboard,

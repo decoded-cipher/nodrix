@@ -12,7 +12,7 @@ export interface Env {
   R2: R2Bucket;
   KV: KVNamespace;
   ASSETS: Fetcher;
-  DEVICE_DO: DurableObjectNamespace;
+  PROJECT_DO: DurableObjectNamespace;
   DASHBOARD_DO: DurableObjectNamespace;
   PROVISION: Workflow;
 

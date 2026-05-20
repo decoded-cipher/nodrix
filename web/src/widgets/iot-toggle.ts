@@ -1,11 +1,11 @@
 // <iot-toggle> — button that dispatches an iot-command event.
 //
 // Attributes:
-//   - data-title, data-device, data-command, data-on-value, data-off-value
+//   - data-title, data-variable, data-on-value, data-off-value
 // Property:
 //   - current: last known value (so the toggle reflects state)
 // Event:
-//   - iot-command { device, name, value }  bubbles + composed
+//   - iot-command { variable, value }  bubbles + composed
 
 const TEMPLATE = `
   <style>
@@ -144,8 +144,7 @@ export class IotToggleElement extends HTMLElement {
       bubbles: true,
       composed: true,
       detail: {
-        device: this.getAttribute('data-device') ?? '',
-        name: this.getAttribute('data-command') ?? '',
+        variable: this.getAttribute('data-variable') ?? '',
         value: next,
       },
     }));

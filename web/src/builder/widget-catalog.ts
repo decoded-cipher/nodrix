@@ -3,7 +3,7 @@
 
 import type { WidgetType } from '../types';
 
-export type FieldType = 'string' | 'number' | 'boolean' | 'device' | 'select' | 'series';
+export type FieldType = 'string' | 'number' | 'boolean' | 'variable' | 'select' | 'series';
 
 export type FieldDef = {
   key: string;
@@ -51,11 +51,10 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Display the most recent reading of a single metric — temperature, pressure, status text.',
     icon: ICON_VALUE,
     defaultSize: { w: 3, h: 2 },
-    defaultProps: { title: '', device: '', metric: '', unit: '' },
+    defaultProps: { title: '', variable: '', unit: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
-      { key: 'device', label: 'Device', type: 'device' },
-      { key: 'metric', label: 'Metric', type: 'string' },
+      { key: 'variable', label: 'Variable', type: 'variable' },
       { key: 'unit', label: 'Unit', type: 'string' },
     ],
   },
@@ -68,11 +67,10 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Visualize a single bounded value such as battery percentage, fill level, or signal strength.',
     icon: ICON_GAUGE,
     defaultSize: { w: 3, h: 3 },
-    defaultProps: { title: '', device: '', metric: '', min: 0, max: 100 },
+    defaultProps: { title: '', variable: '', min: 0, max: 100 },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
-      { key: 'device', label: 'Device', type: 'device' },
-      { key: 'metric', label: 'Metric', type: 'string' },
+      { key: 'variable', label: 'Variable', type: 'variable' },
       { key: 'min', label: 'Min', type: 'number' },
       { key: 'max', label: 'Max', type: 'number' },
     ],
@@ -95,6 +93,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
       { key: 'series', label: 'Series', type: 'series' },
     ],
   },
+  // (series items are { variable, label, color })
   {
     type: 'iot-toggle',
     label: 'Toggle',
@@ -104,11 +103,10 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Send an on/off command to a device — relays, switches, actuators. Reflects the latest reported state.',
     icon: ICON_TOGGLE,
     defaultSize: { w: 3, h: 2 },
-    defaultProps: { title: '', device: '', command: '', onValue: 'on', offValue: 'off' },
+    defaultProps: { title: '', variable: '', onValue: 'on', offValue: 'off' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
-      { key: 'device', label: 'Device', type: 'device' },
-      { key: 'command', label: 'Command name', type: 'string' },
+      { key: 'variable', label: 'Variable', type: 'variable' },
       { key: 'onValue', label: 'On value', type: 'string' },
       { key: 'offValue', label: 'Off value', type: 'string' },
     ],
@@ -122,11 +120,10 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Trigger a one-shot action — restart a device, run a scene, reset a counter. No persistent state; each press sends the command once.',
     icon: ICON_PUSH,
     defaultSize: { w: 3, h: 2 },
-    defaultProps: { title: '', device: '', command: '', value: '', label: '' },
+    defaultProps: { title: '', variable: '', value: '', label: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
-      { key: 'device', label: 'Device', type: 'device' },
-      { key: 'command', label: 'Command name', type: 'string' },
+      { key: 'variable', label: 'Variable', type: 'variable' },
       { key: 'value', label: 'Payload value', type: 'string' },
       { key: 'label', label: 'Button label (optional)', type: 'string' },
     ],
@@ -140,11 +137,10 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse: 'Set a continuous numeric value — brightness, fan speed, setpoint, volume. Sends the command on release; reflects reported state via the chosen metric.',
     icon: ICON_SLIDER,
     defaultSize: { w: 4, h: 2 },
-    defaultProps: { title: '', device: '', command: '', orientation: 'horizontal', min: 0, max: 100, step: 1, unit: '' },
+    defaultProps: { title: '', variable: '', orientation: 'horizontal', min: 0, max: 100, step: 1, unit: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
-      { key: 'device', label: 'Device', type: 'device' },
-      { key: 'command', label: 'Command name', type: 'string' },
+      { key: 'variable', label: 'Variable', type: 'variable' },
       { key: 'orientation', label: 'Orientation', type: 'select', options: ['horizontal', 'vertical'] },
       { key: 'min', label: 'Min', type: 'number' },
       { key: 'max', label: 'Max', type: 'number' },

@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/project';
 import { specFor } from '../../builder/widget-catalog';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
-import { applyProps, createWidgetElement, buildDataIndex, subscriptionMetric } from '../../builder/render-widget';
+import { applyProps, createWidgetElement, buildDataIndex, subscriptionVariable } from '../../builder/render-widget';
 import { DashboardWs } from '../../ws';
 import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../../types';
 
@@ -75,7 +75,7 @@ onMounted(async () => {
     return;
   }
 
-  await project.loadDevices();
+  await project.loadVariables();
 
   ws = new DashboardWs(dashId, handleMessage);
   ws.start();
@@ -122,24 +122,22 @@ function applySnapshot(snap: SnapshotMsg) {
     if (item.type === 'iot-chart') {
       const series = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
       (el as HTMLElement & { series?: unknown }).series = series.map((s) => {
-        const device = String(s['device'] ?? '');
-        const metric = String(s['metric'] ?? '');
-        const pts = (snap.devices[device]?.series ?? [])
-          .filter((p) => p.metric === metric)
+        const variable = String(s['variable'] ?? '');
+        const pts = snap.series
+          .filter((p) => p.variable === variable)
           .map((p) => ({ ts: p.ts, value: Number(p.value) }))
           .filter((p) => Number.isFinite(p.value));
         return {
-          key: `${device}|${metric}`,
-          label: typeof s['label'] === 'string' ? s['label'] : `${device}.${metric}`,
+          key: variable,
+          label: typeof s['label'] === 'string' ? s['label'] : variable,
           color: typeof s['color'] === 'string' ? s['color'] : undefined,
           points: pts,
         };
       });
     } else {
-      const device = String(item.props['device'] ?? '');
-      const metric = subscriptionMetric(item);
-      if (!device || !metric) continue;
-      const latest = snap.devices[device]?.state[metric];
+      const variable = subscriptionVariable(item);
+      if (!variable) continue;
+      const latest = snap.variables[variable];
       if (latest !== undefined) {
         (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;
         (el as HTMLElement & { value?: unknown; ts?: number }).ts = latest.received_at;
@@ -150,12 +148,12 @@ function applySnapshot(snap: SnapshotMsg) {
 
 function applyUpdate(u: UpdateMsg) {
   const idx = buildDataIndex(layout.value, widgetEls.value);
-  const targets = idx.byKey.get(`${u.device}|${u.metric}`);
+  const targets = idx.byKey.get(u.variable);
   if (!targets) return;
   for (const el of targets) {
     if (el.tagName === 'IOT-CHART') {
       const itemId = [...widgetEls.value.entries()].find(([, e]) => e === el)?.[0];
-      const sk = itemId ? idx.chartKeys.get(itemId)?.get(`${u.device}|${u.metric}`) : null;
+      const sk = itemId ? idx.chartKeys.get(itemId)?.get(u.variable) : null;
       if (sk && Number.isFinite(Number(u.value))) {
         (el as HTMLElement & {
           appendPoint?: (k: string, p: { ts: number; value: number }) => void;

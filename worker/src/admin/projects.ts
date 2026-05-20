@@ -3,7 +3,7 @@ import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
-import type { DeviceDO } from '../do/device-do';
+import type { ProjectDO } from '../do/project-do';
 
 const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -130,9 +130,27 @@ projects.patch('/:proj', async (c) => {
   return c.json(row);
 });
 
-// Cascade: destroys every Device DO (with R2 telemetry history) and Dashboard
-// DO in the project, then deletes the D1 row (which cascades dashboards,
-// devices, device_tokens, user_tokens, project_members via FK).
+// POST /v1/admin/projects/:proj/flush  -> { flushed, keys, newCursor }
+// Forces the Project DO alarm to run now. Handy for smoke tests + ops; nothing
+// on the hot path depends on this.
+projects.post('/:proj/flush', async (c) => {
+  const projId = c.req.param('proj');
+  const user = c.get('user');
+  const member = await c.env.DB
+    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
+    .bind(user.id, projId)
+    .first<{ role: string }>();
+  if (!member) return c.json({ error: 'forbidden' }, 403);
+
+  const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(projId)) as unknown as ProjectDO;
+  const result = await stub.flushNow();
+  return c.json(result);
+});
+
+// Cascade: destroys the project's Project DO (with R2 telemetry history) and
+// every Dashboard DO in the project, then deletes the D1 row (which cascades
+// dashboards, project_variables, project_tokens, user_tokens, project_members
+// via FK).
 projects.delete('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
@@ -155,27 +173,24 @@ projects.delete('/:proj', async (c) => {
     return c.json({ error: 'conflict', reason: 'last_project' }, 409);
   }
 
-  // Gather DO IDs to destroy BEFORE the D1 delete cascades rows away.
-  const [deviceRows, dashboardRows] = await Promise.all([
-    c.env.DB
-      .prepare(`SELECT id FROM devices WHERE project_id = ?`)
-      .bind(projId)
-      .all<{ id: string }>(),
-    c.env.DB
-      .prepare(`SELECT id FROM dashboards WHERE project_id = ?`)
-      .bind(projId)
-      .all<{ id: string }>(),
-  ]);
+  // Gather dashboard DO IDs to destroy BEFORE the D1 delete cascades rows away.
+  const dashboardRows = await c.env.DB
+    .prepare(`SELECT id FROM dashboards WHERE project_id = ?`)
+    .bind(projId)
+    .all<{ id: string }>();
+
+  // The project's own DO holds all variable state + R2 telemetry history.
+  const projectDestroy = (async () => {
+    try {
+      const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(projId)) as unknown as ProjectDO;
+      await stub.destroy();
+    } catch (e) {
+      console.error('project DO destroy failed', projId, e);
+    }
+  })();
 
   await Promise.all([
-    ...deviceRows.results.map(async (d) => {
-      try {
-        const stub = c.env.DEVICE_DO.get(c.env.DEVICE_DO.idFromName(d.id)) as unknown as DeviceDO;
-        await stub.destroy();
-      } catch (e) {
-        console.error('device destroy failed', d.id, e);
-      }
-    }),
+    projectDestroy,
     ...dashboardRows.results.map(async (d) => {
       try {
         const stub = c.env.DASHBOARD_DO.get(c.env.DASHBOARD_DO.idFromName(d.id));

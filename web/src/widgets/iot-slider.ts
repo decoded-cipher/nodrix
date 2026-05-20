@@ -1,10 +1,10 @@
-// <iot-slider> — horizontal slider for sending a numeric command to a
-// device. Dispatches `iot-command` on commit (mouseup / keyup), not on
+// <iot-slider> — horizontal slider for writing a numeric value to a
+// variable. Dispatches `iot-command` on commit (mouseup / keyup), not on
 // every input frame, so the wire isn't flooded while dragging. Reflects
 // the latest reported state via `.value`.
 //
 // Attributes:
-//   - data-title, data-device, data-command, data-unit
+//   - data-title, data-variable, data-unit
 //   - data-min, data-max, data-step
 // Property:
 //   - value: last known numeric value (also accepted via `current` for
@@ -226,8 +226,7 @@ export class IotSliderElement extends HTMLElement {
         bubbles: true,
         composed: true,
         detail: {
-          device: this.getAttribute('data-device') ?? '',
-          name: this.getAttribute('data-command') ?? '',
+          variable: this.getAttribute('data-variable') ?? '',
           value: v,
         },
       }));

@@ -3,17 +3,17 @@ import { nanoid } from 'nanoid';
 // Prefixed nanoid-based ids. URL-safe, easy to eyeball in logs.
 //
 // usr_xxx  user        prj_xxx  project
-// dev_xxx  device      dsh_xxx  dashboard
-// tok_xxx  token       cmd_xxx  command
+// var_xxx  variable    dsh_xxx  dashboard
+// tok_xxx  token       ctl_xxx  control write
 // aut_xxx  automation  itg_xxx  integration
 
 const PREFIXES = {
   user: 'usr',
   project: 'prj',
-  device: 'dev',
+  variable: 'var',
   dashboard: 'dsh',
   token: 'tok',
-  command: 'cmd',
+  control: 'ctl',
   automation: 'aut',
   integration: 'itg',
 } as const;

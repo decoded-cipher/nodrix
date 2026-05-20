@@ -60,20 +60,20 @@ async function main() {
   });
   assert(proj.id.startsWith('prj_'), `project id has prj_ prefix: ${proj.id}`);
 
-  // 3. Create a device.
-  const dev = await req<{ id: string; name: string; token: string }>(
+  // 3. Create a project token (hardware credential).
+  const pt = await req<{ id: string; token: string }>(
     'POST',
-    `/v1/admin/projects/${proj.id}/devices`,
-    { body: { name: 'sensor-1' } }
+    `/v1/admin/projects/${proj.id}/tokens`,
+    { body: { name: 'cluster-node' } }
   );
-  assert(dev.token.length > 20, `device token issued (${dev.token.length} chars)`);
+  assert(pt.token.length > 20, `project token issued (${pt.token.length} chars)`);
 
-  // 4. POST telemetry as the device.
+  // 4. POST telemetry with the project token (variables auto-create).
   const telRes = await fetch(`${BASE}/v1/telemetry`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${dev.token}`,
+      authorization: `Bearer ${pt.token}`,
     },
     body: JSON.stringify({ ts: Math.floor(Date.now() / 1000), metrics: { temperature: 22.5 } }),
   });
@@ -88,12 +88,19 @@ async function main() {
   // 6. Read state via public API.
   const state = await req<{ state: Record<string, { value: unknown }> }>(
     'GET',
-    `/v1/projects/${proj.id}/devices/${dev.id}/state`,
+    `/v1/projects/${proj.id}/state`,
     { bearer: tok.token }
   );
   assert(state.state['temperature']?.value === 22.5, `state echoed temperature=22.5`);
 
-  // 7. Create a dashboard with two widgets pointing at the device.
+  // 6b. The variable auto-created on first telemetry write.
+  const vars = await req<{ variables: Array<{ key: string }> }>(
+    'GET',
+    `/v1/admin/projects/${proj.id}/variables`
+  );
+  assert(vars.variables.some((v) => v.key === 'temperature'), `temperature variable auto-created`);
+
+  // 7. Create a dashboard with two widgets bound to the variable.
   const layout = {
     grid: { columns: 12 },
     items: [
@@ -104,7 +111,7 @@ async function main() {
         w: 3,
         h: 2,
         type: 'iot-value',
-        props: { title: 'Temp', device: dev.id, metric: 'temperature', unit: '°C' },
+        props: { title: 'Temp', variable: 'temperature', unit: '°C' },
       },
       {
         id: 'w_chart',
@@ -116,7 +123,7 @@ async function main() {
         props: {
           title: 'Trend',
           window: '1h',
-          series: [{ device: dev.id, metric: 'temperature', label: 'sensor-1' }],
+          series: [{ variable: 'temperature', label: 'sensor-1' }],
         },
       },
     ],
@@ -134,58 +141,58 @@ async function main() {
   const snapshot = await waitForMessage(ws, (m) => m.type === 'snapshot', 5000);
   assert(snapshot.dashboard === dash.id, `snapshot dashboard matches`);
   // @ts-expect-error narrowed by predicate
-  assert(snapshot.devices[dev.id]?.state.temperature?.value === 22.5, `snapshot includes latest temperature`);
+  assert(snapshot.variables['temperature']?.value === 22.5, `snapshot includes latest temperature`);
 
   // 9. Post another telemetry reading and assert update arrives over WS.
   await fetch(`${BASE}/v1/telemetry`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${dev.token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${pt.token}` },
     body: JSON.stringify({ metrics: { temperature: 23.7 } }),
   });
   const update = await waitForMessage(
     ws,
-    (m) => m.type === 'update' && m.device === dev.id && m.metric === 'temperature' && m.value === 23.7,
+    (m) => m.type === 'update' && m.variable === 'temperature' && m.value === 23.7,
     5000
   );
   assert(update.type === 'update', `update message received`);
 
-  // 10. Send command via WS, poll as device, ack, re-poll empty.
-  ws.send(JSON.stringify({ type: 'command', req: 'r1', device: dev.id, name: 'relay', value: 'on' }));
+  // 10. Send control via WS, poll as hardware, ack, re-poll empty.
+  ws.send(JSON.stringify({ type: 'control', req: 'r1', variable: 'temperature', value: 'on' }));
   const ack = await waitForMessage(ws, (m) => m.type === 'ack' && m.req === 'r1', 5000);
-  assert(ack.type === 'ack' && ack.ok === true, `command ack ok`);
+  assert(ack.type === 'ack' && ack.ok === true, `control ack ok`);
 
-  const pollRes = await fetch(`${BASE}/v1/commands`, {
-    headers: { authorization: `Bearer ${dev.token}` },
+  const pollRes = await fetch(`${BASE}/v1/control`, {
+    headers: { authorization: `Bearer ${pt.token}` },
   });
-  const pollBody = (await pollRes.json()) as { commands: Array<{ id: string; name: string; value: unknown }> };
+  const pollBody = (await pollRes.json()) as { control: Array<{ id: string; variable: string; value: unknown }> };
   assert(
-    pollBody.commands.some((c) => c.name === 'relay' && c.value === 'on'),
-    `device sees pending command relay=on`
+    pollBody.control.some((c) => c.variable === 'temperature' && c.value === 'on'),
+    `hardware sees pending control temperature=on`
   );
-  const cmdIds = pollBody.commands.map((c) => c.id);
+  const cmdIds = pollBody.control.map((c) => c.id);
 
-  const ackRes = await fetch(`${BASE}/v1/commands/ack`, {
+  const ackRes = await fetch(`${BASE}/v1/control/ack`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${dev.token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${pt.token}` },
     body: JSON.stringify({ ids: cmdIds }),
   });
   const ackBody = (await ackRes.json()) as { acked: number };
-  assert(ackBody.acked === cmdIds.length, `device acks ${cmdIds.length} commands`);
+  assert(ackBody.acked === cmdIds.length, `hardware acks ${cmdIds.length} control writes`);
 
-  const repollRes = await fetch(`${BASE}/v1/commands`, {
-    headers: { authorization: `Bearer ${dev.token}` },
+  const repollRes = await fetch(`${BASE}/v1/control`, {
+    headers: { authorization: `Bearer ${pt.token}` },
   });
-  const repollBody = (await repollRes.json()) as { commands: unknown[] };
-  assert(repollBody.commands.length === 0, `re-poll returns no pending commands`);
+  const repollBody = (await repollRes.json()) as { control: unknown[] };
+  assert(repollBody.control.length === 0, `re-poll returns no pending control`);
 
   // 11. Force the alarm flush; assert keys + cursor advanced.
   const flushRes = await req<{ flushed: number; keys: string[]; newCursor: number }>(
     'POST',
-    `/v1/admin/projects/${proj.id}/devices/${dev.id}/flush`
+    `/v1/admin/projects/${proj.id}/flush`
   );
   assert(flushRes.flushed >= 2, `flush wrote at least 2 points (got ${flushRes.flushed})`);
   assert(flushRes.keys.length >= 1, `flush produced at least 1 R2 key`);
-  assert(flushRes.keys[0]!.startsWith(`telemetry/${dev.id}/`), `R2 key partitioned by device id`);
+  assert(flushRes.keys[0]!.startsWith(`telemetry/${proj.id}/`), `R2 key partitioned by project id`);
 
   ws.close();
 

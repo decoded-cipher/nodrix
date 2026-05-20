@@ -61,58 +61,22 @@ export function validateLayout(input: unknown): { ok: true; value: Layout } | { 
   };
 }
 
-// Extract (device, metric) pairs from a layout. Used by the Dashboard DO to
-// figure out which Device DOs to subscribe to on connect.
-export function devicesAndMetricsFromLayout(layout: Layout): Array<{ device: string; metric: string }> {
-  const out: Array<{ device: string; metric: string }> = [];
-  const seen = new Set<string>();
-
-  for (const item of layout.items) {
-    const props = item.props;
-    if (item.type === 'iot-chart' && Array.isArray(props['series'])) {
-      for (const s of props['series'] as Array<Record<string, unknown>>) {
-        if (typeof s['device'] === 'string' && typeof s['metric'] === 'string') {
-          push(s['device'], s['metric']);
-        }
-      }
-    } else if (item.type === 'iot-push') {
-      // Push is fire-and-forget — no metric subscription.
-    } else {
-      // value / gauge subscribe to their `metric` prop.
-      // toggle / slider reuse their `command` prop as the metric name —
-      // the device echoes state under the same name it receives commands.
-      const device = typeof props['device'] === 'string' ? props['device'] : null;
-      const metric = item.type === 'iot-toggle' || item.type === 'iot-slider'
-        ? (typeof props['command'] === 'string' ? props['command'] : null)
-        : (typeof props['metric'] === 'string' ? props['metric'] : null);
-      if (device && metric) push(device, metric);
-    }
-  }
-  return out;
-
-  function push(device: string, metric: string) {
-    const key = `${device}|${metric}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push({ device, metric });
-  }
-}
-
 function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
-// Devices referenced by a layout (for cross-project validation when saving).
-export function devicesFromLayout(layout: Layout): string[] {
+// Variable keys referenced by a layout. Charts use a `series` array of
+// `{ variable }`; every other widget uses a single `variable` prop.
+export function variablesFromLayout(layout: Layout): string[] {
   const set = new Set<string>();
   for (const item of layout.items) {
     const props = item.props;
     if (item.type === 'iot-chart' && Array.isArray(props['series'])) {
       for (const s of props['series'] as Array<Record<string, unknown>>) {
-        if (typeof s['device'] === 'string') set.add(s['device']);
+        if (typeof s['variable'] === 'string') set.add(s['variable']);
       }
-    } else if (typeof props['device'] === 'string') {
-      set.add(props['device']);
+    } else if (typeof props['variable'] === 'string') {
+      set.add(props['variable']);
     }
   }
   return [...set];

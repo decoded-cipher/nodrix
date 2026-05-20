@@ -2,8 +2,11 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import type { DashboardDO } from './dashboard-do';
 
-// Device Durable Object. One per device id. SQLite-backed.
-// See plan §5: latest state + recent ring buffer + pending commands + flush cursor.
+// Project Durable Object. One per project id. SQLite-backed.
+// Holds latest variable state + recent ring buffer + pending control writes +
+// flush cursor. Replaces the old per-device DeviceDO; data is now keyed by
+// variable (the telemetry JSON field name) instead of metric, and the R2 key
+// prefix is the project id instead of the device id.
 
 const RING_BUFFER_MAX_ROWS = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
@@ -11,7 +14,7 @@ const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
 
 export type IngestPoint = {
-  metric: string;
+  variable: string;
   value: number | string | boolean | null;
 };
 
@@ -21,14 +24,14 @@ export type IngestResult = {
 };
 
 export type LatestStateRow = {
-  metric: string;
+  variable: string;
   value: unknown;
   received_at: number;
 };
 
 export type SeriesRow = {
   ts: number;
-  metric: string;
+  variable: string;
   value: unknown;
 };
 
@@ -38,12 +41,12 @@ export type FlushResult = {
   newCursor: number;
 };
 
-export class DeviceDO extends DurableObject<Env> {
+export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
-  private deviceId(): string {
+  private projectId(): string {
     // Stored on first ingest; used as the R2 key prefix.
     const row = this.sql
-      .exec<{ v: string }>(`SELECT v FROM flush_meta WHERE k = 'device_id'`)
+      .exec<{ v: string }>(`SELECT v FROM flush_meta WHERE k = 'project_id'`)
       .toArray()[0];
     return row?.v ?? this.ctx.id.toString();
   }
@@ -56,22 +59,22 @@ export class DeviceDO extends DurableObject<Env> {
 
   // ---- RPC: telemetry ingest -------------------------------------------------
 
-  async ingest(deviceId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
+  async ingest(projectId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
     const receivedAt = Math.floor(Date.now() / 1000);
 
-    // Persist device_id once for the R2 key (idFromName doesn't round-trip cheaply).
+    // Persist project_id once for the R2 key (idFromName doesn't round-trip cheaply).
     this.sql.exec(
-      `INSERT INTO flush_meta (k, v) VALUES ('device_id', ?)
+      `INSERT INTO flush_meta (k, v) VALUES ('project_id', ?)
        ON CONFLICT(k) DO NOTHING`,
-      deviceId
+      projectId
     );
 
     for (const p of points) {
       this.sql.exec(
-        `INSERT INTO latest_state (metric, value, received_at)
+        `INSERT INTO latest_state (variable, value, received_at)
          VALUES (?, ?, ?)
-         ON CONFLICT(metric) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
-        p.metric,
+         ON CONFLICT(variable) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
+        p.variable,
         JSON.stringify(p.value),
         receivedAt
       );
@@ -79,27 +82,27 @@ export class DeviceDO extends DurableObject<Env> {
 
     for (const p of points) {
       this.sql.exec(
-        `INSERT INTO ring_buffer (ts, metric, value) VALUES (?, ?, ?)`,
+        `INSERT INTO ring_buffer (ts, variable, value) VALUES (?, ?, ?)`,
         receivedAt,
-        p.metric,
+        p.variable,
         JSON.stringify(p.value)
       );
     }
 
-    // Eviction is independent of the flush cursor (§5.1 copy-not-move).
+    // Eviction is independent of the flush cursor (copy-not-move).
     this.evictRingBuffer(receivedAt);
 
     // Ensure a flush is scheduled.
     await this.ensureAlarmScheduled();
 
     // Fire-and-forget notify to each subscribed Dashboard DO. Failures here
-    // never block ingest — the device already got its 204 (plan §6.1).
-    this.notifyDashboards(deviceId, points, receivedAt);
+    // never block ingest — the device already got its 204.
+    this.notifyDashboards(points, receivedAt);
 
     return { receivedAt, count: points.length };
   }
 
-  private notifyDashboards(deviceId: string, points: IngestPoint[], ts: number): void {
+  private notifyDashboards(points: IngestPoint[], ts: number): void {
     const subs = this.sql
       .exec<{ dashboard_id: string }>(`SELECT dashboard_id FROM subscriptions`)
       .toArray();
@@ -114,7 +117,7 @@ export class DeviceDO extends DurableObject<Env> {
               const stub = this.env.DASHBOARD_DO.get(
                 this.env.DASHBOARD_DO.idFromName(s.dashboard_id)
               ) as unknown as DashboardDO;
-              await stub.notify(deviceId, p.metric, p.value, ts);
+              await stub.notify(p.variable, p.value, ts);
             } catch {
               // Best-effort. A wedged Dashboard DO must not break telemetry.
             }
@@ -128,38 +131,38 @@ export class DeviceDO extends DurableObject<Env> {
 
   async getLatestState(): Promise<LatestStateRow[]> {
     const rows = this.sql
-      .exec<{ metric: string; value: string; received_at: number }>(
-        `SELECT metric, value, received_at FROM latest_state ORDER BY metric ASC`
+      .exec<{ variable: string; value: string; received_at: number }>(
+        `SELECT variable, value, received_at FROM latest_state ORDER BY variable ASC`
       )
       .toArray();
     return rows.map((r) => ({
-      metric: r.metric,
+      variable: r.variable,
       value: safeParse(r.value),
       received_at: r.received_at,
     }));
   }
 
-  async getSeries(metric: string | null, sinceTs: number | null): Promise<SeriesRow[]> {
+  async getSeries(variable: string | null, sinceTs: number | null): Promise<SeriesRow[]> {
     const cutoff = sinceTs ?? 0;
-    const rows = metric
+    const rows = variable
       ? this.sql
-          .exec<{ ts: number; metric: string; value: string }>(
-            `SELECT ts, metric, value FROM ring_buffer
-             WHERE metric = ? AND ts >= ?
+          .exec<{ ts: number; variable: string; value: string }>(
+            `SELECT ts, variable, value FROM ring_buffer
+             WHERE variable = ? AND ts >= ?
              ORDER BY ts ASC`,
-            metric,
+            variable,
             cutoff
           )
           .toArray()
       : this.sql
-          .exec<{ ts: number; metric: string; value: string }>(
-            `SELECT ts, metric, value FROM ring_buffer
+          .exec<{ ts: number; variable: string; value: string }>(
+            `SELECT ts, variable, value FROM ring_buffer
              WHERE ts >= ?
              ORDER BY ts ASC`,
             cutoff
           )
           .toArray();
-    return rows.map((r) => ({ ts: r.ts, metric: r.metric, value: safeParse(r.value) }));
+    return rows.map((r) => ({ ts: r.ts, variable: r.variable, value: safeParse(r.value) }));
   }
 
   // ---- RPC: subscriptions (Dashboard DO fan-in) -----------------------------
@@ -176,49 +179,60 @@ export class DeviceDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM subscriptions WHERE dashboard_id = ?`, dashboardId);
   }
 
-  // ---- RPC: commands ---------------------------------------------------------
+  // ---- RPC: control (cloud -> hardware writes) ------------------------------
 
-  async addCommand(id: string, name: string, value: unknown): Promise<void> {
+  async addControl(id: string, variable: string, value: unknown): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
     this.sql.exec(
-      `INSERT INTO pending_commands (id, name, value, created_at, delivered_at)
+      `INSERT INTO pending_control (id, variable, value, created_at, delivered_at)
        VALUES (?, ?, ?, ?, NULL)`,
       id,
-      name,
+      variable,
       JSON.stringify(value),
       now
     );
 
-    // Push to any connected device WS clients. If the device is offline the
-    // command stays in pending_commands and will be flushed on next connect.
-    const payload = JSON.stringify({ type: 'command', id, name, value });
+    // Push to any connected hardware WS clients. If offline, the write stays in
+    // pending_control and is flushed on next connect.
+    const payload = JSON.stringify({ type: 'control', id, variable, value });
     for (const ws of this.ctx.getWebSockets()) {
       try { ws.send(payload); } catch { /* dead socket; ignore */ }
     }
   }
 
-  async listPendingCommands(): Promise<Array<{ id: string; name: string; value: unknown }>> {
+  async listPendingControl(): Promise<Array<{ id: string; variable: string; value: unknown }>> {
     const rows = this.sql
-      .exec<{ id: string; name: string; value: string }>(
-        `SELECT id, name, value FROM pending_commands
+      .exec<{ id: string; variable: string; value: string }>(
+        `SELECT id, variable, value FROM pending_control
          WHERE delivered_at IS NULL
          ORDER BY created_at ASC`
       )
       .toArray();
-    return rows.map((r) => ({ id: r.id, name: r.name, value: safeParse(r.value) }));
+    return rows.map((r) => ({ id: r.id, variable: r.variable, value: safeParse(r.value) }));
   }
 
-  async ackCommands(ids: string[]): Promise<{ acked: number }> {
+  async ackControl(ids: string[]): Promise<{ acked: number }> {
     if (ids.length === 0) return { acked: 0 };
     const now = Math.floor(Date.now() / 1000);
     const placeholders = ids.map(() => '?').join(',');
     const cursor = this.sql.exec(
-      `UPDATE pending_commands SET delivered_at = ?
+      `UPDATE pending_control SET delivered_at = ?
         WHERE id IN (${placeholders}) AND delivered_at IS NULL`,
       now,
       ...ids
     );
     return { acked: cursor.rowsWritten };
+  }
+
+  // ---- RPC: variable deletion ------------------------------------------------
+
+  // Drops hot state for a single variable (called when an admin deletes the
+  // variable). Cold R2 history is partitioned by project+hour, not variable, so
+  // historical lines for this key are left in place (orphaned, harmless).
+  async deleteVariable(variable: string): Promise<void> {
+    this.sql.exec(`DELETE FROM latest_state WHERE variable = ?`, variable);
+    this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ?`, variable);
+    this.sql.exec(`DELETE FROM pending_control WHERE variable = ?`, variable);
   }
 
   // ---- RPC: dev/debug --------------------------------------------------------
@@ -227,10 +241,10 @@ export class DeviceDO extends DurableObject<Env> {
     return this.runFlush();
   }
 
-  // ---- HTTP entry: device WebSocket upgrade ---------------------------------
-  // The worker forwards GET /v1/devices/ws to us after Bearer-token auth.
-  // We accept the upgrade as a hibernated WS so an always-connected device
-  // costs ~zero compute when idle.
+  // ---- HTTP entry: hardware control WebSocket upgrade -----------------------
+  // The worker forwards GET /v1/control/ws to us after project-token auth.
+  // Accepted as a hibernated WS so an always-connected device costs ~zero
+  // compute when idle.
   override async fetch(request: Request): Promise<Response> {
     const upgrade = request.headers.get('upgrade');
     if (upgrade !== 'websocket') {
@@ -241,12 +255,12 @@ export class DeviceDO extends DurableObject<Env> {
     const server = pair[1] as WebSocket;
     this.ctx.acceptWebSocket(server);
 
-    // Flush any pending (undelivered) commands on connect so a device that
-    // missed messages while offline catches up immediately. The device will
-    // ack them via `{type:'ack', ids:[...]}` once processed.
+    // Flush any pending (undelivered) control writes on connect so a device
+    // that missed messages while offline catches up immediately. The device
+    // acks them via `{type:'ack', ids:[...]}` once processed.
     const pending = this.sql
-      .exec<{ id: string; name: string; value: string }>(
-        `SELECT id, name, value FROM pending_commands
+      .exec<{ id: string; variable: string; value: string }>(
+        `SELECT id, variable, value FROM pending_control
           WHERE delivered_at IS NULL
           ORDER BY created_at ASC`
       )
@@ -254,9 +268,9 @@ export class DeviceDO extends DurableObject<Env> {
     for (const cmd of pending) {
       try {
         server.send(JSON.stringify({
-          type: 'command',
+          type: 'control',
           id: cmd.id,
-          name: cmd.name,
+          variable: cmd.variable,
           value: safeParse(cmd.value),
         }));
       } catch { /* ignore */ }
@@ -272,14 +286,14 @@ export class DeviceDO extends DurableObject<Env> {
       const msg = JSON.parse(raw) as { type?: string; ids?: unknown };
       if (msg.type === 'ack' && Array.isArray(msg.ids)) {
         const ids = msg.ids.filter((x): x is string => typeof x === 'string');
-        if (ids.length > 0) await this.ackCommands(ids);
+        if (ids.length > 0) await this.ackControl(ids);
       }
     } catch { /* malformed frame — drop */ }
   }
 
   override async webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): Promise<void> {
-    // No per-connection state to clean up — commands stay in pending_commands
-    // and flush on the next connect.
+    // No per-connection state to clean up — control writes stay in
+    // pending_control and flush on the next connect.
   }
 
   override async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
@@ -288,17 +302,17 @@ export class DeviceDO extends DurableObject<Env> {
 
   // ---- RPC: destroy ----------------------------------------------------------
 
-  // Wipes ALL data owned by this device — DO SQLite + R2 telemetry history.
-  // Called by the admin DELETE handlers before the metadata row is removed.
+  // Wipes ALL data owned by this project — DO SQLite + R2 telemetry history.
+  // Called by the admin DELETE handler before the project metadata is removed.
   async destroy(): Promise<void> {
-    const deviceId = this.deviceId();
+    const projectId = this.projectId();
 
-    // Delete every R2 object under telemetry/{deviceId}/. Pagination handles
-    // long-lived devices with many hourly partitions.
+    // Delete every R2 object under telemetry/{projectId}/. Pagination handles
+    // long-lived projects with many hourly partitions.
     let cursor: string | undefined;
     do {
       const list = await this.env.R2.list({
-        prefix: `telemetry/${deviceId}/`,
+        prefix: `telemetry/${projectId}/`,
         ...(cursor ? { cursor } : {}),
       });
       if (list.objects.length > 0) {
@@ -307,7 +321,7 @@ export class DeviceDO extends DurableObject<Env> {
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
 
-    // Cancel any scheduled flush + wipe SQLite + KV storage entirely.
+    // Cancel any scheduled flush + wipe SQLite storage entirely.
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
   }
@@ -316,7 +330,7 @@ export class DeviceDO extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     const result = await this.runFlush();
-    // Only reschedule if there's still unflushed data — keeps idle devices cold.
+    // Only reschedule if there's still unflushed data — keeps idle projects cold.
     if (result.flushed > 0) {
       await this.ctx.storage.setAlarm(Date.now() + FLUSH_INTERVAL_MS);
     }
@@ -363,8 +377,8 @@ export class DeviceDO extends DurableObject<Env> {
   private async runFlush(): Promise<FlushResult> {
     const cursor = this.getFlushCursor();
     const rows = this.sql
-      .exec<{ rowid: number; ts: number; metric: string; value: string }>(
-        `SELECT rowid, ts, metric, value FROM ring_buffer WHERE rowid > ? ORDER BY rowid ASC`,
+      .exec<{ rowid: number; ts: number; variable: string; value: string }>(
+        `SELECT rowid, ts, variable, value FROM ring_buffer WHERE rowid > ? ORDER BY rowid ASC`,
         cursor
       )
       .toArray();
@@ -380,15 +394,15 @@ export class DeviceDO extends DurableObject<Env> {
       else byHour.set(bucket, [r]);
     }
 
-    const deviceId = this.deviceId();
+    const projectId = this.projectId();
     const keys: string[] = [];
 
     for (const [bucket, bucketRows] of byHour) {
       const lastRowid = bucketRows[bucketRows.length - 1]!.rowid;
-      const key = `telemetry/${deviceId}/${bucket}/r-${lastRowid.toString().padStart(12, '0')}.ndjson`;
+      const key = `telemetry/${projectId}/${bucket}/r-${lastRowid.toString().padStart(12, '0')}.ndjson`;
       const body = bucketRows
         .map((r) =>
-          JSON.stringify({ ts: r.ts, metric: r.metric, value: safeParse(r.value) })
+          JSON.stringify({ ts: r.ts, variable: r.variable, value: safeParse(r.value) })
         )
         .join('\n') + '\n';
 
@@ -402,31 +416,31 @@ export class DeviceDO extends DurableObject<Env> {
     const newCursor = rows[rows.length - 1]!.rowid;
     this.setFlushCursor(newCursor);
 
-    // Flush NEVER deletes ring_buffer rows. Eviction owns that (§5.1).
+    // Flush NEVER deletes ring_buffer rows. Eviction owns that.
     return { flushed: rows.length, keys, newCursor };
   }
 
   private initSchema(): void {
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS latest_state (
-        metric      TEXT PRIMARY KEY,
+        variable    TEXT PRIMARY KEY,
         value       TEXT NOT NULL,
         received_at INTEGER NOT NULL
       );
     `);
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS ring_buffer (
-        rowid  INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts     INTEGER NOT NULL,
-        metric TEXT NOT NULL,
-        value  TEXT NOT NULL
+        rowid    INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts       INTEGER NOT NULL,
+        variable TEXT NOT NULL,
+        value    TEXT NOT NULL
       );
     `);
     this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_ts ON ring_buffer(ts);`);
     this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS pending_commands (
+      CREATE TABLE IF NOT EXISTS pending_control (
         id           TEXT PRIMARY KEY,
-        name         TEXT NOT NULL,
+        variable     TEXT NOT NULL,
         value        TEXT NOT NULL,
         created_at   INTEGER NOT NULL,
         delivered_at INTEGER

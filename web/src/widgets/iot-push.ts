@@ -3,11 +3,11 @@
 // or any one-shot device command.
 //
 // Attributes:
-//   - data-title, data-device, data-command
-//   - data-value     payload sent with the command (empty string by default)
-//   - data-label     button face label (falls back to command name, then "Press")
+//   - data-title, data-variable
+//   - data-value     payload sent with the write (empty string by default)
+//   - data-label     button face label (falls back to "Press")
 // Event:
-//   - iot-command { device, name, value }  bubbles + composed
+//   - iot-command { variable, value }  bubbles + composed
 
 const TEMPLATE = `
   <style>
@@ -117,7 +117,7 @@ export class IotPushElement extends HTMLElement {
   #flashTimer: number | null = null;
 
   static get observedAttributes() {
-    return ['data-title', 'data-label', 'data-command'];
+    return ['data-title', 'data-label', 'data-variable'];
   }
 
   constructor() {
@@ -146,8 +146,7 @@ export class IotPushElement extends HTMLElement {
       bubbles: true,
       composed: true,
       detail: {
-        device: this.getAttribute('data-device') ?? '',
-        name: this.getAttribute('data-command') ?? '',
+        variable: this.getAttribute('data-variable') ?? '',
         value: this.getAttribute('data-value') ?? '',
       },
     }));

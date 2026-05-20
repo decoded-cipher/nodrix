@@ -7,7 +7,8 @@ import type { Env } from '../env';
 
 export type AuditTargetType =
   | 'project'
-  | 'device'
+  | 'variable'
+  | 'project_token'
   | 'dashboard'
   | 'token'
   | 'automation'

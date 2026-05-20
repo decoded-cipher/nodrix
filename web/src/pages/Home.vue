@@ -35,9 +35,9 @@ const stats = computed(() => [
     href: '/projects',
   },
   {
-    label: 'Devices',
-    value: project.devices.length,
-    href: ui.currentProject ? `/p/${ui.currentProject.id}/devices` : '/projects',
+    label: 'Variables',
+    value: project.variables.length,
+    href: ui.currentProject ? `/p/${ui.currentProject.id}/variables` : '/projects',
   },
   {
     label: 'Dashboards',
@@ -45,12 +45,12 @@ const stats = computed(() => [
     href: ui.currentProject ? `/p/${ui.currentProject.id}/dashboards` : '/projects',
   },
   {
-    label: 'Online now',
-    value: project.devices.filter((d) => {
-      if (!d.last_seen) return false;
-      return Date.now() / 1000 - d.last_seen < 60;
+    label: 'Active now',
+    value: project.variables.filter((v) => {
+      if (!v.last_seen) return false;
+      return Date.now() / 1000 - v.last_seen < 60;
     }).length,
-    href: ui.currentProject ? `/p/${ui.currentProject.id}/devices` : '/projects',
+    href: ui.currentProject ? `/p/${ui.currentProject.id}/variables` : '/projects',
   },
 ]);
 
@@ -58,8 +58,8 @@ const projectQuickLinks = computed(() => {
   if (!ui.currentProject) return [];
   const id = ui.currentProject.id;
   return [
-    { label: 'New dashboard', desc: 'Drag widgets to visualize device data', to: `/p/${id}/dashboards`, color: 'orange' },
-    { label: 'Add device', desc: 'Register a new device and get its token', to: `/p/${id}/devices`, color: 'sky' },
+    { label: 'New dashboard', desc: 'Drag widgets to visualize variable data', to: `/p/${id}/dashboards`, color: 'orange' },
+    { label: 'Add variable', desc: 'Declare a data point or get a connection token', to: `/p/${id}/variables`, color: 'sky' },
     { label: 'Create automation', desc: 'Trigger actions on schedule, state, or event', to: `/p/${id}/automations`, color: 'emerald' },
     { label: 'Add integration', desc: 'Webhooks, code blocks, Slack — reusable connectors', to: `/p/${id}/integrations`, color: 'violet' },
   ];

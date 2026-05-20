@@ -47,8 +47,8 @@ const crumbs = computed<Crumb[]>(() => {
         out.push({ label, to: edit ? `/p/${projId}/d/${dash}` : undefined });
         if (edit) out.push({ label: 'Edit' });
       }
-    } else if (path.includes('/devices')) {
-      out.push({ label: 'Devices' });
+    } else if (path.includes('/variables')) {
+      out.push({ label: 'Variables' });
     } else if (path.includes('/automations')) {
       out.push({ label: 'Automations' });
     } else if (path.includes('/integrations')) {

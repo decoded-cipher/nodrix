@@ -1,26 +1,25 @@
 // Builds a configured custom-element instance for a widget. Shared by view
 // and edit modes so layout JSON renders identically in both.
 //
-// Widget contract (plan §9): data in via property/attribute, intent out via
+// Widget contract: data in via property/attribute, intent out via
 // `iot-command` events. NEVER imports api.ts or ws.ts.
 
 import type { Layout, WidgetInstance } from '../types';
 
 export type DataIndex = {
-  // (device|metric) -> set of widget element instances that should receive updates
+  // variable -> set of widget element instances that should receive updates
   byKey: Map<string, Set<HTMLElement>>;
   // (widgetId) -> the series-key mapping (for chart appendPoint dispatch)
-  chartKeys: Map<string, Map<string, string>>; // widgetId -> (device|metric -> seriesKey)
+  chartKeys: Map<string, Map<string, string>>; // widgetId -> (variable -> seriesKey)
 };
 
 export function buildDataIndex(layout: Layout, els: Map<string, HTMLElement>): DataIndex {
   const byKey = new Map<string, Set<HTMLElement>>();
   const chartKeys = new Map<string, Map<string, string>>();
 
-  const addSub = (el: HTMLElement, device: string, metric: string) => {
-    const key = `${device}|${metric}`;
-    let set = byKey.get(key);
-    if (!set) { set = new Set(); byKey.set(key, set); }
+  const addSub = (el: HTMLElement, variable: string) => {
+    let set = byKey.get(variable);
+    if (!set) { set = new Set(); byKey.set(variable, set); }
     set.add(el);
   };
 
@@ -32,23 +31,19 @@ export function buildDataIndex(layout: Layout, els: Map<string, HTMLElement>): D
       const series = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
       const m = new Map<string, string>();
       for (const s of series) {
-        const device = String(s['device'] ?? '');
-        const metric = String(s['metric'] ?? '');
-        if (!device || !metric) continue;
-        const sk = seriesKey(device, metric);
-        m.set(`${device}|${metric}`, sk);
-        addSub(el, device, metric);
+        const variable = String(s['variable'] ?? '');
+        if (!variable) continue;
+        m.set(variable, seriesKey(variable));
+        addSub(el, variable);
       }
       chartKeys.set(item.id, m);
     } else if (item.type !== 'iot-push') {
-      // iot-push is fire-and-forget — no state to subscribe to.
-      // Everything else subscribes to (device, subscriptionMetric):
-      //   value / gauge → the explicit `metric` prop
-      //   toggle / slider → the `command` prop, so the device echoes state
-      //     under the same name it receives commands on.
-      const device = String(item.props['device'] ?? '');
-      const metric = subscriptionMetric(item);
-      if (device && metric) addSub(el, device, metric);
+      // iot-push is fire-and-forget — no state to subscribe to. Everything
+      // else subscribes to its single `variable` prop. Control widgets
+      // (toggle/slider) reflect the reported state of the same variable they
+      // write to.
+      const variable = subscriptionVariable(item);
+      if (variable) addSub(el, variable);
     }
   }
 
@@ -65,8 +60,7 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
   const p = item.props;
   if (typeof p['title'] === 'string') el.setAttribute('data-title', p['title']);
   if (typeof p['unit'] === 'string') el.setAttribute('data-unit', p['unit']);
-  if (typeof p['device'] === 'string') el.setAttribute('data-device', p['device']);
-  if (typeof p['command'] === 'string') el.setAttribute('data-command', p['command']);
+  if (typeof p['variable'] === 'string') el.setAttribute('data-variable', p['variable']);
   if (typeof p['min'] === 'number') el.setAttribute('data-min', String(p['min']));
   if (typeof p['max'] === 'number') el.setAttribute('data-max', String(p['max']));
   if (typeof p['step'] === 'number') el.setAttribute('data-step', String(p['step']));
@@ -81,24 +75,21 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
   if (item.type === 'iot-chart') {
     const series = (p['series'] as Array<Record<string, unknown>> | undefined) ?? [];
     (el as HTMLElement & { series?: unknown }).series = series.map((s) => ({
-      key: seriesKey(String(s['device'] ?? ''), String(s['metric'] ?? '')),
-      label: typeof s['label'] === 'string' ? s['label'] : `${String(s['device'])}.${String(s['metric'])}`,
+      key: seriesKey(String(s['variable'] ?? '')),
+      label: typeof s['label'] === 'string' ? s['label'] : String(s['variable'] ?? ''),
       color: typeof s['color'] === 'string' ? s['color'] : undefined,
       points: [],
     }));
   }
 }
 
-export function seriesKey(device: string, metric: string): string {
-  return `${device}|${metric}`;
+export function seriesKey(variable: string): string {
+  return variable;
 }
 
-// Which metric name a widget subscribes to for state. Control widgets
-// (toggle/slider) reuse their `command` name so the device can echo state
-// under the same name it receives commands on — no separate field needed.
-export function subscriptionMetric(item: WidgetInstance): string {
-  if (item.type === 'iot-toggle' || item.type === 'iot-slider') {
-    return String(item.props['command'] ?? '');
-  }
-  return String(item.props['metric'] ?? '');
+// Which variable a widget subscribes to for state. All widgets use a single
+// `variable` prop; control widgets (toggle/slider) reflect the reported state
+// of the same variable they write to.
+export function subscriptionVariable(item: WidgetInstance): string {
+  return String(item.props['variable'] ?? '');
 }

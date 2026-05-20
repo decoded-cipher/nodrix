@@ -22,17 +22,25 @@ export type Project = {
   archived_at?: number | null;
 };
 
-export type Device = {
+export type Variable = {
   id: string;
-  name: string;
+  key: string;
+  name?: string | null;
+  unit?: string | null;
   created_at: number;
+  updated_at: number;
   last_seen: number | null;
-  description?: string | null;
-  updated_at?: number;
-  archived_at?: number | null;
 };
 
-export type DeviceWithToken = Device & { token: string };
+export type ProjectToken = {
+  id: string;
+  name?: string | null;
+  created_at: number;
+  last_used_at: number | null;
+  revoked_at: number | null;
+};
+
+export type ProjectTokenWithSecret = ProjectToken & { token: string };
 
 export type UserToken = {
   id: string;
@@ -141,19 +149,13 @@ export type SnapshotMsg = {
   type: 'snapshot';
   dashboard: string;
   layout: Layout;
-  devices: Record<
-    string,
-    {
-      state: Record<string, { value: unknown; received_at: number }>;
-      series: Array<{ ts: number; metric: string; value: unknown }>;
-    }
-  >;
+  variables: Record<string, { value: unknown; received_at: number }>;
+  series: Array<{ ts: number; variable: string; value: unknown }>;
 };
 
 export type UpdateMsg = {
   type: 'update';
-  device: string;
-  metric: string;
+  variable: string;
   value: unknown;
   ts: number;
 };
@@ -165,9 +167,8 @@ export type WsServerMsg =
   | { type: 'ack'; req: string; ok: boolean; reason?: string };
 
 export type WsClientMsg = {
-  type: 'command';
+  type: 'control';
   req?: string;
-  device: string;
-  name: string;
+  variable: string;
   value?: unknown;
 };

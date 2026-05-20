@@ -2,7 +2,7 @@
 
 ![status](https://img.shields.io/badge/status-alpha-red) ![not production ready](https://img.shields.io/badge/not_production_ready-do_not_deploy-red)
 
-**The IoT platform Cloudflare didn't build.** Devices POST telemetry over HTTPS, poll for commands, and stream realtime data to a drag-and-drop dashboard — all running in your own Cloudflare account on Workers, D1, R2, and Durable Objects.
+**The IoT platform Cloudflare didn't build.** Hardware POSTs telemetry over HTTPS to a project's variables, polls for control writes, and streams realtime data to a drag-and-drop dashboard — all running in your own Cloudflare account on Workers, D1, R2, and Durable Objects.
 
 > [!CAUTION]
 > ## 🚧 Early development — do not deploy 🚧
@@ -22,17 +22,17 @@
 
 ## ✨ Features
 
-- 📡 **HTTPS telemetry ingress** — devices POST JSON; no MQTT broker to operate.
+- 📡 **HTTPS telemetry ingress** — hardware POSTs JSON to a project's variables (auto-created on first sight); no MQTT broker to operate.
 - 📊 **Realtime dashboards** — drag-and-drop widget grid streams updates over hibernating WebSockets.
-- 🎮 **Commands** — server-issued commands round-trip via short device polls.
+- 🎮 **Control** — dashboard widgets write variable values that hardware picks up via short polls.
 - 🤖 **Automations** — trigger webhooks, code snippets, or service integrations on telemetry events.
-- 🗂️ **Multi-project** — group devices, dashboards, and members by project.
+- 🗂️ **Multi-project** — group variables, dashboards, and members by project.
 - 🔑 **Auth** — email + password out of the box; optional Google / GitHub OAuth toggled at runtime.
 - 📝 **Audit log** — every privileged action recorded and paginated in the UI.
 
 ## 🏗️ Architecture
 
-- **Worker** ([worker/](worker/)) — single Hono app, two Durable Object classes (Device, Dashboard), one Workflow (provisioning), D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
+- **Worker** ([worker/](worker/)) — single Hono app, two Durable Object classes (Project, Dashboard), one Workflow (provisioning), D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
 - **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder. Built and served as Worker static assets.
 - **Promo site** ([promo/](promo/)) — Astro static site. Deploys independently to Cloudflare Pages.
 
@@ -40,11 +40,11 @@
 
 | Store | Holds |
 |---|---|
-| Device DO (SQLite) | Latest state, recent ring buffer, pending commands, flush cursor |
-| R2 | Cold telemetry history (NDJSON, partitioned by device + hour) |
-| D1 | Users, sessions, accounts, projects, devices, dashboards, tokens, automations, integrations, audit log, OAuth provider config (metadata only — never any telemetry point) |
+| Project DO (SQLite) | Latest variable state, recent ring buffer, pending control writes, flush cursor |
+| R2 | Cold telemetry history (NDJSON, partitioned by project + hour) |
+| D1 | Users, sessions, accounts, projects, variables, dashboards, tokens, automations, integrations, audit log, OAuth provider config (metadata only — never any telemetry point) |
 | KV | Cached `/state` responses |
-| Dashboard DO | Per-dashboard subscription set + hibernated WebSockets |
+| Dashboard DO | Per-dashboard subscription + hibernated WebSockets |
 
 ## 🔐 Authentication
 

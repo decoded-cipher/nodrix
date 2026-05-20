@@ -5,7 +5,7 @@ import { ensureMigrated } from './db/auto-migrate';
 import { recordAudit } from './lib/audit';
 import me from './admin/me';
 import projects from './admin/projects';
-import devices from './admin/devices';
+import variables from './admin/variables';
 import tokens from './admin/tokens';
 import dashboards from './admin/dashboards';
 import automations from './admin/automations';
@@ -15,14 +15,14 @@ import authProviders, { publicAuthProviders } from './admin/auth-providers';
 import versionInfo from './admin/version';
 import sessionsRouter from './admin/sessions';
 import telemetry from './device/telemetry';
-import commands from './device/commands';
+import control from './device/control';
 import readState from './read/state';
 import readSeries from './read/series';
 import readList from './read/list';
 import ws from './dashboard/ws';
 import { sha256Hex } from './lib/ids';
 
-export { DeviceDO } from './do/device-do';
+export { ProjectDO } from './do/project-do';
 export { DashboardDO } from './do/dashboard-do';
 export { Provision } from './workflows/provision';
 
@@ -130,21 +130,21 @@ app.route('/v1/admin/sessions', sessionsRouter);
 app.route('/v1/admin/auth-providers', authProviders);
 app.route('/v1/admin/version', versionInfo);
 app.route('/v1/admin/projects', projects);
-app.route('/v1/admin/projects/:proj/devices', devices);
+app.route('/v1/admin/projects/:proj/variables', variables);
 app.route('/v1/admin/projects/:proj/dashboards', dashboards);
 app.route('/v1/admin/projects/:proj/automations', automations);
 app.route('/v1/admin/projects/:proj/integrations', integrations);
 app.route('/v1/admin/tokens', tokens);
 app.route('/v1/admin/audit-log', auditLog);
 
-// Device-facing (Bearer token auth, see the route modules):
+// Hardware-facing (Bearer project-token auth, see the route modules):
 app.route('/v1/telemetry', telemetry);
-app.route('/v1/commands', commands);
+app.route('/v1/control', control);
 
-// Device WebSocket: hibernated push channel for commands. Bearer token may
-// arrive in Authorization OR ?token=... (WS clients can't set headers on the
-// upgrade request). Routed to the Device DO which owns the WS connection.
-app.get('/v1/devices/ws', async (c) => {
+// Control WebSocket: hibernated push channel for cloud->hardware variable
+// writes. Bearer token may arrive in Authorization OR ?token=... (WS clients
+// can't set headers on the upgrade request). Routed to the Project DO.
+app.get('/v1/control/ws', async (c) => {
   const headerToken = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim();
   const queryToken = c.req.query('token');
   const token = headerToken || queryToken;
@@ -157,32 +157,31 @@ app.get('/v1/devices/ws', async (c) => {
   const hash = await sha256Hex(token);
   const row = await c.env.DB
     .prepare(
-      `SELECT t.id AS token_id, d.id AS device_id
-         FROM device_tokens t
-         JOIN devices d ON d.id = t.device_id
-        WHERE t.hash = ? AND t.revoked_at IS NULL`
+      `SELECT id AS token_id, project_id
+         FROM project_tokens
+        WHERE hash = ? AND revoked_at IS NULL`
     )
     .bind(hash)
-    .first<{ token_id: string; device_id: string }>();
+    .first<{ token_id: string; project_id: string }>();
   if (!row) return c.text('unauthorized', 401);
 
   c.executionCtx.waitUntil(
     c.env.DB
-      .prepare(`UPDATE device_tokens SET last_used_at = ? WHERE id = ?`)
+      .prepare(`UPDATE project_tokens SET last_used_at = ? WHERE id = ?`)
       .bind(Math.floor(Date.now() / 1000), row.token_id)
       .run()
       .then(() => undefined)
       .catch(() => undefined)
   );
 
-  const stub = c.env.DEVICE_DO.get(c.env.DEVICE_DO.idFromName(row.device_id));
+  const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(row.project_id));
   return stub.fetch(c.req.raw);
 });
 
 // Public read API (user/API token auth):
-app.route('/v1/projects/:proj/devices', readList);
-app.route('/v1/projects/:proj/devices/:id/state', readState);
-app.route('/v1/projects/:proj/devices/:id/series', readSeries);
+app.route('/v1/projects/:proj/variables', readList);
+app.route('/v1/projects/:proj/state', readState);
+app.route('/v1/projects/:proj/variables/:key/series', readSeries);
 
 // WebSocket: dashboard live feed (session auth).
 app.route('/ws', ws);
