@@ -227,6 +227,18 @@ export const useProjectStore = defineStore('project', () => {
     automations.value = automations.value.filter((a) => a.id !== id);
   }
 
+  async function runAutomation(
+    id: string
+  ): Promise<{ status: 'ok' | 'error' | 'skipped'; error?: string; actionsRun: number }> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const res = await api.post<{
+      result: { status: 'ok' | 'error' | 'skipped'; error?: string; actionsRun: number };
+      automation: Automation;
+    }>(`/v1/admin/projects/${currentProjectId.value}/automations/${id}/run`);
+    automations.value = automations.value.map((x) => (x.id === id ? res.automation : x));
+    return res.result;
+  }
+
   // ─── Integrations ───────────────────────────────────────────────────────────
 
   async function loadIntegrations(): Promise<void> {
@@ -299,6 +311,7 @@ export const useProjectStore = defineStore('project', () => {
     createAutomation,
     updateAutomation,
     deleteAutomation,
+    runAutomation,
     loadIntegrations,
     createIntegration,
     updateIntegration,

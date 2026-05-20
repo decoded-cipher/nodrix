@@ -15,6 +15,10 @@ export interface Env {
   PROJECT_DO: DurableObjectNamespace;
   DASHBOARD_DO: DurableObjectNamespace;
   PROVISION: Workflow;
+  // Scheduler workflow: sleeps until the next schedule/sunset automation fire
+  // time (waking early on a 'reschedule' event when automations change). Replaces
+  // the every-minute cron poll.
+  SCHEDULER: Workflow;
 
   // Legacy: the signing secret is now auto-generated on first boot and
   // stored in deployment_settings (see lib/auth-secret.ts). Still honored

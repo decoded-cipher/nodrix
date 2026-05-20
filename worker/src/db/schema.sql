@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS automations (
   description     TEXT,
   enabled         INTEGER NOT NULL DEFAULT 1,                  -- 0/1
   trigger_type    TEXT NOT NULL CHECK (trigger_type IN
-                    ('schedule','device_state','sunset_sunrise','event','scene')),
+                    ('variable','scene','schedule','sunset_sunrise','event')),
   trigger_config  TEXT NOT NULL,                               -- JSON
   actions         TEXT NOT NULL,                               -- JSON ordered list
   created_by      TEXT REFERENCES users(id),

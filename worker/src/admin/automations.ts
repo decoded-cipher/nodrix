@@ -4,13 +4,22 @@ import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
+import { runAutomation } from '../engine/run';
+import type { AutomationContext } from '../engine/types';
+import { pokeScheduler, ensureScheduler } from '../workflows/scheduler';
 
 const automations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
+
+// schedule + sunset/sunrise automations are driven by the SchedulerWorkflow;
+// changes to them poke the scheduler to recompute its next fire time.
+function isScheduled(triggerType: string | undefined): boolean {
+  return triggerType === 'schedule' || triggerType === 'sunset_sunrise';
+}
 
 automations.use('*', requireSession);
 automations.use('*', resolveProject);
 
-const TRIGGER_TYPES = ['schedule', 'device_state', 'sunset_sunrise', 'event', 'scene'] as const;
+const TRIGGER_TYPES = ['variable', 'scene', 'schedule', 'sunset_sunrise', 'event'] as const;
 type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 type AutomationRow = {
@@ -51,6 +60,19 @@ function safeParse(s: string): unknown {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+// Best-effort: tell the Project DO to drop its cached automation list so the
+// next telemetry ingest re-reads variable triggers from D1 immediately.
+async function invalidateProjectDO(env: Env, projectId: string): Promise<void> {
+  try {
+    const stub = env.PROJECT_DO.get(env.PROJECT_DO.idFromName(projectId)) as unknown as {
+      invalidateAutomations(): Promise<void>;
+    };
+    await stub.invalidateAutomations();
+  } catch (e) {
+    console.error('invalidate automations cache failed', projectId, e);
+  }
+}
+
 // GET /v1/admin/projects/:proj/automations
 automations.get('/', async (c) => {
   const project = c.get('project');
@@ -65,6 +87,12 @@ automations.get('/', async (c) => {
     )
     .bind(project.id)
     .all<AutomationRow>();
+
+  // Lazily self-heal the scheduler if this project has scheduled automations.
+  if (rows.results.some((r) => isScheduled(r.trigger_type) && r.enabled === 1)) {
+    c.executionCtx.waitUntil(ensureScheduler(c.env));
+  }
+
   return c.json({ automations: rows.results.map(shape) });
 });
 
@@ -125,12 +153,42 @@ automations.post('/', async (c) => {
       metadata: { name, trigger_type: body.trigger_type },
     })
   );
+  c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
+  if (isScheduled(body.trigger_type)) c.executionCtx.waitUntil(pokeScheduler(c.env));
 
   const row = await c.env.DB
     .prepare(`SELECT * FROM automations WHERE id = ?`)
     .bind(id)
     .first<AutomationRow>();
   return c.json(shape(row!), 201);
+});
+
+// POST /v1/admin/projects/:proj/automations/:id/run
+// Manual run — drives "scene" automations and doubles as a test harness for any
+// automation. Runs synchronously so the UI gets the outcome.
+automations.post('/:id/run', async (c) => {
+  const project = c.get('project');
+  const id = c.req.param('id');
+
+  const row = await c.env.DB
+    .prepare(`SELECT * FROM automations WHERE id = ? AND project_id = ?`)
+    .bind(id, project.id)
+    .first<AutomationRow>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  const ctx: AutomationContext = {
+    source: 'manual',
+    projectId: project.id,
+    ts: Math.floor(Date.now() / 1000),
+    depth: 0,
+  };
+  const result = await runAutomation(c.env, row, ctx);
+
+  const updated = await c.env.DB
+    .prepare(`SELECT * FROM automations WHERE id = ?`)
+    .bind(id)
+    .first<AutomationRow>();
+  return c.json({ result, automation: shape(updated!) });
 });
 
 // PATCH /v1/admin/projects/:proj/automations/:id
@@ -147,9 +205,9 @@ automations.patch('/:id', async (c) => {
   }>();
 
   const existing = await c.env.DB
-    .prepare(`SELECT id FROM automations WHERE id = ? AND project_id = ?`)
+    .prepare(`SELECT id, trigger_type FROM automations WHERE id = ? AND project_id = ?`)
     .bind(id, project.id)
-    .first<{ id: string }>();
+    .first<{ id: string; trigger_type: string }>();
   if (!existing) return c.json({ error: 'not_found' }, 404);
 
   const sets: string[] = [];
@@ -191,6 +249,8 @@ automations.patch('/:id', async (c) => {
       targetId: id,
     })
   );
+  c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
+  if (isScheduled(existing.trigger_type)) c.executionCtx.waitUntil(pokeScheduler(c.env));
 
   const row = await c.env.DB
     .prepare(`SELECT * FROM automations WHERE id = ?`)
@@ -204,6 +264,11 @@ automations.delete('/:id', async (c) => {
   const project = c.get('project');
   const user = c.get('user');
   const id = c.req.param('id');
+
+  const existing = await c.env.DB
+    .prepare(`SELECT trigger_type FROM automations WHERE id = ? AND project_id = ?`)
+    .bind(id, project.id)
+    .first<{ trigger_type: string }>();
 
   const res = await c.env.DB
     .prepare(`DELETE FROM automations WHERE id = ? AND project_id = ?`)
@@ -220,6 +285,8 @@ automations.delete('/:id', async (c) => {
       targetId: id,
     })
   );
+  c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
+  if (isScheduled(existing?.trigger_type)) c.executionCtx.waitUntil(pokeScheduler(c.env));
   return c.body(null, 204);
 });
 

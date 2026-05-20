@@ -144,7 +144,7 @@ const STATEMENTS = [
     description     TEXT,
     enabled         INTEGER NOT NULL DEFAULT 1,
     trigger_type    TEXT NOT NULL CHECK (trigger_type IN
-                      ('schedule','device_state','sunset_sunrise','event','scene')),
+                      ('variable','scene','schedule','sunset_sunrise','event')),
     trigger_config  TEXT NOT NULL,
     actions         TEXT NOT NULL,
     created_by      TEXT REFERENCES users(id),

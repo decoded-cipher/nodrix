@@ -16,6 +16,7 @@ import versionInfo from './admin/version';
 import sessionsRouter from './admin/sessions';
 import telemetry from './device/telemetry';
 import control from './device/control';
+import events from './device/events';
 import readState from './read/state';
 import readSeries from './read/series';
 import readList from './read/list';
@@ -25,6 +26,7 @@ import { sha256Hex } from './lib/ids';
 export { ProjectDO } from './do/project-do';
 export { DashboardDO } from './do/dashboard-do';
 export { Provision } from './workflows/provision';
+export { SchedulerWorkflow } from './workflows/scheduler';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -140,6 +142,7 @@ app.route('/v1/admin/audit-log', auditLog);
 // Hardware-facing (Bearer project-token auth, see the route modules):
 app.route('/v1/telemetry', telemetry);
 app.route('/v1/control', control);
+app.route('/v1/events', events);
 
 // Control WebSocket: hibernated push channel for cloud->hardware variable
 // writes. Bearer token may arrive in Authorization OR ?token=... (WS clients

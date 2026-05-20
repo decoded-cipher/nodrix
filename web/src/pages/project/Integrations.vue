@@ -26,11 +26,22 @@ const KIND_LABEL: Record<IntegrationKind, string> = {
   http_service: 'HTTP service',
 };
 
+// Which kinds the runtime actually executes today. The rest are creatable but
+// skipped by the engine until their executors land.
+const EXECUTABLE: Record<IntegrationKind, boolean> = {
+  webhook: true,
+  slack: true,
+  http_service: true,
+  code_block: false,
+  email: false,
+  mqtt: false,
+};
+
 const SERVICE_KINDS: { kind: IntegrationKind; desc: string }[] = [
-  { kind: 'slack',        desc: 'Post to a channel' },
-  { kind: 'email',        desc: 'Send a templated email' },
-  { kind: 'mqtt',         desc: 'Publish to a broker' },
-  { kind: 'http_service', desc: 'Generic outbound HTTP service' },
+  { kind: 'slack',        desc: 'Post to a channel via an incoming webhook' },
+  { kind: 'http_service', desc: 'Generic outbound HTTP request' },
+  { kind: 'email',        desc: 'Send a templated email (not yet executed)' },
+  { kind: 'mqtt',         desc: 'Publish to a broker (not yet executed)' },
 ];
 
 const tabs: { key: TabKey; label: string }[] = [
@@ -47,8 +58,14 @@ const showForm = ref(false);
 const formKind = ref<IntegrationKind>('webhook');
 const formName = ref('');
 const formWebhookUrl = ref('');
+const formSlackUrl = ref('');
+const formSlackTemplate = ref('');
+const formHttpUrl = ref('');
+const formHttpMethod = ref('POST');
+const formHttpHeaders = ref('');
 const formCode = ref('export default function (event) {\n  return event;\n}\n');
 const formServiceConfig = ref('{}');
+const slackPlaceholder = '{{variable}} is now {{value}}';
 const submitting = ref(false);
 const formError = ref<string | null>(null);
 
@@ -67,10 +84,13 @@ function openCreate(kind: IntegrationKind) {
   formKind.value = kind;
   formName.value = '';
   formWebhookUrl.value = '';
+  formSlackUrl.value = '';
+  formSlackTemplate.value = '';
+  formHttpUrl.value = '';
+  formHttpMethod.value = 'POST';
+  formHttpHeaders.value = '';
+  formServiceConfig.value = '{}';
   formError.value = null;
-  if (kind === 'http_service' || kind === 'slack' || kind === 'email' || kind === 'mqtt') {
-    formServiceConfig.value = '{}';
-  }
   showForm.value = true;
 }
 
@@ -84,13 +104,27 @@ async function submit() {
   if (!name) return;
   formError.value = null;
   let config: unknown = {};
-  if (formKind.value === 'webhook') {
+  const kind = formKind.value;
+  if (kind === 'webhook') {
     const url = formWebhookUrl.value.trim();
     if (!url) { formError.value = 'URL is required.'; return; }
     config = { url };
-  } else if (formKind.value === 'code_block') {
+  } else if (kind === 'slack') {
+    const url = formSlackUrl.value.trim();
+    if (!url) { formError.value = 'Slack webhook URL is required.'; return; }
+    config = { webhook_url: url, ...(formSlackTemplate.value.trim() ? { template: formSlackTemplate.value } : {}) };
+  } else if (kind === 'http_service') {
+    const url = formHttpUrl.value.trim();
+    if (!url) { formError.value = 'URL is required.'; return; }
+    let headers: Record<string, string> = {};
+    if (formHttpHeaders.value.trim()) {
+      try { headers = JSON.parse(formHttpHeaders.value); } catch { formError.value = 'Headers must be valid JSON.'; return; }
+    }
+    config = { url, method: formHttpMethod.value, ...(Object.keys(headers).length ? { headers } : {}) };
+  } else if (kind === 'code_block') {
     config = { language: 'javascript', source: formCode.value };
   } else {
+    // email / mqtt — raw JSON until their executors land.
     try {
       config = JSON.parse(formServiceConfig.value || '{}');
     } catch {
@@ -191,6 +225,7 @@ async function copyUrl(i: Integration) {
         />
       </label>
 
+      <!-- webhook -->
       <label v-if="formKind === 'webhook'" class="mt-3 block">
         <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Target URL</span>
         <input
@@ -200,8 +235,62 @@ async function copyUrl(i: Integration) {
           placeholder="https://hooks.example.com/…"
           class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
         />
+        <span class="mt-1 block text-[11px] text-neutral-500 dark:text-neutral-400">Receives a JSON POST with the trigger context (source, variable, value, …).</span>
       </label>
 
+      <!-- slack -->
+      <div v-else-if="formKind === 'slack'" class="mt-3 space-y-3">
+        <label class="block">
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Slack incoming webhook URL</span>
+          <input
+            v-model="formSlackUrl"
+            type="url"
+            required
+            placeholder="https://hooks.slack.com/services/…"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          />
+        </label>
+        <label class="block">
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Message template (optional)</span>
+          <input
+            v-model="formSlackTemplate"
+            type="text"
+            :placeholder="slackPlaceholder"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          />
+          <span class="mt-1 block text-[11px] text-neutral-500 dark:text-neutral-400">Use <code v-pre>{{variable}}</code>, <code v-pre>{{value}}</code>, <code v-pre>{{event}}</code>. Defaults to an auto message.</span>
+        </label>
+      </div>
+
+      <!-- http_service -->
+      <div v-else-if="formKind === 'http_service'" class="mt-3 space-y-3">
+        <div class="flex gap-2">
+          <select
+            v-model="formHttpMethod"
+            class="rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          >
+            <option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+          </select>
+          <input
+            v-model="formHttpUrl"
+            type="url"
+            required
+            placeholder="https://api.example.com/…"
+            class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          />
+        </div>
+        <label class="block">
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Headers (JSON, optional)</span>
+          <textarea
+            v-model="formHttpHeaders"
+            rows="3"
+            placeholder='{ "authorization": "Bearer …" }'
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          />
+        </label>
+      </div>
+
+      <!-- code_block (not yet executed) -->
       <label v-else-if="formKind === 'code_block'" class="mt-3 block">
         <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Source (JavaScript)</span>
         <textarea
@@ -209,8 +298,10 @@ async function copyUrl(i: Integration) {
           rows="8"
           class="mt-1 w-full rounded-md border border-neutral-300 bg-neutral-950 px-3 py-2 font-mono text-xs text-neutral-100 dark:border-neutral-700"
         />
+        <span class="mt-1 block text-[11px] text-amber-600 dark:text-amber-400">Code blocks are not executed yet — saved for when the sandbox runtime lands.</span>
       </label>
 
+      <!-- email / mqtt (not yet executed) -->
       <label v-else class="mt-3 block">
         <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Config (JSON)</span>
         <textarea
@@ -218,6 +309,7 @@ async function copyUrl(i: Integration) {
           rows="6"
           class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
         />
+        <span class="mt-1 block text-[11px] text-amber-600 dark:text-amber-400">{{ KIND_LABEL[formKind] }} is not executed yet — saved for when its connector lands.</span>
       </label>
 
       <p v-if="formError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ formError }}</p>
@@ -320,7 +412,10 @@ async function copyUrl(i: Integration) {
       <ul v-if="byTab.code.length > 0" class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <li v-for="i in byTab.code" :key="i.id" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
           <div class="min-w-0 flex-1">
-            <div class="truncate font-medium">{{ i.name }}</div>
+            <div class="flex items-center gap-2">
+              <span class="truncate font-medium">{{ i.name }}</span>
+              <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">preview</span>
+            </div>
             <div class="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ i.id }}</div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
@@ -359,6 +454,11 @@ async function copyUrl(i: Integration) {
               <span class="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                 {{ KIND_LABEL[i.kind] }}
               </span>
+              <span
+                v-if="!EXECUTABLE[i.kind]"
+                class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                title="Saved but not executed by the runtime yet"
+              >preview</span>
               <span
                 v-if="!i.enabled"
                 class="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"

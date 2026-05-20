@@ -124,5 +124,14 @@ export const MIGRATIONS: Migration[] = [
       "CREATE TABLE IF NOT EXISTS project_tokens (\n  id           TEXT PRIMARY KEY,\n  project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name         TEXT,\n  hash         TEXT NOT NULL UNIQUE,    \n  created_by   TEXT REFERENCES users(id),\n  created_at   INTEGER NOT NULL,\n  last_used_at INTEGER,\n  revoked_at   INTEGER\n)",
       "CREATE INDEX IF NOT EXISTS idx_project_tokens_project ON project_tokens(project_id)"
     ]
+  },
+  {
+    "name": "0008_automation_triggers",
+    "statements": [
+      "DROP TABLE IF EXISTS automations",
+      "CREATE TABLE IF NOT EXISTS automations (\n  id              TEXT PRIMARY KEY,\n  project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name            TEXT NOT NULL,\n  description     TEXT,\n  enabled         INTEGER NOT NULL DEFAULT 1,                  \n  trigger_type    TEXT NOT NULL CHECK (trigger_type IN\n                    ('variable','scene','schedule','sunset_sunrise','event')),\n  trigger_config  TEXT NOT NULL,                               \n  actions         TEXT NOT NULL,                               \n  created_by      TEXT REFERENCES users(id),\n  created_at      INTEGER NOT NULL,\n  updated_at      INTEGER NOT NULL,\n  last_run_at     INTEGER,\n  last_run_status TEXT CHECK (last_run_status IN ('ok','error','skipped')),\n  last_error      TEXT\n)",
+      "CREATE INDEX IF NOT EXISTS idx_automations_project ON automations(project_id)",
+      "CREATE INDEX IF NOT EXISTS idx_automations_enabled ON automations(enabled) WHERE enabled = 1"
+    ]
   }
 ];

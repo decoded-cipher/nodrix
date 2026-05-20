@@ -1,6 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import type { DashboardDO } from './dashboard-do';
+import { newId } from '../lib/ids';
+import { runAutomation } from '../engine/run';
+import { matchVariableCondition } from '../engine/triggers';
+import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '../engine/types';
 
 // Project Durable Object. One per project id. SQLite-backed.
 // Holds latest variable state + recent ring buffer + pending control writes +
@@ -12,6 +16,9 @@ const RING_BUFFER_MAX_ROWS = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
 const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
+// Variable-trigger automations are cached in DO SQLite so high-rate telemetry
+// doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
+const AUTO_CACHE_TTL_MS = 30_000;
 
 export type IngestPoint = {
   variable: string;
@@ -69,6 +76,17 @@ export class ProjectDO extends DurableObject<Env> {
       projectId
     );
 
+    // Snapshot prior values BEFORE the upsert so edge-triggered automations can
+    // see the false->true transition.
+    const prev = new Map<string, unknown>();
+    for (const p of points) {
+      if (prev.has(p.variable)) continue;
+      const row = this.sql
+        .exec<{ value: string }>(`SELECT value FROM latest_state WHERE variable = ?`, p.variable)
+        .toArray()[0];
+      prev.set(p.variable, row ? safeParse(row.value) : undefined);
+    }
+
     for (const p of points) {
       this.sql.exec(
         `INSERT INTO latest_state (variable, value, received_at)
@@ -99,7 +117,99 @@ export class ProjectDO extends DurableObject<Env> {
     // never block ingest — the device already got its 204.
     this.notifyDashboards(points, receivedAt);
 
+    // Fire-and-forget variable-trigger evaluation. Never blocks ingest.
+    this.evaluateVariableTriggers(projectId, points, prev, receivedAt);
+
     return { receivedAt, count: points.length };
+  }
+
+  // ---- automations: variable triggers ----------------------------------------
+
+  private evaluateVariableTriggers(
+    projectId: string,
+    points: IngestPoint[],
+    prev: Map<string, unknown>,
+    ts: number
+  ): void {
+    this.ctx.waitUntil(
+      (async () => {
+        try {
+          const autos = await this.getVariableAutomations(projectId);
+          if (autos.length === 0) return;
+
+          const setVariable = (variable: string, value: unknown): Promise<void> =>
+            this.addControl(newId('control'), variable, value);
+
+          for (const a of autos) {
+            let cfg: VariableTriggerConfig;
+            try { cfg = JSON.parse(a.trigger_config); } catch { continue; }
+
+            const point = points.find((p) => p.variable === cfg.variable);
+            if (!point) continue;
+            if (!matchVariableCondition(cfg, point.value, prev.get(cfg.variable))) continue;
+
+            const ctx: AutomationContext = {
+              source: 'variable',
+              projectId,
+              ts,
+              variable: cfg.variable,
+              value: point.value,
+              depth: 0,
+            };
+            await runAutomation(this.env, a, ctx, { setVariable });
+          }
+        } catch (e) {
+          console.error('variable-trigger eval failed', e);
+        }
+      })()
+    );
+  }
+
+  // Cached list of enabled variable-trigger automations, refreshed from D1 on a
+  // short TTL (or eagerly via invalidateAutomations()).
+  private async getVariableAutomations(projectId: string): Promise<AutomationRow[]> {
+    const now = Date.now();
+    const atRow = this.sql
+      .exec<{ v: string }>(`SELECT v FROM auto_cache WHERE k = 'cached_at'`)
+      .toArray()[0];
+    const cachedAt = atRow ? Number(atRow.v) : 0;
+
+    if (now - cachedAt < AUTO_CACHE_TTL_MS) {
+      const row = this.sql
+        .exec<{ v: string }>(`SELECT v FROM auto_cache WHERE k = 'automations'`)
+        .toArray()[0];
+      if (row) {
+        try { return JSON.parse(row.v) as AutomationRow[]; } catch { /* refetch below */ }
+      }
+    }
+
+    const res = await this.env.DB
+      .prepare(
+        `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
+           FROM automations
+          WHERE project_id = ? AND enabled = 1 AND trigger_type = 'variable'`
+      )
+      .bind(projectId)
+      .all<AutomationRow>();
+    const list = res.results;
+
+    this.sql.exec(
+      `INSERT INTO auto_cache (k, v) VALUES ('automations', ?)
+       ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
+      JSON.stringify(list)
+    );
+    this.sql.exec(
+      `INSERT INTO auto_cache (k, v) VALUES ('cached_at', ?)
+       ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
+      String(now)
+    );
+    return list;
+  }
+
+  // Called by the admin automations routes after a create/update/delete so the
+  // next ingest refetches instead of waiting out the TTL.
+  async invalidateAutomations(): Promise<void> {
+    this.sql.exec(`DELETE FROM auto_cache WHERE k = 'cached_at'`);
   }
 
   private notifyDashboards(points: IngestPoint[], ts: number): void {
@@ -455,6 +565,12 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS subscriptions (
         dashboard_id TEXT PRIMARY KEY
+      );
+    `);
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS auto_cache (
+        k TEXT PRIMARY KEY,
+        v TEXT
       );
     `);
   }

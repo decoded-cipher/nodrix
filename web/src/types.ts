@@ -88,11 +88,46 @@ export type Dashboard = DashboardMeta & {
 // ─── New entities (backed by 0002_schema_v2.sql) ─────────────────────────────
 
 export type AutomationTriggerType =
+  | 'variable'
+  | 'scene'
   | 'schedule'
-  | 'device_state'
   | 'sunset_sunrise'
-  | 'event'
-  | 'scene';
+  | 'event';
+
+// ─── Trigger config shapes (stored in automations.trigger_config) ────────────
+
+export type VariableOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'changed';
+
+export type VariableTriggerConfig = {
+  variable: string;                   // variable key
+  operator: VariableOperator;
+  value?: number | string | boolean;  // omitted for 'changed'
+  mode?: 'edge' | 'always';           // edge = fire once on entry (default)
+};
+
+export type ScheduleTriggerConfig = {
+  time: string;                       // 'HH:MM' 24h
+  days?: number[];                    // 0=Sun..6=Sat; empty/absent = every day
+  tz?: string;                        // IANA tz, default 'UTC'
+};
+
+export type SolarTriggerConfig = {
+  event: 'sunrise' | 'sunset';
+  lat: number;
+  lng: number;
+  offset_minutes?: number;            // +/- minutes around the solar event
+};
+
+export type EventTriggerConfig = {
+  event: string;                      // matched against POST /v1/events { event }
+};
+
+// ─── Action descriptors (stored in automations.actions, ordered) ─────────────
+
+export type Action =
+  | { type: 'set_variable'; variable: string; value: number | string | boolean }
+  | { type: 'call_integration'; integration_id: string; payload?: Record<string, unknown> }
+  | { type: 'emit_event'; event: string; payload?: Record<string, unknown> };
 
 export type Automation = {
   id: string;
