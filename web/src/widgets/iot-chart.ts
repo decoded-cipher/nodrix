@@ -36,12 +36,11 @@ const WIDGET_CSS = `
   }
   .card {
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: clamp(4px, 2cqmin, 8px);
+    grid-template-rows: auto 1fr;
     height: 100%;
     width: 100%;
     box-sizing: border-box;
-    padding: clamp(10px, 4cqmin, 16px);
+    padding: clamp(10px, 4cqmin, 16px) clamp(10px, 4cqmin, 16px) clamp(36px, 9cqmin, 48px);
     background: var(--color-bg-elevated, white);
     border: 1px solid var(--color-border, #e5e5e5);
     border-radius: 10px;
@@ -49,6 +48,14 @@ const WIDGET_CSS = `
     overflow: hidden;
   }
   .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
+  .header {
+    display: flex;
+    align-items: baseline;
+    /* Title left, ts pushed to the far right. */
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
   .title {
     /* Fixed size — apex's CSS bundle can interact unpredictably with
        container-query units inside the shadow root, so don't gamble. */
@@ -62,6 +69,7 @@ const WIDGET_CSS = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
   }
   .title:empty { display: none; }
   .chart-host {
@@ -74,8 +82,8 @@ const WIDGET_CSS = `
     color: var(--color-text-faint, #a3a3a3);
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    text-align: right;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   /* Bring ApexCharts text colors in line with the dashboard theme. */
   :host .apexcharts-text,
@@ -118,9 +126,11 @@ export class IotChartElement extends HTMLElement {
       <style>${WIDGET_CSS}</style>
       <style>${apexCss}</style>
       <div class="card">
-        <div class="title"></div>
+        <div class="header">
+          <div class="title"></div>
+          <div class="ts"></div>
+        </div>
         <div class="chart-host"></div>
-        <div class="ts"></div>
       </div>
     `;
     this.#host = shadow.querySelector('.chart-host');
@@ -232,6 +242,10 @@ export class IotChartElement extends HTMLElement {
       chart: {
         type: apexType,
         height: '100%',
+        // Pull the apex canvas up so it visually hugs the title row;
+        // apex reserves ~10px of dead space at the top of its canvas
+        // by default which reads as a big gap between title and graph.
+        offsetY: -5,
         // Toolbar always off — zoom (when enabled) is drag-to-select +
         // double-click to reset.
         toolbar: { show: false },
@@ -270,23 +284,24 @@ export class IotChartElement extends HTMLElement {
             minute: 'HH:mm',
             second: 'HH:mm',
           },
+          offsetY: -4,
         },
         axisBorder: { show: true, color: axisColor, height: 1 },
-        axisTicks: { show: true, color: axisColor, height: 4 },
+        axisTicks: { show: true, color: axisColor, height: 6 },
       },
       yaxis: {
         labels: {
           style: { fontSize: '10px' },
-          // Negative offset pushes the numbers further left so there's
-          // visible breathing room between them and the axis line.
-          offsetX: -4,
+          // Push labels further left so they don't collide with the
+          // shifted axis line below.
+          offsetX: -10,
           // Round Y-axis ticks to integers when the value clearly is one,
           // otherwise show enough precision to distinguish nearby ticks.
           formatter: (v: number) => formatNumber(v),
         },
-        axisBorder: { show: true, color: axisColor, width: 1 },
-        // Longer tick stubs that sit right at the start of the plot area.
-        axisTicks: { show: true, color: axisColor, width: 6 },
+        // Shift the axis line + ticks leftward into the label gutter.
+        axisBorder: { show: true, color: axisColor, width: 1, offsetX: -4 },
+        axisTicks: { show: true, color: axisColor, width: 4, offsetX: 4 },
       },
       tooltip: {
         x: { format: 'HH:mm' },
