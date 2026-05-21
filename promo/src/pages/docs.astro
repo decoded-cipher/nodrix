@@ -9,12 +9,38 @@ const toc = [
   { href: '#read-api', label: 'Read API' },
   { href: '#automations', label: 'Automations' },
 ];
+
+const site = Astro.site!;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'TechArticle',
+      headline: 'nodrix documentation',
+      description:
+        'Deploy, claim, and connect: the nodrix device protocol, read API, and automation model.',
+      url: new URL('docs/', site).href,
+      inLanguage: 'en',
+      isPartOf: { '@id': new URL('#website', site).href },
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: site.href },
+        { '@type': 'ListItem', position: 2, name: 'Docs', item: new URL('docs/', site).href },
+      ],
+    },
+  ],
+};
 ---
 
 <Site
   title="Docs — nodrix"
   description="Deploy, claim, and connect: the nodrix device protocol, read API, and automation model."
 >
+  <Fragment slot="head">
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <!-- Header -->
   <section class="hero-glow relative overflow-hidden border-b border-neutral-200/70">
     <div class="bg-dotgrid absolute inset-0 opacity-70"></div>

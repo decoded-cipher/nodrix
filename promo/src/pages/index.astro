@@ -292,7 +292,10 @@ const widgets = [
       <div class="hero-glow relative overflow-hidden rounded-3xl bg-neutral-900 px-6 py-14 text-center sm:px-12 sm:py-20">
         <div class="bg-dotgrid absolute inset-0 opacity-10" style="background-image: radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px);"></div>
         <div class="relative">
-          <img src="/white_logo.png" alt="nodrix" class="mx-auto h-8 w-auto sm:h-10" width="160" height="46" />
+          <picture>
+            <source srcset="/white_logo.webp" type="image/webp" />
+            <img src="/white_logo.png" alt="nodrix" class="mx-auto h-8 w-auto sm:h-10" width="160" height="46" />
+          </picture>
           <h2 class="mx-auto mt-6 max-w-2xl text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Spin up your own IoT cloud in a click.
           </h2>

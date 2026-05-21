@@ -25,6 +25,12 @@ export const GET: APIRoute = ({ site }) => {
 - [Documentation](${u('docs')}): Device protocol, read API, and automation model.
 - [Widgets](${u('widgets')}): The six built-in framework-agnostic Web Component widgets.
 
+## Markdown & full text (for machines)
+- [Full text](${u('llms-full.txt')}): The entire site in one document.
+- [Home (markdown)](${u('index.md')})
+- [Docs (markdown)](${u('docs.md')})
+- [Widgets (markdown)](${u('widgets.md')})
+
 ## Tech stack
 - Cloudflare Workers, Durable Objects, D1, R2, KV.
 

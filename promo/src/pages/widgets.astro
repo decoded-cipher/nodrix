@@ -36,12 +36,41 @@ const control = [
     attrs: 'data-title, data-variable, data-value, data-label',
   },
 ];
+
+const site = Astro.site!;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'ItemList',
+      name: 'nodrix widgets',
+      description:
+        'The six built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables.',
+      itemListElement: [...display, ...control].map((w, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: w.name,
+        description: w.desc,
+      })),
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: site.href },
+        { '@type': 'ListItem', position: 2, name: 'Widgets', item: new URL('widgets/', site).href },
+      ],
+    },
+  ],
+};
 ---
 
 <Site
   title="Widgets — nodrix"
   description="The six built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables."
 >
+  <Fragment slot="head">
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <!-- Header -->
   <section class="hero-glow relative overflow-hidden border-b border-neutral-200/70">
     <div class="bg-dotgrid absolute inset-0 opacity-70"></div>

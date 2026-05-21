@@ -2,9 +2,26 @@
 
 /* ---------------------------------------------------------------------------
    nodrix promo — design tokens
-   Font: Plus Jakarta Sans (loaded via <link> in Site.astro).
+   Fonts: Plus Jakarta Sans + JetBrains Mono, self-hosted (see @font-face below).
    Accent: coral, sampled from the logo's dot.
 --------------------------------------------------------------------------- */
+
+/* Self-hosted variable fonts (latin subset) — no third-party requests. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2");
+}
+
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

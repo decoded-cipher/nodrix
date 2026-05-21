@@ -26,6 +26,10 @@ const desc = description ?? 'Open-source IoT platform that deploys to your own C
 
 const siteName = 'nodrix';
 const imageAlt = 'nodrix — your own IoT cloud, on Cloudflare';
+
+// Paste verification codes here once when registering the domain.
+const googleVerification = '';
+const bingVerification = '';
 // Everything below derives from `site` in astro.config.mjs — change the
 // domain there and canonical / OG / JSON-LD all follow.
 const site = Astro.site!;
@@ -116,12 +120,15 @@ const jsonLd = {
     <!-- Structured data (JSON-LD) -->
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Self-hosted fonts: preload the body/headline face for LCP. -->
+    <link rel="preload" href="/fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin />
+
+    {/* Search engine verification — paste your codes when setting up Search Console / Bing. */}
+    {googleVerification && <meta name="google-site-verification" content={googleVerification} />}
+    {bingVerification && <meta name="msvalidate.01" content={bingVerification} />}
+
+    <!-- Page-specific head tags (per-page JSON-LD, etc.) -->
+    <slot name="head" />
   </head>
   <body class="min-h-full bg-white text-neutral-900 antialiased font-sans">
     <a
@@ -132,7 +139,10 @@ const jsonLd = {
     <header class="sticky top-0 z-40 border-b border-neutral-200/70 bg-white/80 backdrop-blur-md">
       <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
         <a href="/" class="flex shrink-0 items-center" aria-label="nodrix home">
-          <img src="/dark_logo.png" alt="nodrix" class="h-6 w-auto sm:h-7" width="120" height="35" />
+          <picture>
+            <source srcset="/dark_logo.webp" type="image/webp" />
+            <img src="/dark_logo.png" alt="nodrix" class="h-6 w-auto sm:h-7" width="120" height="35" />
+          </picture>
         </a>
 
         <div class="hidden items-center gap-7 text-sm font-medium text-neutral-600 md:flex">
@@ -180,7 +190,10 @@ const jsonLd = {
       <div class="mx-auto max-w-6xl px-5 py-12 sm:px-6">
         <div class="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div class="max-w-xs">
-            <img src="/dark_logo.png" alt="nodrix" class="h-6 w-auto" width="120" height="35" />
+            <picture>
+              <source srcset="/dark_logo.webp" type="image/webp" />
+              <img src="/dark_logo.png" alt="nodrix" class="h-6 w-auto" width="120" height="35" />
+            </picture>
             <p class="mt-4 text-sm leading-relaxed text-neutral-500">
               Your own IoT cloud — open source, single-tenant, and running entirely on your Cloudflare account.
             </p>
