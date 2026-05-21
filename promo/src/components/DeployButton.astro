@@ -6,17 +6,17 @@ export interface Props {
   class?: string;
 }
 
-const repoUrl = Astro.props.repo ?? 'https://github.com/decoded-cipher/nodrix';
 const label = Astro.props.label ?? 'Deploy to Cloudflare';
 const size = Astro.props.size ?? 'md';
 const extra = Astro.props.class ?? '';
-const deployUrl = `https://deploy.workers.cloudflare.com/?url=${encodeURIComponent(repoUrl)}`;
 
 const sizing = size === 'lg' ? 'px-6 py-3.5 text-base' : 'px-5 py-3 text-sm';
 ---
 
 <a
-  href={deployUrl}
+  href="/go/deploy"
+  target="_blank"
+  rel="noopener noreferrer"
   class={`group inline-flex items-center justify-center gap-2 rounded-xl bg-accent-500 font-semibold text-white shadow-sm shadow-accent-500/25 transition-all hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${sizing} ${extra}`}
 >
   <svg class="h-5 w-5 transition-transform group-hover:scale-105" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
