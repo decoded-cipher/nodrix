@@ -4,9 +4,15 @@ import '../styles/global.css';
 export interface Props {
   title: string;
   description?: string;
+  /** Path or absolute URL to the social share image. */
+  image?: string;
+  /** Open Graph type, e.g. "website" or "article". */
+  type?: string;
+  /** When true, ask crawlers not to index this page. */
+  noindex?: boolean;
 }
 
-const { title, description } = Astro.props;
+const { title, description, image = '/og.png', type = 'website', noindex = false } = Astro.props;
 const repoUrl = 'https://github.com/decoded-cipher/nodrix';
 const deployUrl = `https://deploy.workers.cloudflare.com/?url=${encodeURIComponent(repoUrl)}`;
 
@@ -17,6 +23,49 @@ const nav = [
   { href: '/docs', label: 'Docs' },
 ];
 const desc = description ?? 'Open-source IoT platform that deploys to your own Cloudflare account. Hardware POSTs over HTTPS, realtime drag-and-drop dashboards, automations, and a clean read API.';
+
+const siteName = 'nodrix';
+const imageAlt = 'nodrix — your own IoT cloud, on Cloudflare';
+// Everything below derives from `site` in astro.config.mjs — change the
+// domain there and canonical / OG / JSON-LD all follow.
+const site = Astro.site!;
+const canonical = new URL(Astro.url.pathname, site).href;
+const ogImage = new URL(image, site).href;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': new URL('#org', site).href,
+      name: siteName,
+      url: site.href,
+      logo: new URL('/icon-512.png', site).href,
+      sameAs: [repoUrl],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': new URL('#website', site).href,
+      name: siteName,
+      url: site.href,
+      description: desc,
+      publisher: { '@id': new URL('#org', site).href },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: siteName,
+      applicationCategory: 'DeveloperApplication',
+      operatingSystem: 'Cloudflare Workers',
+      description: desc,
+      url: site.href,
+      softwareVersion: 'pre-alpha',
+      isAccessibleForFree: true,
+      license: 'https://opensource.org/licenses/MIT',
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      sameAs: [repoUrl],
+    },
+  ],
+};
 ---
 
 <!doctype html>
@@ -32,12 +81,40 @@ const desc = description ?? 'Open-source IoT platform that deploys to your own C
     <link rel="manifest" href="/site.webmanifest" />
     <title>{title}</title>
     <meta name="description" content={desc} />
-    <meta property="og:type" content="website" />
+    <link rel="canonical" href={canonical} />
+    <meta
+      name="robots"
+      content={noindex
+        ? 'noindex, nofollow'
+        : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'}
+    />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={desc} />
-    <meta property="og:image" content="/dark_logo.png" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={imageAlt} />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonical} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={desc} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+
     <meta name="theme-color" content="#ff6a45" />
+
+    <!-- Structured data (JSON-LD) -->
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
