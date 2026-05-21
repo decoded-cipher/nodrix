@@ -10,10 +10,10 @@
 // vanilla-JS pattern used for the header menu in Site.astro.
 //
 // Bot protection: a Cloudflare Turnstile widget guards the form; the Function
-// verifies the token server-side. Set PUBLIC_TURNSTILE_SITEKEY (build env) and
-// the TURNSTILE_SECRET_KEY Pages secret for production. Falls back to Cloudflare's
-// always-pass test keys so local dev works out of the box.
-const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? '1x00000000000000000000AA';
+// verifies the token server-side. The site key is public, so it's hard-coded
+// here and used everywhere. The matching TURNSTILE_SECRET_KEY must be set as a
+// Pages secret (production) and in .dev.vars (local dev).
+const turnstileSiteKey = '0x4AAAAAADT8tR-a6EWOLJdC';
 ---
 
 <div id="wishlist-modal" class="fixed inset-0 z-50 hidden">
