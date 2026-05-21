@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "deploy": "astro build && wrangler pages deploy dist --project-name nodrix",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
     "astro": "6.3.3"
