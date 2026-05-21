@@ -26,9 +26,6 @@ const desc = description ?? 'Open-source IoT platform that deploys to your own C
 const siteName = 'nodrix';
 const imageAlt = 'nodrix — your own IoT cloud, on Cloudflare';
 
-// Paste verification codes here once when registering the domain.
-const googleVerification = '';
-const bingVerification = '';
 // Everything below derives from `site` in astro.config.mjs — change the
 // domain there and canonical / OG / JSON-LD all follow.
 const site = Astro.site!;
@@ -121,10 +118,6 @@ const jsonLd = {
 
     <!-- Self-hosted fonts: preload the body/headline face for LCP. -->
     <link rel="preload" href="/fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin />
-
-    {/* Search engine verification — paste your codes when setting up Search Console / Bing. */}
-    {googleVerification && <meta name="google-site-verification" content={googleVerification} />}
-    {bingVerification && <meta name="msvalidate.01" content={bingVerification} />}
 
     <!-- Page-specific head tags (per-page JSON-LD, etc.) -->
     <slot name="head" />
