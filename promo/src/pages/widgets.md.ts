@@ -5,7 +5,7 @@ export const GET: APIRoute = ({ site }) => {
   const u = (p = '') => new URL(p, site).href;
   const body = `# nodrix widgets
 
-Six built-in, framework-agnostic Web Components that take data in and emit command intents out — embed them anywhere.
+Built-in, framework-agnostic Web Components that take data in and emit command intents out — embed them anywhere.
 
 ## Display
 - **iot-value** — The latest reading of a single variable, large and legible. Attributes: \`data-title\`, \`data-unit\`.

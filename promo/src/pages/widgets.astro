@@ -45,7 +45,7 @@ const jsonLd = {
       '@type': 'ItemList',
       name: 'nodrix widgets',
       description:
-        'The six built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables.',
+        'The built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables.',
       itemListElement: [...display, ...control].map((w, i) => ({
         '@type': 'ListItem',
         position: i + 1,
@@ -66,7 +66,7 @@ const jsonLd = {
 
 <Site
   title="Widgets — nodrix"
-  description="The six built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables."
+  description="The built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables."
 >
   <Fragment slot="head">
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

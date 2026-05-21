@@ -23,7 +23,7 @@ export const GET: APIRoute = ({ site }) => {
 ## Pages
 - [Home](${u()}): Product overview, features, and how it works.
 - [Documentation](${u('docs')}): Device protocol, read API, and automation model.
-- [Widgets](${u('widgets')}): The six built-in framework-agnostic Web Component widgets.
+- [Widgets](${u('widgets')}): Built-in, framework-agnostic Web Component widgets.
 
 ## Markdown & full text (for machines)
 - [Full text](${u('llms-full.txt')}): The entire site in one document.
