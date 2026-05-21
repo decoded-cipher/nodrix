@@ -1,0 +1,298 @@
+---
+// Join Wishlist modal — site-wide email capture + "in active development" notice.
+//
+// Open it from anywhere by adding `data-wishlist-open` to any clickable element.
+// Auto-opens once per browser session. The "active development" warning shows
+// every time. Before signing up it shows the email form; once a visitor has
+// joined (tracked in localStorage) every later open shows an "already on the
+// waitlist" confirmation instead. Posts to /api/wishlist (Cloudflare Pages
+// Function → D1). Behavior is in the inline script below and mirrors the
+// vanilla-JS pattern used for the header menu in Site.astro.
+//
+// Bot protection: a Cloudflare Turnstile widget guards the form; the Function
+// verifies the token server-side. Set PUBLIC_TURNSTILE_SITEKEY (build env) and
+// the TURNSTILE_SECRET_KEY Pages secret for production. Falls back to Cloudflare's
+// always-pass test keys so local dev works out of the box.
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? '1x00000000000000000000AA';
+---
+
+<div id="wishlist-modal" class="fixed inset-0 z-50 hidden">
+  <div
+    data-wishlist-backdrop
+    class="absolute inset-0 flex items-end justify-center bg-neutral-900/60 p-4 backdrop-blur-sm sm:items-center"
+  >
+    <div
+      data-wishlist-card
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wishlist-title"
+      aria-describedby="wishlist-warning"
+      class="rise relative w-full max-w-md overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl shadow-neutral-900/20"
+    >
+      <button
+        type="button"
+        data-wishlist-close
+        aria-label="Close"
+        class="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+      >
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+
+      <div class="p-6 sm:p-8">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-semibold text-accent-700 ring-1 ring-inset ring-accent-100">
+          <span class="relative flex h-1.5 w-1.5">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-400 opacity-75"></span>
+            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-500"></span>
+          </span>
+          Pre-alpha
+        </span>
+
+        <h2 id="wishlist-title" class="mt-4 text-xl font-bold tracking-tight text-neutral-900">
+          Join the wishlist
+        </h2>
+
+        <!-- Active-development warning — always shown. -->
+        <div class="mt-3 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01" />
+          </svg>
+          <p id="wishlist-warning" class="leading-relaxed">
+            <span class="font-semibold">nodrix is in active development.</span>
+            It's pre-alpha and moving fast, so things may change or break.
+          </p>
+        </div>
+
+        <!-- Sign-up state (shown until the visitor has joined). -->
+        <div id="wishlist-formwrap">
+          <p class="mt-4 text-sm leading-relaxed text-neutral-600">
+            Drop your email and we'll let you know the moment it's stable and ready — no spam, just
+            the launch.
+          </p>
+
+          <form id="wishlist-form" class="mt-4 space-y-3" novalidate>
+            <!-- Honeypot: off-screen, hidden from users; bots that fill it get a fake success. -->
+            <div class="absolute left-[-9999px] top-0" aria-hidden="true">
+              <label>Leave this field empty
+                <input type="text" name="website" tabindex="-1" autocomplete="off" />
+              </label>
+            </div>
+
+            <label for="wishlist-email" class="sr-only">Email address</label>
+            <input
+              id="wishlist-email"
+              name="email"
+              type="email"
+              required
+              autocomplete="email"
+              placeholder="you@example.com"
+              class="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-accent-400 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent-500"
+            />
+
+            <!-- Cloudflare Turnstile — rendered explicitly when the modal first opens. -->
+            <div id="wishlist-turnstile" data-sitekey={turnstileSiteKey} class="flex min-h-[65px] justify-center"></div>
+
+            <button
+              type="submit"
+              id="wishlist-submit"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent-500 px-6 py-3 text-sm font-semibold text-white shadow-sm shadow-accent-500/25 transition-all hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <span data-wishlist-label>Notify me at launch</span>
+            </button>
+
+            <p id="wishlist-status" class="min-h-[1.25rem] text-center text-xs" role="status" aria-live="polite"></p>
+          </form>
+
+          <p class="mt-1 text-center text-[11px] text-neutral-400">
+            We'll only email you about the nodrix launch.
+          </p>
+        </div>
+
+        <!-- Joined state (shown after sign-up, and on every later open). -->
+        <div id="wishlist-joined" class="mt-4 hidden rounded-xl bg-emerald-50 p-5 text-center ring-1 ring-inset ring-emerald-100">
+          <svg class="mx-auto h-8 w-8 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <p class="mt-2 text-sm font-semibold text-neutral-900">You're already on the waitlist.</p>
+          <p class="mt-1 text-xs leading-relaxed text-neutral-600">We'll email you the moment nodrix is stable and ready to deploy.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    // Once-per-session auto-open; persistent "has joined" flag.
+    const SESSION_KEY = 'nodrix:wishlist-session';
+    const JOINED_KEY = 'nodrix:wishlist-joined';
+
+    const modal = document.getElementById('wishlist-modal');
+    if (!modal) return;
+
+    const card = modal.querySelector('[data-wishlist-card]');
+    const closeBtn = modal.querySelector('[data-wishlist-close]');
+    const title = document.getElementById('wishlist-title');
+    const formWrap = document.getElementById('wishlist-formwrap');
+    const joinedEl = document.getElementById('wishlist-joined');
+    const form = document.getElementById('wishlist-form');
+    const emailInput = document.getElementById('wishlist-email');
+    const submitBtn = document.getElementById('wishlist-submit');
+    const label = modal.querySelector('[data-wishlist-label]');
+    const statusEl = document.getElementById('wishlist-status');
+    const turnstileEl = document.getElementById('wishlist-turnstile');
+    const SITEKEY = turnstileEl ? turnstileEl.dataset.sitekey : '';
+
+    let lastFocused = null;
+    let turnstileId = null; // widget id once rendered
+    let turnstileWanted = false; // render requested before the API was ready
+
+    // Render the Turnstile widget once, lazily, when the modal first opens.
+    function ensureTurnstile() {
+      if (turnstileId !== null || !turnstileEl || !SITEKEY) return;
+      if (window.turnstile && typeof window.turnstile.render === 'function') {
+        turnstileId = window.turnstile.render(turnstileEl, { sitekey: SITEKEY });
+      } else {
+        turnstileWanted = true; // the API script will call us back on load
+      }
+    }
+    function resetTurnstile() {
+      if (turnstileId !== null && window.turnstile) window.turnstile.reset(turnstileId);
+    }
+    // Called by the Turnstile API script once it has loaded (see ?onload= below).
+    window.onTurnstileLoad = function () { if (turnstileWanted) ensureTurnstile(); };
+
+    function hasJoined() {
+      try { return !!localStorage.getItem(JOINED_KEY); } catch (_) { return false; }
+    }
+
+    // Swap between the form and the "already joined" confirmation.
+    function applyState() {
+      const joined = hasJoined();
+      formWrap.classList.toggle('hidden', joined);
+      joinedEl.classList.toggle('hidden', !joined);
+      title.textContent = joined ? "You're on the waitlist" : 'Join the wishlist';
+    }
+
+    const isOpen = function () { return !modal.classList.contains('hidden'); };
+
+    function open() {
+      if (isOpen()) return;
+      applyState();
+      lastFocused = document.activeElement;
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      if (!hasJoined()) ensureTurnstile();
+      // Focus the email field when signing up, otherwise the close button.
+      const target = hasJoined() ? closeBtn : emailInput;
+      requestAnimationFrame(function () { target && target.focus(); });
+    }
+
+    function close() {
+      if (!isOpen()) return;
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+      if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+    }
+
+    function setStatus(msg, kind) {
+      statusEl.textContent = msg || '';
+      statusEl.className =
+        'min-h-[1.25rem] text-center text-xs' +
+        (kind === 'error' ? ' text-red-600' : '');
+    }
+
+    function setBusy(busy) {
+      submitBtn.disabled = busy;
+      if (label) label.textContent = busy ? 'Adding you…' : 'Notify me at launch';
+    }
+
+    // Trigger: any [data-wishlist-open] anywhere on the page.
+    document.addEventListener('click', function (e) {
+      const trigger = e.target.closest && e.target.closest('[data-wishlist-open]');
+      if (!trigger) return;
+      e.preventDefault();
+      open();
+    });
+
+    // Close: the × button, or a click anywhere outside the card (backdrop).
+    modal.addEventListener('click', function (e) {
+      if (e.target.closest('[data-wishlist-close]')) { close(); return; }
+      if (!e.target.closest('[data-wishlist-card]')) close();
+    });
+
+    // Esc to close.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isOpen()) close();
+    });
+
+    // Keep Tab focus inside the dialog while it's open.
+    modal.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || !isOpen()) return;
+      const focusable = card.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const visible = Array.prototype.filter.call(focusable, function (el) {
+        return el.offsetParent !== null; // skip elements in the hidden state branch
+      });
+      if (!visible.length) return;
+      const first = visible[0];
+      const last = visible[visible.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    // Submit → POST to the Pages Function.
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const email = (emailInput.value || '').trim();
+      if (!email) { setStatus('Please enter your email.', 'error'); emailInput.focus(); return; }
+
+      // Pull the Turnstile token if the widget rendered; ask the user to wait if
+      // it hasn't solved yet. If the widget never loaded, submit without it and
+      // let the server decide (it only enforces when a secret is configured).
+      let token = '';
+      if (turnstileId !== null && window.turnstile) {
+        token = window.turnstile.getResponse(turnstileId) || '';
+        if (!token) { setStatus('Just a moment — finishing the bot check…', 'error'); return; }
+      }
+
+      setBusy(true);
+      setStatus('', '');
+      try {
+        const res = await fetch('/api/wishlist', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            website: form.website ? form.website.value : '',
+            turnstileToken: token,
+          }),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.ok) {
+          try { localStorage.setItem(JOINED_KEY, '1'); } catch (_) {}
+          setBusy(false);
+          setStatus('', '');
+          applyState(); // swap the form out for the confirmation
+          requestAnimationFrame(function () { closeBtn && closeBtn.focus(); });
+        } else {
+          setBusy(false);
+          resetTurnstile(); // tokens are single-use — get a fresh one for retry
+          setStatus(data.error || 'Something went wrong. Please try again.', 'error');
+        }
+      } catch (_) {
+        setBusy(false);
+        resetTurnstile();
+        setStatus('Network error. Please try again.', 'error');
+      }
+    });
+
+    // Auto-open once per browser session — content depends on join state.
+    try {
+      if (!sessionStorage.getItem(SESSION_KEY)) {
+        sessionStorage.setItem(SESSION_KEY, '1');
+        window.setTimeout(open, 1200);
+      }
+    } catch (_) {}
+  })();
+</script>
+
+<script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async defer></script>
