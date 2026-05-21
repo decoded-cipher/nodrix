@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import WishlistModal from '../components/WishlistModal.astro';
 
 export interface Props {
   title: string;
@@ -151,6 +152,13 @@ const jsonLd = {
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.4.5 0 5.9 0 12.5c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 24 12.5C24 5.9 18.6.5 12 .5Z"/></svg>
             GitHub
           </a>
+          <button
+            type="button"
+            data-wishlist-open
+            class="inline-flex items-center gap-2 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/25 transition-all hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+          >
+            Join wishlist
+          </button>
         </div>
 
         <button
@@ -172,11 +180,20 @@ const jsonLd = {
             <a href={item.href} class="block rounded-lg px-3 py-2.5 text-base font-medium text-neutral-700 hover:bg-neutral-100">{item.label}</a>
           ))}
           <a href={repoUrl} class="block rounded-lg px-3 py-2.5 text-base font-medium text-neutral-700 hover:bg-neutral-100">GitHub</a>
+          <button
+            type="button"
+            data-wishlist-open
+            class="mt-1 block w-full rounded-lg bg-accent-500 px-3 py-2.5 text-center text-base font-semibold text-white transition-colors hover:bg-accent-600"
+          >
+            Join wishlist
+          </button>
         </div>
       </div>
     </header>
 
     <main id="main"><slot /></main>
+
+    <WishlistModal />
 
     <footer class="border-t border-neutral-200 bg-neutral-50">
       <div class="mx-auto max-w-6xl px-5 py-12 sm:px-6">
@@ -239,7 +256,7 @@ const jsonLd = {
           open.classList.toggle('hidden', isOpen);
           close.classList.toggle('hidden', !isOpen);
         });
-        menu.querySelectorAll('a').forEach(function (a) {
+        menu.querySelectorAll('a, [data-wishlist-open]').forEach(function (a) {
           a.addEventListener('click', function () {
             menu.classList.add('hidden');
             btn.setAttribute('aria-expanded', 'false');
