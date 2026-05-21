@@ -1,54 +1,209 @@
 ---
 import Site from '../layouts/Site.astro';
 import DeployButton from '../components/DeployButton.astro';
+
+const toc = [
+  { href: '#setup', label: 'Deploy & claim' },
+  { href: '#tokens', label: 'Tokens' },
+  { href: '#protocol', label: 'Device protocol' },
+  { href: '#read-api', label: 'Read API' },
+  { href: '#automations', label: 'Automations' },
+];
 ---
 
-<Site title="Docs — nodrix" description="Post-deploy setup, device protocol, and read API reference.">
-  <main class="mx-auto max-w-3xl px-6 py-16">
-    <h1 class="text-3xl font-semibold tracking-tight">Setup</h1>
-
-    <section class="mt-8 space-y-4">
-      <p class="text-sm text-neutral-700">
-        Deploy the platform to your Cloudflare account, then create the first account to claim ownership.
+<Site
+  title="Docs — nodrix"
+  description="Deploy, claim, and connect: the nodrix device protocol, read API, and automation model."
+>
+  <!-- Header -->
+  <section class="hero-glow relative overflow-hidden border-b border-neutral-200/70">
+    <div class="bg-dotgrid absolute inset-0 opacity-70"></div>
+    <div class="relative mx-auto max-w-6xl px-5 py-14 sm:px-6 sm:py-20">
+      <span class="text-sm font-semibold text-accent-600">Docs</span>
+      <h1 class="mt-2 text-balance text-4xl font-extrabold tracking-tight text-neutral-900 sm:text-5xl">
+        Deploy, claim, connect.
+      </h1>
+      <p class="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-neutral-600 sm:text-lg">
+        Get an instance running in your own Cloudflare account, then point hardware at it over plain
+        HTTPS. Everything below is the live API surface.
       </p>
-      <DeployButton />
-    </section>
+    </div>
+  </section>
 
-    <h2 class="mt-12 text-xl font-semibold tracking-tight">1. Claim the deployment</h2>
-    <ol class="mt-3 list-decimal space-y-2 pl-6 text-sm text-neutral-700">
-      <li>Open your worker URL (e.g. <code class="font-mono">nodrix.workers.dev</code>).</li>
-      <li>Register the first account with email and password — it's auto-assigned the <strong>owner</strong> role and a default project is created.</li>
-      <li>(Optional) In <strong>Settings → Sign-in providers</strong>, add Google or GitHub OAuth client credentials to enable social sign-in.</li>
-    </ol>
+  <div class="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-16 lg:grid lg:grid-cols-[200px_1fr] lg:gap-12">
+    <!-- TOC -->
+    <aside class="mb-10 lg:mb-0">
+      <nav class="lg:sticky lg:top-24">
+        <p class="text-xs font-semibold uppercase tracking-wider text-neutral-400">On this page</p>
+        <ul class="mt-3 space-y-1 border-l border-neutral-200">
+          {toc.map((t) => (
+            <li>
+              <a href={t.href} class="-ml-px block border-l-2 border-transparent py-1.5 pl-4 text-sm text-neutral-600 transition-colors hover:border-accent-500 hover:text-neutral-900">{t.label}</a>
+            </li>
+          ))}
+        </ul>
+        <div class="mt-6">
+          <DeployButton />
+        </div>
+      </nav>
+    </aside>
 
-    <h2 class="mt-12 text-xl font-semibold tracking-tight">2. Register a device</h2>
-    <p class="mt-2 text-sm text-neutral-700">
-      In the admin UI → <strong>Devices</strong> → <strong>Create</strong>. The token is shown
-      once — copy it into your device firmware now.
-    </p>
+    <!-- Content -->
+    <main class="min-w-0 max-w-2xl">
+      <!-- Setup -->
+      <section id="setup" class="scroll-mt-24">
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Deploy &amp; claim</h2>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-700">
+          Deploy the platform to your Cloudflare account. The button provisions D1, R2, KV, and the
+          Worker — there's nothing else to host.
+        </p>
+        <ol class="mt-5 space-y-3 text-sm leading-relaxed text-neutral-700">
+          <li class="flex gap-3">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-bold text-white">1</span>
+            <span>Open your worker URL (e.g. <code class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[13px]">nodrix.workers.dev</code>).</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-bold text-white">2</span>
+            <span>Register the first account with email + password. It's assigned the <strong>owner</strong> role, and a default project is created for you.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-bold text-white">3</span>
+            <span><em>(Optional)</em> Under <strong>Settings → Sign-in providers</strong>, add Google or GitHub OAuth credentials to light up social sign-in.</span>
+          </li>
+        </ol>
+      </section>
 
-    <h2 class="mt-12 text-xl font-semibold tracking-tight">3. Device protocol</h2>
-    <p class="mt-2 text-sm text-neutral-700">
-      Three HTTPS endpoints. Auth: <code class="font-mono">Authorization: Bearer &lt;device_token&gt;</code>.
-    </p>
-    <pre class="mt-4 overflow-x-auto rounded-md bg-neutral-900 p-4 text-xs text-neutral-100"><code>POST /v1/telemetry
+      <!-- Tokens -->
+      <section id="tokens" class="mt-16 scroll-mt-24">
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Tokens</h2>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-700">
+          Two kinds of bearer token, two audiences. Both are shown once on creation — copy them right
+          away.
+        </p>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 class="font-mono text-sm font-semibold text-neutral-900">Project token</h3>
+            <p class="mt-2 text-sm leading-relaxed text-neutral-600">For hardware. Authorizes telemetry, control, and events on one project.</p>
+          </div>
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 class="font-mono text-sm font-semibold text-neutral-900">User token</h3>
+            <p class="mt-2 text-sm leading-relaxed text-neutral-600">For external apps. Authorizes the read-only API. Mint it under <strong>API tokens</strong>.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Device protocol -->
+      <section id="protocol" class="mt-16 scroll-mt-24">
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Device protocol</h2>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-700">
+          Authenticate every request with your project token:
+          <code class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[13px]">Authorization: Bearer &lt;project_token&gt;</code>
+        </p>
+
+        <h3 class="mt-8 text-base font-semibold text-neutral-900">Send telemetry</h3>
+        <p class="mt-2 text-sm leading-relaxed text-neutral-700">
+          POST one or many metrics. Keys become variables, auto-created on first sight. Send
+          <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[13px]">metrics</code> for a batch, or a single
+          <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[13px]">metric</code>/<code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[13px]">value</code> pair.
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100 sm:text-[13px]"><code><span class="text-accent-400">POST</span> /v1/telemetry
 {`{ "ts": 1715900000, "metrics": { "temperature": 23.4, "humidity": 61 } }`}
-&rarr; 204 No Content
+<span class="text-emerald-400">→ 204 No Content</span></code></pre>
 
-GET /v1/commands
-&rarr; {`{ "commands": [ { "id": "cmd_x", "name": "relay", "value": "on" } ] }`}
+        <h3 class="mt-8 text-base font-semibold text-neutral-900">Poll for control writes</h3>
+        <p class="mt-2 text-sm leading-relaxed text-neutral-700">
+          Dashboard widgets queue value writes for your hardware. Fetch them, apply them, then ack so
+          the platform stops resending.
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100 sm:text-[13px]"><code><span class="text-accent-400">GET</span> /v1/control
+<span class="text-emerald-400">→</span> {`{ "control": [ { "id": "ctl_x", "variable": "relay", "value": "on" } ] }`}
 
-POST /v1/commands/ack
-{`{ "ids": ["cmd_x"] }`}
-&rarr; {`{ "acked": 1 }`}</code></pre>
+<span class="text-accent-400">POST</span> /v1/control/ack
+{`{ "ids": ["ctl_x"] }`}
+<span class="text-emerald-400">→</span> {`{ "acked": 1 }`}</code></pre>
 
-    <h2 class="mt-12 text-xl font-semibold tracking-tight">4. Read API</h2>
-    <p class="mt-2 text-sm text-neutral-700">
-      For external apps. Mint a token in the admin UI → <strong>API tokens</strong>.
-      Auth: <code class="font-mono">Authorization: Bearer &lt;user_token&gt;</code>.
-    </p>
-    <pre class="mt-4 overflow-x-auto rounded-md bg-neutral-900 p-4 text-xs text-neutral-100"><code>GET /v1/projects/:proj/devices
-GET /v1/projects/:proj/devices/:id/state          (edge-cached, ~1s)
-GET /v1/projects/:proj/devices/:id/series?metric=temperature&window=1h</code></pre>
-  </main>
+        <h3 class="mt-8 text-base font-semibold text-neutral-900">…or stream over WebSocket</h3>
+        <p class="mt-2 text-sm leading-relaxed text-neutral-700">
+          Skip polling: open a socket and receive control writes the instant a widget moves. Ack the
+          same way, inline.
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100 sm:text-[13px]"><code><span class="text-accent-400">WSS</span> /v1/control/ws?token=&lt;project_token&gt;
+<span class="text-neutral-500">// incoming</span>
+{`{ "type": "control", "id": "ctl_x", "variable": "relay", "value": "on" }`}
+<span class="text-neutral-500">// reply</span>
+{`{ "type": "ack", "ids": ["ctl_x"] }`}</code></pre>
+
+        <h3 class="mt-8 text-base font-semibold text-neutral-900">Emit an event</h3>
+        <p class="mt-2 text-sm leading-relaxed text-neutral-700">
+          Fire a named event to trigger any matching automation — a button press, a fault, a heartbeat.
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100 sm:text-[13px]"><code><span class="text-accent-400">POST</span> /v1/events
+{`{ "event": "door_opened", "payload": { "by": "front" } }`}
+<span class="text-emerald-400">→ 204 No Content</span></code></pre>
+      </section>
+
+      <!-- Read API -->
+      <section id="read-api" class="mt-16 scroll-mt-24">
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Read API</h2>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-700">
+          For external apps — Grafana, a dashboard of your own, a Pi screen. Authenticate with a user
+          token:
+          <code class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[13px]">Authorization: Bearer &lt;user_token&gt;</code>
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100 sm:text-[13px]"><code><span class="text-neutral-500"># every variable in a project</span>
+<span class="text-accent-400">GET</span> /v1/projects/:proj/variables
+
+<span class="text-neutral-500"># latest value of every variable (edge-cached)</span>
+<span class="text-accent-400">GET</span> /v1/projects/:proj/state
+
+<span class="text-neutral-500"># recent time-series for one variable</span>
+<span class="text-accent-400">GET</span> /v1/projects/:proj/variables/:key/series?window=1h</code></pre>
+        <p class="mt-3 text-xs text-neutral-500">
+          <code class="font-mono">window</code> accepts values like <code class="font-mono">30s</code>, <code class="font-mono">15m</code>, or <code class="font-mono">6h</code> and reads from the recent ring buffer.
+        </p>
+      </section>
+
+      <!-- Automations -->
+      <section id="automations" class="mt-16 scroll-mt-24">
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Automations</h2>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-700">
+          Built and run from the admin UI — no extra code path for your hardware. Each automation is a
+          trigger plus a list of actions, evaluated at the edge.
+        </p>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 class="text-sm font-semibold text-neutral-900">Triggers</h3>
+            <ul class="mt-2 space-y-1.5 text-sm text-neutral-600">
+              <li>• Variable condition (threshold, equality, or change)</li>
+              <li>• Schedule (time of day, by weekday)</li>
+              <li>• Sunrise / sunset, by location</li>
+              <li>• Custom event</li>
+              <li>• Manual run</li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 class="text-sm font-semibold text-neutral-900">Actions</h3>
+            <ul class="mt-2 space-y-1.5 text-sm text-neutral-600">
+              <li>• Set a variable</li>
+              <li>• Call a connection — webhook, Slack, or HTTP service</li>
+              <li>• Emit another event</li>
+            </ul>
+          </div>
+        </div>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-600">
+          Webhook deliveries can be HMAC-signed with a shared secret, so the receiving end can verify
+          the payload genuinely came from your instance.
+        </p>
+      </section>
+
+      <!-- Footer CTA -->
+      <div class="mt-16 rounded-2xl border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
+        <h3 class="text-lg font-semibold text-neutral-900">Ready to try it?</h3>
+        <p class="mt-1.5 text-sm text-neutral-600">Deploy a fresh instance to your own account — it's pre-alpha, so keep it to accounts you're happy to experiment in.</p>
+        <div class="mt-5">
+          <DeployButton />
+        </div>
+      </div>
+    </main>
+  </div>
 </Site>

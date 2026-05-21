@@ -1,33 +1,151 @@
 ---
 import Site from '../layouts/Site.astro';
+
+const display = [
+  {
+    name: 'iot-value',
+    desc: 'The latest reading of a single variable, large and legible. Drop it on a wall display or tuck it into a corner of the grid.',
+    attrs: 'data-title, data-unit',
+  },
+  {
+    name: 'iot-gauge',
+    desc: 'An arc gauge for a numeric variable with configurable min / max bounds — perfect for temperature, battery, or fill level.',
+    attrs: 'data-title, data-min, data-max, data-unit',
+  },
+  {
+    name: 'iot-chart',
+    desc: 'A multi-series time-series chart powered by ApexCharts. Line, area, bar, or stepline, with optional drag-to-zoom.',
+    attrs: 'data-title, data-chart-type, data-zoom',
+  },
+];
+
+const control = [
+  {
+    name: 'iot-toggle',
+    desc: 'An on / off switch that writes a value to a variable and reflects the last reported state so it never drifts out of sync.',
+    attrs: 'data-title, data-variable, data-on-value, data-off-value',
+  },
+  {
+    name: 'iot-slider',
+    desc: 'A horizontal slider for a numeric write. Commits on release — not every frame — so the wire never floods while you drag.',
+    attrs: 'data-title, data-variable, data-min, data-max, data-step',
+  },
+  {
+    name: 'iot-push',
+    desc: 'A momentary push button for one-shot commands — restart a node, trigger a scene, kick off a script. No toggle state.',
+    attrs: 'data-title, data-variable, data-value, data-label',
+  },
+];
 ---
 
-<Site title="Widgets — nodrix" description="The built-in widget set.">
-  <main class="mx-auto max-w-3xl px-6 py-16">
-    <h1 class="text-3xl font-semibold tracking-tight">Built-in widgets</h1>
-    <p class="mt-2 text-sm text-neutral-700">
-      All four ship as framework-agnostic native Web Components. They receive data via properties
-      and emit DOM events for command intents — they don't know about Cloudflare, WebSockets, or
-      any specific frontend stack. Embed them outside this platform if you like.
-    </p>
+<Site
+  title="Widgets — nodrix"
+  description="The six built-in nodrix widgets: framework-agnostic Web Components for displaying and controlling your variables."
+>
+  <!-- Header -->
+  <section class="hero-glow relative overflow-hidden border-b border-neutral-200/70">
+    <div class="bg-dotgrid absolute inset-0 opacity-70"></div>
+    <div class="relative mx-auto max-w-4xl px-5 py-16 sm:px-6 sm:py-24">
+      <span class="text-sm font-semibold text-accent-600">Widgets</span>
+      <h1 class="mt-2 text-balance text-4xl font-extrabold tracking-tight text-neutral-900 sm:text-5xl">
+        Bind data to the screen.
+      </h1>
+      <p class="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-neutral-600 sm:text-lg">
+        Every widget ships as a native, framework-agnostic Web Component. It takes data in through
+        properties and emits command intents as DOM events — it knows nothing about Cloudflare,
+        WebSockets, or any particular frontend. Use them on the built-in dashboard, or embed them in
+        your own app.
+      </p>
+    </div>
+  </section>
 
-    <ul class="mt-8 grid gap-6 md:grid-cols-2">
-      <li class="rounded-lg border border-neutral-200 bg-white p-4">
-        <h3 class="font-semibold">iot-value</h3>
-        <p class="mt-1 text-sm text-neutral-600">Latest reading of a single metric.</p>
-      </li>
-      <li class="rounded-lg border border-neutral-200 bg-white p-4">
-        <h3 class="font-semibold">iot-gauge</h3>
-        <p class="mt-1 text-sm text-neutral-600">Arc gauge with min/max bounds.</p>
-      </li>
-      <li class="rounded-lg border border-neutral-200 bg-white p-4">
-        <h3 class="font-semibold">iot-chart</h3>
-        <p class="mt-1 text-sm text-neutral-600">Multi-series line chart over a recent window.</p>
-      </li>
-      <li class="rounded-lg border border-neutral-200 bg-white p-4">
-        <h3 class="font-semibold">iot-toggle</h3>
-        <p class="mt-1 text-sm text-neutral-600">Button that sends a command back to the device.</p>
-      </li>
-    </ul>
-  </main>
+  <!-- Display widgets -->
+  <section class="border-b border-neutral-200/70 bg-white">
+    <div class="mx-auto max-w-5xl px-5 py-16 sm:px-6 sm:py-20">
+      <div class="flex items-center gap-3">
+        <span class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600">Display</span>
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Show the data</h2>
+      </div>
+      <p class="mt-2 text-sm text-neutral-600">Read-only widgets that render the live value of a variable.</p>
+
+      <div class="mt-8 grid gap-4 md:grid-cols-3">
+        {display.map((w) => (
+          <article class="flex flex-col rounded-2xl border border-neutral-200 bg-white p-6 transition-shadow hover:shadow-md">
+            <code class="font-mono text-base font-semibold text-neutral-900">{w.name}</code>
+            <p class="mt-3 flex-1 text-sm leading-relaxed text-neutral-600">{w.desc}</p>
+            <div class="mt-5 border-t border-neutral-100 pt-4">
+              <p class="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Attributes</p>
+              <code class="mt-1.5 block font-mono text-xs leading-relaxed text-neutral-500">{w.attrs}</code>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Control widgets -->
+  <section class="border-b border-neutral-200/70 bg-neutral-50">
+    <div class="mx-auto max-w-5xl px-5 py-16 sm:px-6 sm:py-20">
+      <div class="flex items-center gap-3">
+        <span class="rounded-full bg-accent-50 px-3 py-1 text-xs font-semibold text-accent-700">Control</span>
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Write it back</h2>
+      </div>
+      <p class="mt-2 text-sm text-neutral-600">
+        Interactive widgets that emit an <code class="font-mono text-[13px] text-accent-700">iot-command</code> event. The platform turns it into a pending control write your hardware picks up.
+      </p>
+
+      <div class="mt-8 grid gap-4 md:grid-cols-3">
+        {control.map((w) => (
+          <article class="flex flex-col rounded-2xl border border-neutral-200 bg-white p-6 transition-shadow hover:shadow-md">
+            <code class="font-mono text-base font-semibold text-neutral-900">{w.name}</code>
+            <p class="mt-3 flex-1 text-sm leading-relaxed text-neutral-600">{w.desc}</p>
+            <div class="mt-5 border-t border-neutral-100 pt-4">
+              <p class="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Attributes</p>
+              <code class="mt-1.5 block font-mono text-xs leading-relaxed text-neutral-500">{w.attrs}</code>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- How they wire up -->
+  <section class="bg-white">
+    <div class="mx-auto max-w-5xl px-5 py-16 sm:px-6 sm:py-20">
+      <div class="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+        <div>
+          <h2 class="text-2xl font-bold tracking-tight text-neutral-900">A contract, not a coupling</h2>
+          <p class="mt-4 text-sm leading-relaxed text-neutral-600">
+            Display widgets receive their value through a property — the dashboard sets
+            <code class="font-mono text-[13px] text-neutral-800"> el.value</code> as updates arrive
+            over the WebSocket. Control widgets dispatch an
+            <code class="font-mono text-[13px] text-neutral-800"> iot-command</code> event that
+            bubbles up; the page forwards it as a control write. That clean boundary is why you can
+            lift any widget straight into your own project.
+          </p>
+          <a href="/docs" class="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-600 hover:text-accent-700">
+            See the device protocol <span aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-xl shadow-neutral-900/10">
+          <div class="flex items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-neutral-700"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-neutral-700"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-neutral-700"></span>
+            <span class="ml-2 text-xs font-medium text-neutral-500">embed anywhere</span>
+          </div>
+          <pre class="overflow-x-auto p-4 text-xs leading-relaxed text-neutral-200 sm:text-[13px]"><code><span class="text-neutral-500">&lt;!-- display: push a value in --&gt;</span>
+&lt;<span class="text-accent-400">iot-gauge</span> data-title=<span class="text-emerald-400">"Temp"</span> data-max=<span class="text-emerald-400">"50"</span>&gt;&lt;/<span class="text-accent-400">iot-gauge</span>&gt;
+gauge.value = <span class="text-emerald-400">23.4</span>;
+
+<span class="text-neutral-500">&lt;!-- control: read an intent out --&gt;</span>
+toggle.addEventListener(<span class="text-emerald-400">'iot-command'</span>, (e) =&gt; {`{`}
+  <span class="text-neutral-500">{`// { variable, value }`}</span>
+  send(e.detail);
+{`}`});</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
 </Site>
