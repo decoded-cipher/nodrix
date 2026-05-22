@@ -208,14 +208,14 @@ function removeMarker(idx: number) {
               <Dropdown
                 :model-value="(m['latVar'] as string) ?? ''"
                 :options="variableOptions"
-                placeholder="lat variable"
+                placeholder="Latitude variable"
                 size="sm"
                 @update:model-value="(v) => updateMarker(idx, 'latVar', v)"
               />
               <Dropdown
                 :model-value="(m['lngVar'] as string) ?? ''"
                 :options="variableOptions"
-                placeholder="lng variable"
+                placeholder="Longitude variable"
                 size="sm"
                 @update:model-value="(v) => updateMarker(idx, 'lngVar', v)"
               />
@@ -225,7 +225,7 @@ function removeMarker(idx: number) {
                 :value="m['lat'] ?? 0"
                 type="number"
                 step="any"
-                placeholder="lat"
+                placeholder="Latitude"
                 class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                 @input="updateMarker(idx, 'lat', Number(($event.target as HTMLInputElement).value))"
               />
@@ -233,7 +233,7 @@ function removeMarker(idx: number) {
                 :value="m['lng'] ?? 0"
                 type="number"
                 step="any"
-                placeholder="lng"
+                placeholder="Longitude"
                 class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                 @input="updateMarker(idx, 'lng', Number(($event.target as HTMLInputElement).value))"
               />

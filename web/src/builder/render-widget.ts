@@ -100,7 +100,6 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
 
   if (item.type === 'iot-map') {
     if (typeof p['basemap'] === 'string') el.setAttribute('data-basemap', p['basemap']);
-    if (typeof p['autoFit'] === 'boolean') el.setAttribute('data-auto-fit', p['autoFit'] ? 'true' : 'false');
     if (typeof p['zoom'] === 'number') el.setAttribute('data-zoom', String(p['zoom']));
     if (typeof p['centerLat'] === 'number') el.setAttribute('data-center-lat', String(p['centerLat']));
     if (typeof p['centerLng'] === 'number') el.setAttribute('data-center-lng', String(p['centerLng']));
