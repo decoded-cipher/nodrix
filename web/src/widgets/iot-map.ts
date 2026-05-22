@@ -18,8 +18,9 @@
 //     or refresh its tooltip, and re-fit if auto-fit is on.
 //
 // Contract: data in via attributes/properties, no transport knowledge. Markers
-// use L.circleMarker (vector) so there are no icon-image asset paths to break
-// inside the bundler / shadow root, and per-marker color comes for free.
+// are L.divIcon pins (a CSS dot + an expanding pulse ring) — no marker-image
+// assets to break inside the bundler / shadow root, and per-marker color is
+// passed through a CSS variable.
 
 import L from 'leaflet';
 import leafletCss from 'leaflet/dist/leaflet.css?raw';
@@ -151,6 +152,34 @@ const WIDGET_CSS = `
   .popup-title { font-weight: 600; }
   .popup-val { font-variant-numeric: tabular-nums; }
   .popup-ts { color: var(--color-text-faint, #a3a3a3); font-size: 10px; margin-top: 2px; }
+  /* Marker pin: a colored dot with a small expanding pulse ring behind it. */
+  .map-pin-icon { background: none; border: none; }
+  .map-pin { position: relative; display: block; width: 16px; height: 16px; }
+  .map-pin-dot {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--pin, #ea580c);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.18);
+    box-sizing: border-box;
+  }
+  .map-pin-pulse {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--pin, #ea580c);
+    opacity: 0.5;
+    animation: map-pin-pulse 1.8s ease-out infinite;
+  }
+  @keyframes map-pin-pulse {
+    0%   { transform: scale(1);   opacity: 0.5; }
+    70%  { transform: scale(2.2); opacity: 0; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .map-pin-pulse { animation: none; opacity: 0; }
+  }
 `;
 
 export class IotMapElement extends HTMLElement {
@@ -161,7 +190,7 @@ export class IotMapElement extends HTMLElement {
 
   #markers: MarkerConfig[] = [];
   #resolved: Resolved[] = [];
-  #layers: (L.CircleMarker | undefined)[] = [];
+  #layers: (L.Marker | undefined)[] = [];
   #bindings = new Map<string, Binding[]>();
   #values = new Map<string, { value: unknown; ts: number | null }>();
 
@@ -292,7 +321,6 @@ export class IotMapElement extends HTMLElement {
     this.#map = L.map(this.#host, {
       zoomControl: false,
       attributionControl: false,
-      preferCanvas: true,
     });
     this.#map.setView([this.numAttr('data-center-lat', 0), this.numAttr('data-center-lng', 0)], this.numAttr('data-zoom', 13));
     this.setBasemap();
@@ -354,18 +382,13 @@ export class IotMapElement extends HTMLElement {
         bounds.push(latlng);
         const color = this.#markers[i]?.color || DEFAULT_COLOR;
         if (!layer) {
-          const m = L.circleMarker(latlng, {
-            radius: 8,
-            color: '#ffffff',
-            weight: 2,
-            fillColor: color,
-            fillOpacity: 1,
-          }).addTo(this.#map);
-          m.bindTooltip(this.tooltipHtml(i), { direction: 'top', offset: [0, -6], opacity: 1 });
+          const m = L.marker(latlng, { icon: this.makeIcon(color), keyboard: false }).addTo(this.#map);
+          m.bindTooltip(this.tooltipHtml(i), { direction: 'top', offset: [0, -8], opacity: 1 });
           this.#layers[i] = m;
         } else {
+          // Color is config-driven; a config change rebuilds all layers, so on a
+          // data tick we only move the pin (keeps the pulse animation running).
           layer.setLatLng(latlng);
-          layer.setStyle({ fillColor: color });
           layer.setTooltipContent(this.tooltipHtml(i));
         }
       } else if (layer) {
@@ -410,6 +433,17 @@ export class IotMapElement extends HTMLElement {
     }
     if (r?.ts) html += `<div class="popup-ts">${new Date(r.ts * 1000).toLocaleTimeString()}</div>`;
     return html;
+  }
+
+  // A pin = colored dot + an expanding pulse ring. Color rides in via a CSS
+  // custom property so the pulse keyframes can reuse it.
+  private makeIcon(color: string): L.DivIcon {
+    return L.divIcon({
+      className: 'map-pin-icon',
+      html: `<span class="map-pin" style="--pin:${esc(color)}"><span class="map-pin-pulse"></span><span class="map-pin-dot"></span></span>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
   }
 
   private renderTitle() {
