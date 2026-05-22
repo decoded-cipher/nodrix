@@ -6,6 +6,7 @@
   "scripts": {
     "sensors": "node --env-file=.env sensors.js",
     "controllers": "node --env-file=.env controllers.js",
+    "gps": "node --env-file=.env gps.js",
     "start": "node --env-file=.env start.js"
   },
   "dependencies": {
