@@ -10,12 +10,12 @@
 // Properties:
 //   - markers: Array<{ source, lat, lng, latVar, lngVar, label, valueVar, color }>
 //       A marker's position is static (lat/lng) or live (latVar/lngVar). An
-//       optional valueVar feeds the click popup.
+//       optional valueVar feeds the hover tooltip.
 //
 // Methods:
 //   - updateVar(key, value, ts): the page calls this for every bound-variable
 //     update (snapshot + live). We resolve key -> marker/field, move the marker
-//     or refresh its popup, and re-fit if auto-fit is on.
+//     or refresh its tooltip, and re-fit if auto-fit is on.
 //
 // Contract: data in via attributes/properties, no transport knowledge. Markers
 // use L.circleMarker (vector) so there are no icon-image asset paths to break
@@ -133,14 +133,21 @@ const WIDGET_CSS = `
     background: var(--color-bg, #fafafa);
     font: inherit;
   }
-  /* Theme the popup + attribution to match the dashboard. */
-  .leaflet-popup-content-wrapper,
-  .leaflet-popup-tip {
+  /* Hover tooltip, themed to match the dashboard. */
+  .leaflet-tooltip {
     background: var(--color-bg-elevated, white);
     color: var(--color-text, #171717);
+    border: 1px solid var(--color-border, #e5e5e5);
+    border-radius: 4px;
     box-shadow: 0 4px 16px -6px rgba(0,0,0,0.3);
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 12px;
   }
-  .leaflet-popup-content { margin: 8px 12px; font-size: 12px; }
+  .leaflet-tooltip-top::before { border-top-color: var(--color-bg-elevated, white); }
+  .leaflet-tooltip-bottom::before { border-bottom-color: var(--color-bg-elevated, white); }
+  .leaflet-tooltip-left::before { border-left-color: var(--color-bg-elevated, white); }
+  .leaflet-tooltip-right::before { border-right-color: var(--color-bg-elevated, white); }
   .popup-title { font-weight: 600; }
   .popup-val { font-variant-numeric: tabular-nums; }
   .popup-ts { color: var(--color-text-faint, #a3a3a3); font-size: 10px; margin-top: 2px; }
@@ -354,12 +361,12 @@ export class IotMapElement extends HTMLElement {
             fillColor: color,
             fillOpacity: 1,
           }).addTo(this.#map);
-          m.bindPopup(this.popupHtml(i));
+          m.bindTooltip(this.tooltipHtml(i), { direction: 'top', offset: [0, -6], opacity: 1 });
           this.#layers[i] = m;
         } else {
           layer.setLatLng(latlng);
           layer.setStyle({ fillColor: color });
-          layer.setPopupContent(this.popupHtml(i));
+          layer.setTooltipContent(this.tooltipHtml(i));
         }
       } else if (layer) {
         layer.remove();
@@ -392,7 +399,7 @@ export class IotMapElement extends HTMLElement {
     this.#forceView = false;
   }
 
-  private popupHtml(idx: number): string {
+  private tooltipHtml(idx: number): string {
     const m = this.#markers[idx];
     const r = this.#resolved[idx];
     const label = (m?.label && m.label.trim()) || `Marker ${idx + 1}`;
