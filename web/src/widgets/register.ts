@@ -4,6 +4,7 @@ import { IotChartElement } from './iot-chart';
 import { IotToggleElement } from './iot-toggle';
 import { IotPushElement } from './iot-push';
 import { IotSliderElement } from './iot-slider';
+import { IotMapElement } from './iot-map';
 
 let registered = false;
 
@@ -16,4 +17,5 @@ export function registerWidgets(): void {
   if (!customElements.get('iot-toggle')) customElements.define('iot-toggle', IotToggleElement);
   if (!customElements.get('iot-push')) customElements.define('iot-push', IotPushElement);
   if (!customElements.get('iot-slider')) customElements.define('iot-slider', IotSliderElement);
+  if (!customElements.get('iot-map')) customElements.define('iot-map', IotMapElement);
 }

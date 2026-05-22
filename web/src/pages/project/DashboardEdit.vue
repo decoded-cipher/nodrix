@@ -134,6 +134,12 @@ function applySnapshot(snap: SnapshotMsg) {
           points: pts,
         };
       });
+    } else if (item.type === 'iot-map') {
+      const m = el as HTMLElement & { updateVar?: (k: string, v: unknown, ts: number) => void };
+      for (const key of mapVariableKeys(item)) {
+        const latest = snap.variables[key];
+        if (latest !== undefined) m.updateVar?.(key, latest.value, latest.received_at);
+      }
     } else {
       const variable = subscriptionVariable(item);
       if (!variable) continue;
@@ -162,11 +168,35 @@ function applyUpdate(u: UpdateMsg) {
     } else if (el.tagName === 'IOT-TOGGLE') {
       (el as HTMLElement & { current?: unknown; ts?: number }).current = u.value;
       (el as HTMLElement & { current?: unknown; ts?: number }).ts = u.ts;
+    } else if (el.tagName === 'IOT-MAP') {
+      (el as HTMLElement & { updateVar?: (k: string, v: unknown, ts: number) => void }).updateVar?.(
+        u.variable,
+        u.value,
+        u.ts
+      );
     } else {
       (el as HTMLElement & { value?: unknown; ts?: number }).value = u.value;
       (el as HTMLElement & { value?: unknown; ts?: number }).ts = u.ts;
     }
   }
+}
+
+// Variable keys a map widget subscribes to (lat/lng of live markers + any
+// value variable). Mirrors the subscription logic in buildDataIndex.
+function mapVariableKeys(item: { props: Record<string, unknown> }): string[] {
+  const markers = (item.props['markers'] as Array<Record<string, unknown>> | undefined) ?? [];
+  const keys = new Set<string>();
+  for (const mk of markers) {
+    if ((mk['source'] ?? 'static') === 'variable') {
+      const lat = String(mk['latVar'] ?? '');
+      const lng = String(mk['lngVar'] ?? '');
+      if (lat) keys.add(lat);
+      if (lng) keys.add(lng);
+    }
+    const value = String(mk['valueVar'] ?? '');
+    if (value) keys.add(value);
+  }
+  return [...keys];
 }
 
 function addWidget(type: WidgetType) {

@@ -3,7 +3,7 @@
 
 import type { WidgetType } from '../types';
 
-export type FieldType = 'string' | 'number' | 'boolean' | 'variable' | 'select' | 'series';
+export type FieldType = 'string' | 'number' | 'boolean' | 'variable' | 'select' | 'series' | 'markers';
 
 export type FieldDef = {
   key: string;
@@ -40,6 +40,7 @@ const ICON_CHART = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_TOGGLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>`;
 const ICON_PUSH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg>`;
 const ICON_SLIDER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><circle cx="14" cy="12" r="3.25" fill="currentColor" stroke="none"/></svg>`;
+const ICON_MAP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.25" fill="currentColor" stroke="none"/></svg>`;
 
 export const CATALOG: ReadonlyArray<WidgetSpec> = [
   {
@@ -94,6 +95,28 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     ],
   },
   // (series items are { variable, label, color })
+  {
+    type: 'iot-map',
+    label: 'Map',
+    description: 'Geographic markers from static coords or live lat/lng variables.',
+    category: 'Monitor',
+    dataTypes: ['Lat/Lng pairs', 'Static coordinates'],
+    whenToUse:
+      'Plot device or asset locations on a map — fleet tracking, or fixed sensors across a site. Each marker can sit at fixed coordinates or follow a lat/lng variable pair, with an optional value shown on click.',
+    icon: ICON_MAP,
+    defaultSize: { w: 6, h: 4 },
+    defaultProps: { title: '', basemap: 'auto', autoFit: true, zoom: 13, centerLat: 0, centerLng: 0, markers: [] },
+    fields: [
+      { key: 'title', label: 'Title', type: 'string' },
+      { key: 'basemap', label: 'Basemap', type: 'select', options: ['auto', 'streets', 'light', 'dark', 'satellite'] },
+      { key: 'autoFit', label: 'Auto-fit to markers', type: 'boolean' },
+      { key: 'zoom', label: 'Default zoom', type: 'number' },
+      { key: 'centerLat', label: 'Center lat', type: 'number' },
+      { key: 'centerLng', label: 'Center lng', type: 'number' },
+      { key: 'markers', label: 'Markers', type: 'markers' },
+    ],
+  },
+  // (marker items are { source, lat, lng, latVar, lngVar, label, valueVar, color })
   {
     type: 'iot-toggle',
     label: 'Toggle',

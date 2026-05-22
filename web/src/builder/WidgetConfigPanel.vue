@@ -49,6 +49,27 @@ function removeSeries(idx: number) {
   series.splice(idx, 1);
   setProp('series', series);
 }
+
+function updateMarker(idx: number, key: string, v: unknown) {
+  if (!props.item) return;
+  const markers = [...((props.item.props['markers'] as Array<Record<string, unknown>>) ?? [])];
+  markers[idx] = { ...markers[idx], [key]: v };
+  setProp('markers', markers);
+}
+
+function addMarker() {
+  if (!props.item) return;
+  const markers = [...((props.item.props['markers'] as Array<Record<string, unknown>>) ?? [])];
+  markers.push({ source: 'static', lat: 0, lng: 0, label: '' });
+  setProp('markers', markers);
+}
+
+function removeMarker(idx: number) {
+  if (!props.item) return;
+  const markers = [...((props.item.props['markers'] as Array<Record<string, unknown>>) ?? [])];
+  markers.splice(idx, 1);
+  setProp('markers', markers);
+}
 </script>
 
 <template>
@@ -165,6 +186,92 @@ function removeSeries(idx: number) {
             class="w-full rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             @click="addSeries"
           >+ Add series</button>
+        </div>
+
+        <div v-else-if="f.type === 'markers'" class="space-y-3">
+          <div class="text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</div>
+          <div
+            v-for="(m, idx) in (item.props.markers as Array<Record<string, unknown>>) ?? []"
+            :key="idx"
+            class="space-y-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800"
+          >
+            <Dropdown
+              :model-value="(m['source'] as string) ?? 'static'"
+              :options="[
+                { value: 'static', label: 'Static coordinates' },
+                { value: 'variable', label: 'Lat/Lng variables' },
+              ]"
+              size="sm"
+              @update:model-value="(v) => updateMarker(idx, 'source', v)"
+            />
+            <div v-if="(m['source'] ?? 'static') === 'variable'" class="space-y-2">
+              <Dropdown
+                :model-value="(m['latVar'] as string) ?? ''"
+                :options="variableOptions"
+                placeholder="lat variable"
+                size="sm"
+                @update:model-value="(v) => updateMarker(idx, 'latVar', v)"
+              />
+              <Dropdown
+                :model-value="(m['lngVar'] as string) ?? ''"
+                :options="variableOptions"
+                placeholder="lng variable"
+                size="sm"
+                @update:model-value="(v) => updateMarker(idx, 'lngVar', v)"
+              />
+            </div>
+            <div v-else class="flex gap-2">
+              <input
+                :value="m['lat'] ?? 0"
+                type="number"
+                step="any"
+                placeholder="lat"
+                class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                @input="updateMarker(idx, 'lat', Number(($event.target as HTMLInputElement).value))"
+              />
+              <input
+                :value="m['lng'] ?? 0"
+                type="number"
+                step="any"
+                placeholder="lng"
+                class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                @input="updateMarker(idx, 'lng', Number(($event.target as HTMLInputElement).value))"
+              />
+            </div>
+            <input
+              :value="m['label'] ?? ''"
+              type="text"
+              placeholder="label (optional)"
+              class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+              @input="updateMarker(idx, 'label', ($event.target as HTMLInputElement).value)"
+            />
+            <Dropdown
+              :model-value="(m['valueVar'] as string) ?? ''"
+              :options="variableOptions"
+              placeholder="value variable (optional)"
+              size="sm"
+              @update:model-value="(v) => updateMarker(idx, 'valueVar', v)"
+            />
+            <div class="flex items-center gap-2">
+              <input
+                :value="(m['color'] as string) || '#ea580c'"
+                type="color"
+                class="h-7 w-9 shrink-0 cursor-pointer rounded border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950"
+                @input="updateMarker(idx, 'color', ($event.target as HTMLInputElement).value)"
+              />
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">Marker color</span>
+            </div>
+            <button
+              type="button"
+              class="w-full rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+              @click="removeMarker(idx)"
+            >Remove marker</button>
+          </div>
+          <button
+            type="button"
+            class="w-full rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            @click="addMarker"
+          >+ Add marker</button>
         </div>
       </template>
     </div>
