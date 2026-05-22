@@ -102,17 +102,24 @@ dashboards.post('/', async (c) => {
   );
 });
 
-// PUT /v1/admin/projects/:proj/dashboards/:id  body: { name?, layout?, if_updated_at? }
+// PUT /v1/admin/projects/:proj/dashboards/:id  body: { name?, description?, layout?, if_updated_at? }
 dashboards.put('/:id', async (c) => {
   const project = c.get('project');
   const user = c.get('user');
   const id = c.req.param('id');
-  const body = await c.req.json<{ name?: string; layout?: unknown; if_updated_at?: number }>();
+  const body = await c.req.json<{
+    name?: string;
+    description?: string | null;
+    layout?: unknown;
+    if_updated_at?: number;
+  }>();
 
   const current = await c.env.DB
-    .prepare(`SELECT name, layout, updated_at FROM dashboards WHERE id = ? AND project_id = ?`)
+    .prepare(
+      `SELECT name, description, layout, updated_at FROM dashboards WHERE id = ? AND project_id = ?`
+    )
     .bind(id, project.id)
-    .first<{ name: string; layout: string; updated_at: number }>();
+    .first<{ name: string; description: string | null; layout: string; updated_at: number }>();
   if (!current) return c.json({ error: 'not_found' }, 404);
 
   // Optimistic concurrency.
@@ -121,6 +128,15 @@ dashboards.put('/:id', async (c) => {
   }
 
   const nextName = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : current.name;
+
+  // description is only touched when the key is present; empty string clears it.
+  const nextDescription =
+    body.description === undefined
+      ? current.description
+      : typeof body.description === 'string' && body.description.trim()
+        ? body.description.trim()
+        : null;
+
   let nextLayoutJson: string = current.layout;
   if (body.layout !== undefined) {
     const v = validateLayout(body.layout);
@@ -131,9 +147,9 @@ dashboards.put('/:id', async (c) => {
   const now = Math.floor(Date.now() / 1000);
   await c.env.DB
     .prepare(
-      `UPDATE dashboards SET name = ?, layout = ?, updated_at = ? WHERE id = ? AND project_id = ?`
+      `UPDATE dashboards SET name = ?, description = ?, layout = ?, updated_at = ? WHERE id = ? AND project_id = ?`
     )
-    .bind(nextName, nextLayoutJson, now, id, project.id)
+    .bind(nextName, nextDescription, nextLayoutJson, now, id, project.id)
     .run();
 
   c.executionCtx.waitUntil(
@@ -145,12 +161,19 @@ dashboards.put('/:id', async (c) => {
       targetId: id,
       metadata: {
         renamed: typeof body.name === 'string' && body.name.trim() !== current.name,
+        description_changed: body.description !== undefined && nextDescription !== current.description,
         layout_changed: body.layout !== undefined,
       },
     })
   );
 
-  return c.json({ id, name: nextName, layout: JSON.parse(nextLayoutJson), updated_at: now });
+  return c.json({
+    id,
+    name: nextName,
+    description: nextDescription,
+    layout: JSON.parse(nextLayoutJson),
+    updated_at: now,
+  });
 });
 
 // DELETE /v1/admin/projects/:proj/dashboards/:id

@@ -120,11 +120,29 @@ export const useProjectStore = defineStore('project', () => {
     const meta: DashboardMeta = {
       id: d.id,
       name: d.name,
+      description: d.description ?? null,
       created_at: d.created_at,
       updated_at: d.updated_at,
     };
     dashboards.value = [...dashboards.value, meta];
     return meta;
+  }
+
+  async function updateDashboard(
+    id: string,
+    patch: { name?: string; description?: string | null }
+  ): Promise<DashboardMeta> {
+    if (!currentProjectId.value) throw new Error('no project');
+    const d = await api.put<Dashboard>(
+      `/v1/admin/projects/${currentProjectId.value}/dashboards/${id}`,
+      patch
+    );
+    dashboards.value = dashboards.value.map((x) =>
+      x.id === id
+        ? { ...x, name: d.name, description: d.description ?? null, updated_at: d.updated_at }
+        : x
+    );
+    return dashboards.value.find((x) => x.id === id)!;
   }
 
   async function fetchDashboard(id: string): Promise<Dashboard> {
@@ -318,6 +336,7 @@ export const useProjectStore = defineStore('project', () => {
     revokeProjectToken,
     loadDashboards,
     createDashboard,
+    updateDashboard,
     fetchDashboard,
     saveDashboard,
     deleteDashboard,
