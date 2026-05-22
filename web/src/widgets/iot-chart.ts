@@ -15,8 +15,23 @@
 // The page calls appendPoint(key, {ts, value}) on each WS update; we feed
 // that into apex's appendData() so live ticks animate in.
 
-import ApexCharts from 'apexcharts';
+import type ApexCharts from 'apexcharts';
 import apexCss from 'apexcharts/dist/apexcharts.css?raw';
+
+// ApexCharts is a heavy dependency. Load it as a separate async chunk the first
+// time a chart actually renders, so value/gauge/toggle-only dashboards never
+// download it. The promise is shared across all chart instances.
+let apexPromise: Promise<typeof import('apexcharts')> | null = null;
+function loadApex(): Promise<typeof import('apexcharts')> {
+  if (!apexPromise) {
+    apexPromise = import('apexcharts').then((m) => {
+      // CJS interop: the chunk may expose the class as `default` or directly.
+      const anyM = m as { default?: typeof import('apexcharts') };
+      return (anyM.default ?? m) as typeof import('apexcharts');
+    });
+  }
+  return apexPromise;
+}
 
 type SeriesPoint = { ts: number; value: number };
 type SeriesData = { key: string; label?: string; color?: string; points: SeriesPoint[] };
@@ -213,12 +228,20 @@ export class IotChartElement extends HTMLElement {
     if (this.#pendingFrame !== null) return;
     this.#pendingFrame = requestAnimationFrame(() => {
       this.#pendingFrame = null;
-      this.rebuild();
+      void this.rebuild();
     });
   }
 
-  private rebuild() {
+  private async rebuild() {
     if (!this.#host) return;
+    let ApexCtor: typeof import('apexcharts');
+    try {
+      ApexCtor = await loadApex();
+    } catch {
+      return; // chunk failed to load — nothing to render
+    }
+    // The element may have disconnected while the chunk was loading.
+    if (!this.#host || !this.isConnected) return;
     this.destroyChart();
     this.updateTs();
 
@@ -322,7 +345,7 @@ export class IotChartElement extends HTMLElement {
       },
     };
 
-    this.#chart = new ApexCharts(this.#host, options);
+    this.#chart = new ApexCtor(this.#host, options);
     this.#chart.render();
   }
 

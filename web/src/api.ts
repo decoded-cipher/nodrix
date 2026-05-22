@@ -39,8 +39,22 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
 }
 
+// Collapse concurrent identical GETs into one network request — e.g. two
+// components mounting at once both calling the same loader. The promise is shared
+// while in flight and dropped as soon as it settles, so this is a dedup of
+// in-flight requests, not a response cache (data stays fresh on the next call).
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function getDeduped<T>(path: string): Promise<T> {
+  const existing = inflightGets.get(path);
+  if (existing) return existing as Promise<T>;
+  const p = request<T>('GET', path).finally(() => inflightGets.delete(path));
+  inflightGets.set(path, p);
+  return p;
+}
+
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
+  get: <T>(path: string) => getDeduped<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),

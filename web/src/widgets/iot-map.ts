@@ -22,8 +22,21 @@
 // assets to break inside the bundler / shadow root, and per-marker color is
 // passed through a CSS variable.
 
-import L from 'leaflet';
+import type * as L from 'leaflet';
 import leafletCss from 'leaflet/dist/leaflet.css?raw';
+
+// Leaflet is a heavy dependency. Load it as a separate async chunk the first time
+// a map initialises, so dashboards without a map widget never download it. The
+// promise is shared across all map instances.
+let leafletPromise: Promise<typeof import('leaflet')> | null = null;
+function loadLeaflet(): Promise<typeof import('leaflet')> {
+  if (!leafletPromise) {
+    leafletPromise = import('leaflet').then(
+      (m) => (m as { default?: typeof import('leaflet') }).default ?? m
+    );
+  }
+  return leafletPromise;
+}
 
 type MarkerSource = 'static' | 'variable';
 type MarkerConfig = {
@@ -183,6 +196,7 @@ const WIDGET_CSS = `
 `;
 
 export class IotMapElement extends HTMLElement {
+  #L: typeof import('leaflet') | null = null;
   #map: L.Map | null = null;
   #host: HTMLElement | null = null;
   #tileLayer: L.TileLayer | null = null;
@@ -227,7 +241,7 @@ export class IotMapElement extends HTMLElement {
 
   connectedCallback() {
     this.renderTitle();
-    this.initMap();
+    void this.initMap();
   }
 
   disconnectedCallback() {
@@ -316,9 +330,17 @@ export class IotMapElement extends HTMLElement {
     }
   }
 
-  private initMap() {
+  private async initMap() {
     if (this.#map || !this.#host) return;
-    this.#map = L.map(this.#host, {
+    try {
+      this.#L = await loadLeaflet();
+    } catch {
+      return; // chunk failed to load
+    }
+    // The element may have disconnected while the chunk was loading.
+    if (!this.#host || !this.isConnected || this.#map) return;
+    const lib = this.#L;
+    this.#map = lib.map(this.#host, {
       zoomControl: false,
       attributionControl: false,
     });
@@ -341,13 +363,13 @@ export class IotMapElement extends HTMLElement {
   }
 
   private setBasemap() {
-    if (!this.#map) return;
+    if (!this.#map || !this.#L) return;
     const kind = this.resolveBasemap();
     if (this.#tileKind === kind && this.#tileLayer) return;
     this.#tileKind = kind;
     if (this.#tileLayer) this.#tileLayer.remove();
     const def = TILES[kind];
-    this.#tileLayer = L.tileLayer(def.url, {
+    this.#tileLayer = this.#L.tileLayer(def.url, {
       attribution: def.attribution,
       maxZoom: def.maxZoom,
       subdomains: def.subdomains,
@@ -369,7 +391,7 @@ export class IotMapElement extends HTMLElement {
   }
 
   private render() {
-    if (!this.#map) return;
+    if (!this.#map || !this.#L) return;
     const bounds: [number, number][] = [];
 
     for (let i = 0; i < this.#markers.length; i++) {
@@ -382,7 +404,7 @@ export class IotMapElement extends HTMLElement {
         bounds.push(latlng);
         const color = this.#markers[i]?.color || DEFAULT_COLOR;
         if (!layer) {
-          const m = L.marker(latlng, { icon: this.makeIcon(color), keyboard: false }).addTo(this.#map);
+          const m = this.#L.marker(latlng, { icon: this.makeIcon(color), keyboard: false }).addTo(this.#map);
           m.bindTooltip(this.tooltipHtml(i), { direction: 'top', offset: [0, -10], opacity: 1 });
           this.#layers[i] = m;
         } else {
@@ -406,11 +428,11 @@ export class IotMapElement extends HTMLElement {
   }
 
   private applyView(bounds: [number, number][]) {
-    if (!this.#map) return;
+    if (!this.#map || !this.#L) return;
     // Always auto-fit to the markers. The center/zoom is only a fallback shown
     // before any marker has a resolved position.
     if (bounds.length > 0) {
-      this.#map.fitBounds(L.latLngBounds(bounds), { padding: [24, 24], maxZoom: 16 });
+      this.#map.fitBounds(this.#L.latLngBounds(bounds), { padding: [24, 24], maxZoom: 16 });
       this.#viewSet = true;
     } else if (this.#forceView || !this.#viewSet) {
       this.#map.setView(
@@ -438,7 +460,7 @@ export class IotMapElement extends HTMLElement {
   // A pin = colored dot + an expanding pulse ring. Color rides in via a CSS
   // custom property so the pulse keyframes can reuse it.
   private makeIcon(color: string): L.DivIcon {
-    return L.divIcon({
+    return this.#L!.divIcon({
       className: 'map-pin-icon',
       html: `<span class="map-pin" style="--pin:${esc(color)}"><span class="map-pin-pulse"></span><span class="map-pin-dot"></span></span>`,
       iconSize: [20, 20],

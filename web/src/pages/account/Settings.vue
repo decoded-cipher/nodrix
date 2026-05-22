@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../../stores/session';
 import { useThemeStore, type ThemeMode } from '../../stores/theme';
@@ -107,13 +107,24 @@ function openCloudflareDashboard() {
 // without a manual refresh. Stops early once the deployed SHA catches up.
 let versionRecheckTimer: ReturnType<typeof setTimeout> | null = null;
 let versionRecheckCount = 0;
+let versionRecheckStopped = false;
 const VERSION_RECHECK_MAX = 60; // 60 * 10s = 10 min
+function stopVersionRecheck() {
+  versionRecheckStopped = true;
+  if (versionRecheckTimer) {
+    clearTimeout(versionRecheckTimer);
+    versionRecheckTimer = null;
+  }
+}
 function scheduleVersionRecheck() {
   versionRecheckCount = 0;
+  versionRecheckStopped = false;
   if (versionRecheckTimer) clearTimeout(versionRecheckTimer);
   const tick = async () => {
     versionRecheckCount += 1;
     await refreshVersion();
+    // The component may have unmounted while the request was in flight.
+    if (versionRecheckStopped) return;
     if (versionInfo.value?.status === 'up_to_date') {
       updateDispatched.value = false;
       return;
@@ -123,6 +134,9 @@ function scheduleVersionRecheck() {
   };
   versionRecheckTimer = setTimeout(tick, 10_000);
 }
+
+// Don't keep polling /v1/admin/version after the user leaves Settings.
+onBeforeUnmount(stopVersionRecheck);
 
 onMounted(async () => {
   if (session.user) isOwner.value = session.user.role === 'owner';

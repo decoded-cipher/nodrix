@@ -18,6 +18,10 @@ import { getSetting, setSetting } from './deployment-settings';
 const KEY = 'auth.signing_secret';
 const BYTES = 32;
 
+// The signing secret is stable for the life of a deployment, so once resolved we
+// keep it in isolate memory — no KV hop on subsequent requests in this isolate.
+let cachedSecret: string | null = null;
+
 function generate(): string {
   const buf = crypto.getRandomValues(new Uint8Array(BYTES));
   let s = '';
@@ -26,11 +30,16 @@ function generate(): string {
 }
 
 export async function getOrCreateSigningSecret(env: Env): Promise<string> {
+  if (cachedSecret) return cachedSecret;
   const existing = await getSetting(env, KEY);
-  if (existing) return existing;
+  if (existing) {
+    cachedSecret = existing;
+    return existing;
+  }
   // Seed from env on legacy deploys so the upgrade doesn't invalidate live
   // sessions; otherwise generate fresh.
   const seed = (env.BETTER_AUTH_SECRET ?? '').trim() || generate();
   await setSetting(env, KEY, seed);
+  cachedSecret = seed;
   return seed;
 }

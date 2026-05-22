@@ -14,6 +14,9 @@ import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '..
 
 const RING_BUFFER_MAX_ROWS = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
+// Eviction (age + overflow DELETE + COUNT) runs at most this often instead of on
+// every ingest — a single cheap last_evict_at lookup gates the actual work.
+const EVICT_INTERVAL_SECONDS = 30;
 const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
@@ -77,14 +80,20 @@ export class ProjectDO extends DurableObject<Env> {
     );
 
     // Snapshot prior values BEFORE the upsert so edge-triggered automations can
-    // see the false->true transition.
+    // see the false->true transition. One IN query over the unique keys instead
+    // of a SELECT per point. Variables with no prior row map to undefined.
+    const uniqueVars = [...new Set(points.map((p) => p.variable))];
     const prev = new Map<string, unknown>();
-    for (const p of points) {
-      if (prev.has(p.variable)) continue;
-      const row = this.sql
-        .exec<{ value: string }>(`SELECT value FROM latest_state WHERE variable = ?`, p.variable)
-        .toArray()[0];
-      prev.set(p.variable, row ? safeParse(row.value) : undefined);
+    for (const v of uniqueVars) prev.set(v, undefined);
+    if (uniqueVars.length > 0) {
+      const placeholders = uniqueVars.map(() => '?').join(',');
+      const rows = this.sql
+        .exec<{ variable: string; value: string }>(
+          `SELECT variable, value FROM latest_state WHERE variable IN (${placeholders})`,
+          ...uniqueVars
+        )
+        .toArray();
+      for (const r of rows) prev.set(r.variable, safeParse(r.value));
     }
 
     for (const p of points) {
@@ -218,21 +227,23 @@ export class ProjectDO extends DurableObject<Env> {
       .toArray();
     if (subs.length === 0) return;
 
+    // One RPC per subscribed dashboard, carrying the whole point batch — not one
+    // per (dashboard × point). The Dashboard DO fans each point out to its sockets.
+    const batch = points.map((p) => ({ variable: p.variable, value: p.value }));
+
     // Don't await: ingest returns to the device immediately.
     this.ctx.waitUntil(
       Promise.all(
-        subs.flatMap((s) =>
-          points.map(async (p) => {
-            try {
-              const stub = this.env.DASHBOARD_DO.get(
-                this.env.DASHBOARD_DO.idFromName(s.dashboard_id)
-              ) as unknown as DashboardDO;
-              await stub.notify(p.variable, p.value, ts);
-            } catch {
-              // Best-effort. A wedged Dashboard DO must not break telemetry.
-            }
-          })
-        )
+        subs.map(async (s) => {
+          try {
+            const stub = this.env.DASHBOARD_DO.get(
+              this.env.DASHBOARD_DO.idFromName(s.dashboard_id)
+            ) as unknown as DashboardDO;
+            await stub.notifyBatch(batch, ts);
+          } catch {
+            // Best-effort. A wedged Dashboard DO must not break telemetry.
+          }
+        })
       ).then(() => undefined)
     );
   }
@@ -250,6 +261,25 @@ export class ProjectDO extends DurableObject<Env> {
       value: safeParse(r.value),
       received_at: r.received_at,
     }));
+  }
+
+  // Series for a specific set of variables in one query. Used by the dashboard
+  // snapshot so a connecting client only receives history for the variables its
+  // chart widgets render — not the whole ring buffer.
+  async getSeriesForVariables(variables: string[], sinceTs: number | null): Promise<SeriesRow[]> {
+    if (variables.length === 0) return [];
+    const cutoff = sinceTs ?? 0;
+    const placeholders = variables.map(() => '?').join(',');
+    const rows = this.sql
+      .exec<{ ts: number; variable: string; value: string }>(
+        `SELECT ts, variable, value FROM ring_buffer
+         WHERE variable IN (${placeholders}) AND ts >= ?
+         ORDER BY ts ASC`,
+        ...variables,
+        cutoff
+      )
+      .toArray();
+    return rows.map((r) => ({ ts: r.ts, variable: r.variable, value: safeParse(r.value) }));
   }
 
   async getSeries(variable: string | null, sinceTs: number | null): Promise<SeriesRow[]> {
@@ -576,6 +606,14 @@ export class ProjectDO extends DurableObject<Env> {
   }
 
   private evictRingBuffer(now: number): void {
+    // Gate the actual eviction on a cheap last_evict_at lookup so the age DELETE,
+    // COUNT, and overflow DELETE don't run on every single ingest.
+    const lastRow = this.sql
+      .exec<{ v: string }>(`SELECT v FROM flush_meta WHERE k = 'last_evict_at'`)
+      .toArray()[0];
+    const lastEvict = lastRow ? Number(lastRow.v) : 0;
+    if (now - lastEvict < EVICT_INTERVAL_SECONDS) return;
+
     const ageCutoff = now - RING_BUFFER_MAX_AGE_SECONDS;
     this.sql.exec(`DELETE FROM ring_buffer WHERE ts < ?`, ageCutoff);
 
@@ -591,6 +629,12 @@ export class ProjectDO extends DurableObject<Env> {
         overflow
       );
     }
+
+    this.sql.exec(
+      `INSERT INTO flush_meta (k, v) VALUES ('last_evict_at', ?)
+       ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
+      String(now)
+    );
   }
 }
 

@@ -141,10 +141,14 @@ projects.post('/:proj/flush', async (c) => {
   return c.json(result);
 });
 
-// Cascade: destroys the project's Project DO (with R2 telemetry history) and
-// every Dashboard DO in the project, then deletes the D1 row (which cascades
-// dashboards, project_variables, project_tokens, user_tokens, project_members
-// via FK).
+// Cascade: wipes the project's Project DO (which owns R2 telemetry history, not
+// covered by D1 FK cascade), then deletes the D1 row — which cascades dashboards,
+// project_variables, project_tokens, user_tokens, project_members via FK.
+//
+// Dashboard DOs are intentionally NOT destroyed here: that was an RPC per
+// dashboard. Each one's only D1-backed row disappears via the cascade, so on any
+// reconnect its bootstrap returns dashboard_not_found and closes; an idle DO with
+// no alarm and a few bytes of SQLite costs effectively nothing.
 projects.delete('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
@@ -155,33 +159,13 @@ projects.delete('/:proj', async (c) => {
     .first<{ role: string }>();
   if (!member || member.role !== 'owner') return c.json({ error: 'forbidden' }, 403);
 
-  // Gather dashboard DO IDs to destroy BEFORE the D1 delete cascades rows away.
-  const dashboardRows = await c.env.DB
-    .prepare(`SELECT id FROM dashboards WHERE project_id = ?`)
-    .bind(projId)
-    .all<{ id: string }>();
-
   // The project's own DO holds all variable state + R2 telemetry history.
-  const projectDestroy = (async () => {
-    try {
-      const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(projId)) as unknown as ProjectDO;
-      await stub.destroy();
-    } catch (e) {
-      console.error('project DO destroy failed', projId, e);
-    }
-  })();
-
-  await Promise.all([
-    projectDestroy,
-    ...dashboardRows.results.map(async (d) => {
-      try {
-        const stub = c.env.DASHBOARD_DO.get(c.env.DASHBOARD_DO.idFromName(d.id));
-        await (stub as unknown as { destroy: () => Promise<void> }).destroy();
-      } catch (e) {
-        console.error('dashboard destroy failed', d.id, e);
-      }
-    }),
-  ]);
+  try {
+    const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(projId)) as unknown as ProjectDO;
+    await stub.destroy();
+  } catch (e) {
+    console.error('project DO destroy failed', projId, e);
+  }
 
   await c.env.DB.prepare(`DELETE FROM projects WHERE id = ?`).bind(projId).run();
 

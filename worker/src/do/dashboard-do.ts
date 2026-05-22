@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import type { ProjectDO } from './project-do';
-import { validateLayout, type Layout } from '../lib/layout';
+import { validateLayout, variablesFromLayout, chartVariablesFromLayout, type Layout } from '../lib/layout';
 import { newId } from '../lib/ids';
 
 // Dashboard Durable Object. One per dashboard id (ctx.id.name === dashboard_id).
@@ -77,14 +77,22 @@ export class DashboardDO extends DurableObject<Env> {
 
   // ---- RPC from the Project DO ----------------------------------------------
 
-  async notify(variable: string, value: unknown, ts: number): Promise<void> {
-    const msg: UpdateMsg = { type: 'update', variable, value, ts };
-    const json = JSON.stringify(msg);
-    for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.send(json);
-      } catch {
-        // Dead socket; will be cleaned up on webSocketClose.
+  // One RPC per ingest (not per point): the Project DO sends the whole batch of
+  // updated variables for this dashboard in a single call. We fan each point out
+  // to every live socket as an individual `update` frame, keeping the wire
+  // protocol unchanged while collapsing cross-DO RPCs from N×M to N.
+  async notifyBatch(points: Array<{ variable: string; value: unknown }>, ts: number): Promise<void> {
+    const sockets = this.ctx.getWebSockets();
+    if (sockets.length === 0 || points.length === 0) return;
+    for (const p of points) {
+      const msg: UpdateMsg = { type: 'update', variable: p.variable, value: p.value, ts };
+      const json = JSON.stringify(msg);
+      for (const ws of sockets) {
+        try {
+          ws.send(json);
+        } catch {
+          // Dead socket; will be cleaned up on webSocketClose.
+        }
       }
     }
   }
@@ -161,13 +169,23 @@ export class DashboardDO extends DurableObject<Env> {
     const stub = this.env.PROJECT_DO.get(
       this.env.PROJECT_DO.idFromName(row.project_id)
     ) as unknown as ProjectDO;
+
+    // Only ship what this dashboard renders: latest state for every referenced
+    // variable, and 1h of series for chart variables only (other widgets render
+    // from latest state alone). Avoids streaming the whole project's history.
+    const shownVars = new Set(variablesFromLayout(layout));
+    const chartVars = chartVariablesFromLayout(layout);
     const [latest, series] = await Promise.all([
       stub.getLatestState().catch(() => []),
-      stub.getSeries(null, Math.floor(Date.now() / 1000) - 60 * 60).catch(() => []),
+      chartVars.length > 0
+        ? stub.getSeriesForVariables(chartVars, Math.floor(Date.now() / 1000) - 60 * 60).catch(() => [])
+        : Promise.resolve([] as Array<{ ts: number; variable: string; value: unknown }>),
     ]);
 
     const variables: Record<string, { value: unknown; received_at: number }> = {};
-    for (const r of latest) variables[r.variable] = { value: r.value, received_at: r.received_at };
+    for (const r of latest) {
+      if (shownVars.has(r.variable)) variables[r.variable] = { value: r.value, received_at: r.received_at };
+    }
 
     const snapshot: Snapshot = {
       type: 'snapshot',
@@ -195,18 +213,21 @@ export class DashboardDO extends DurableObject<Env> {
     };
 
     const dashId = this.dashboardId();
+    // Resolve the dashboard's project and validate the variable in one round-trip.
+    // LEFT JOIN keeps the two distinct ack reasons: no row → dashboard missing;
+    // row with null variable_id → variable not in the dashboard's project.
     const row = await this.env.DB
-      .prepare(`SELECT project_id FROM dashboards WHERE id = ?`)
-      .bind(dashId)
-      .first<{ project_id: string }>();
+      .prepare(
+        `SELECT d.project_id, pv.id AS variable_id
+           FROM dashboards d
+           LEFT JOIN project_variables pv
+             ON pv.project_id = d.project_id AND pv.key = ?
+          WHERE d.id = ?`
+      )
+      .bind(msg.variable, dashId)
+      .first<{ project_id: string; variable_id: string | null }>();
     if (!row) return ack(false, 'dashboard_not_found');
-
-    // Confirm the variable belongs to the dashboard's project.
-    const variable = await this.env.DB
-      .prepare(`SELECT id FROM project_variables WHERE project_id = ? AND key = ?`)
-      .bind(row.project_id, msg.variable)
-      .first<{ id: string }>();
-    if (!variable) return ack(false, 'variable_not_in_project');
+    if (!row.variable_id) return ack(false, 'variable_not_in_project');
 
     const cmdId = newId('control');
     const stub = this.env.PROJECT_DO.get(

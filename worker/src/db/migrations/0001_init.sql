@@ -181,6 +181,10 @@ CREATE TABLE IF NOT EXISTS automations (
 );
 CREATE INDEX IF NOT EXISTS idx_automations_project ON automations(project_id);
 CREATE INDEX IF NOT EXISTS idx_automations_enabled ON automations(enabled) WHERE enabled = 1;
+-- Hot lookups: variable-trigger fetch (project + enabled + type) and the
+-- scheduler scan (enabled + type). Composite covers both without a full scan.
+CREATE INDEX IF NOT EXISTS idx_automations_project_enabled_type
+  ON automations(project_id, enabled, trigger_type);
 
 -- Integrations: reusable connectors (webhook, Slack, HTTP service, ...).
 CREATE TABLE IF NOT EXISTS integrations (
@@ -214,6 +218,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_project ON audit_log(project_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_log_target  ON audit_log(target_type, target_id);
+-- Account-wide audit query filters/sorts the null-project branch by user_id.
+CREATE INDEX IF NOT EXISTS idx_audit_log_user    ON audit_log(user_id);
 
 -- Deployment-wide settings (generic K/V).
 CREATE TABLE IF NOT EXISTS deployment_settings (

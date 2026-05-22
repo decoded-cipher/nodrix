@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/project';
 import { specFor } from '../../builder/widget-catalog';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
-import { applyProps, createWidgetElement, buildDataIndex, subscriptionVariable } from '../../builder/render-widget';
+import { applyProps, createWidgetElement, buildDataIndex, subscriptionVariable, type DataIndex } from '../../builder/render-widget';
 import { DashboardWs } from '../../ws';
 import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../../types';
 
@@ -22,6 +22,9 @@ const dirty = ref(false);
 const err = ref<string | null>(null);
 
 const widgetEls = shallowRef<Map<string, HTMLElement>>(new Map());
+// Cached subscription index — rebuilt only when the layout/elements change
+// (in syncWidgetElements), not on every incoming WS update.
+const idxCache = shallowRef<DataIndex | null>(null);
 let ws: DashboardWs | null = null;
 
 // Project layout.items into grid-layout-plus's shape. One-way bind because
@@ -85,7 +88,10 @@ onBeforeUnmount(() => {
   ws?.stop();
 });
 
-watch(layout, () => syncWidgetElements(), { deep: true, flush: 'post' });
+// Every layout mutation reassigns layout.value to a fresh object (add/remove/
+// move/resize/config-edit/save all do `layout.value = {...}`), so a shallow
+// watch fires on each change — no need for a deep tree walk every reactive tick.
+watch(layout, () => syncWidgetElements(), { flush: 'post' });
 
 function syncWidgetElements() {
   // After each render of grid items, ensure each .widget-host has the right
@@ -108,6 +114,8 @@ function syncWidgetElements() {
   for (const id of [...widgetEls.value.keys()]) {
     if (!ids.has(id)) widgetEls.value.delete(id);
   }
+  // Refresh the subscription index now that elements + props are current.
+  idxCache.value = buildDataIndex(layout.value, widgetEls.value);
 }
 
 function handleMessage(msg: WsServerMsg) {
@@ -153,7 +161,9 @@ function applySnapshot(snap: SnapshotMsg) {
 }
 
 function applyUpdate(u: UpdateMsg) {
-  const idx = buildDataIndex(layout.value, widgetEls.value);
+  // Reuse the cached index; fall back to a build if an update lands before the
+  // first post-layout sync has run.
+  const idx = idxCache.value ?? buildDataIndex(layout.value, widgetEls.value);
   const targets = idx.byKey.get(u.variable);
   if (!targets) return;
   for (const el of targets) {
