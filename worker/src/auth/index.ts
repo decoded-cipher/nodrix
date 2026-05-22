@@ -41,26 +41,62 @@ async function readClientSecret(signingSecret: string, stored: string): Promise<
   return decryptSecret(signingSecret, stored, OAUTH_SECRET_ENC_INFO);
 }
 
-async function loadProviders(env: Env, signingSecret: string): Promise<SocialProviders> {
+// OAuth provider config is read on every buildAuth() (i.e. every authenticated
+// request). It changes only when an owner edits Settings, so it's KV-cached.
+// We cache the RAW rows — secrets stay encrypted at rest in KV exactly as in D1;
+// decryption still happens per request (cheap) but the D1 read is skipped.
+const PROVIDERS_CACHE_KEY = 'settings:auth_providers';
+const PROVIDERS_CACHE_TTL_SECONDS = 300;
+
+async function loadProviderRows(env: Env): Promise<ProviderRow[]> {
   try {
-    const rows = await env.DB
+    const cached = await env.KV.get(PROVIDERS_CACHE_KEY);
+    if (cached !== null) {
+      try { return JSON.parse(cached) as ProviderRow[]; } catch { /* corrupt — refetch */ }
+    }
+  } catch {
+    // KV down — fall through to D1.
+  }
+
+  let rows: ProviderRow[] = [];
+  try {
+    const res = await env.DB
       .prepare(`SELECT kind, client_id, client_secret, enabled FROM auth_providers WHERE enabled = 1`)
       .all<ProviderRow>();
-    const out: SocialProviders = {};
-    for (const r of rows.results) {
-      try {
-        const clientSecret = await readClientSecret(signingSecret, r.client_secret);
-        out[r.kind] = { clientId: r.client_id, clientSecret };
-      } catch {
-        // Decrypt failed (corrupted row or signing secret rotated). Skip
-        // this provider rather than taking down the whole auth pipeline.
-      }
-    }
-    return out;
+    rows = res.results;
   } catch {
-    // Table may not exist yet on a fresh deploy — fall back to no providers.
-    return {};
+    // Table may not exist yet on a fresh deploy — treat as no providers, but
+    // don't cache the empty result (the table is about to be created).
+    return [];
   }
+
+  try {
+    await env.KV.put(PROVIDERS_CACHE_KEY, JSON.stringify(rows), {
+      expirationTtl: PROVIDERS_CACHE_TTL_SECONDS,
+    });
+  } catch { /* best-effort */ }
+  return rows;
+}
+
+// Called by the admin auth-providers routes after a write so the next request
+// rebuilds from D1 instead of waiting out the TTL.
+export async function invalidateAuthProvidersCache(env: Env): Promise<void> {
+  try { await env.KV.delete(PROVIDERS_CACHE_KEY); } catch { /* best-effort */ }
+}
+
+async function loadProviders(env: Env, signingSecret: string): Promise<SocialProviders> {
+  const rows = await loadProviderRows(env);
+  const out: SocialProviders = {};
+  for (const r of rows) {
+    try {
+      const clientSecret = await readClientSecret(signingSecret, r.client_secret);
+      out[r.kind] = { clientId: r.client_id, clientSecret };
+    } catch {
+      // Decrypt failed (corrupted row or signing secret rotated). Skip this
+      // provider rather than taking down the whole auth pipeline.
+    }
+  }
+  return out;
 }
 
 // baseURL is derived from the request origin so the same code works on

@@ -4,7 +4,7 @@ import { requireSession, type UserContextVars } from '../middleware/require-sess
 import { recordAudit } from '../lib/audit';
 import { encryptSecret } from '../lib/crypto';
 import { getOrCreateSigningSecret } from '../lib/auth-secret';
-import { OAUTH_SECRET_ENC_INFO } from '../auth/index';
+import { OAUTH_SECRET_ENC_INFO, invalidateAuthProvidersCache } from '../auth/index';
 
 const authProviders = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -88,6 +88,9 @@ authProviders.put('/:kind', async (c) => {
     .bind(kind, clientId, encryptedSecret, enabled, now, now)
     .run();
 
+  // Next buildAuth() must see the new config immediately, not after the TTL.
+  await invalidateAuthProvidersCache(c.env);
+
   c.executionCtx.waitUntil(
     recordAudit(c.env, {
       projectId: null,
@@ -115,6 +118,8 @@ authProviders.delete('/:kind', async (c) => {
     .bind(kind)
     .run();
   if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
+
+  await invalidateAuthProvidersCache(c.env);
 
   c.executionCtx.waitUntil(
     recordAudit(c.env, {

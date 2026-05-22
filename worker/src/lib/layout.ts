@@ -91,3 +91,17 @@ export function variablesFromLayout(layout: Layout): string[] {
   }
   return [...set];
 }
+
+// Variable keys that actually need historical series on a dashboard. Only chart
+// widgets consume series; every other widget renders from latest state alone, so
+// the snapshot doesn't need to ship history for them.
+export function chartVariablesFromLayout(layout: Layout): string[] {
+  const set = new Set<string>();
+  for (const item of layout.items) {
+    if (item.type !== 'iot-chart' || !Array.isArray(item.props['series'])) continue;
+    for (const s of item.props['series'] as Array<Record<string, unknown>>) {
+      if (typeof s['variable'] === 'string') set.add(s['variable']);
+    }
+  }
+  return [...set];
+}
