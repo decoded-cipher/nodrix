@@ -37,6 +37,22 @@ export function buildDataIndex(layout: Layout, els: Map<string, HTMLElement>): D
         addSub(el, variable);
       }
       chartKeys.set(item.id, m);
+    } else if (item.type === 'iot-map') {
+      // A map subscribes to every variable bound by its markers — the lat/lng
+      // pair of each live marker plus any value variable. The widget itself
+      // owns the variable -> marker mapping, so the page only needs to route
+      // updates to the element via updateVar().
+      const markers = (item.props['markers'] as Array<Record<string, unknown>> | undefined) ?? [];
+      for (const mk of markers) {
+        if ((mk['source'] ?? 'static') === 'variable') {
+          const latVar = String(mk['latVar'] ?? '');
+          const lngVar = String(mk['lngVar'] ?? '');
+          if (latVar) addSub(el, latVar);
+          if (lngVar) addSub(el, lngVar);
+        }
+        const valueVar = String(mk['valueVar'] ?? '');
+        if (valueVar) addSub(el, valueVar);
+      }
     } else if (item.type !== 'iot-push') {
       // iot-push is fire-and-forget — no state to subscribe to. Everything
       // else subscribes to its single `variable` prop. Control widgets
@@ -80,6 +96,16 @@ export function applyProps(el: HTMLElement, item: WidgetInstance): void {
       color: typeof s['color'] === 'string' ? s['color'] : undefined,
       points: [],
     }));
+  }
+
+  if (item.type === 'iot-map') {
+    if (typeof p['basemap'] === 'string') el.setAttribute('data-basemap', p['basemap']);
+    if (typeof p['autoFit'] === 'boolean') el.setAttribute('data-auto-fit', p['autoFit'] ? 'true' : 'false');
+    if (typeof p['zoom'] === 'number') el.setAttribute('data-zoom', String(p['zoom']));
+    if (typeof p['centerLat'] === 'number') el.setAttribute('data-center-lat', String(p['centerLat']));
+    if (typeof p['centerLng'] === 'number') el.setAttribute('data-center-lng', String(p['centerLng']));
+    (el as HTMLElement & { markers?: unknown }).markers =
+      (p['markers'] as Array<Record<string, unknown>> | undefined) ?? [];
   }
 }
 
