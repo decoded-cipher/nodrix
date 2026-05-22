@@ -19,7 +19,7 @@ const turnstileSiteKey = '0x4AAAAAADT8tR-a6EWOLJdC';
 <div id="wishlist-modal" class="fixed inset-0 z-50 hidden">
   <div
     data-wishlist-backdrop
-    class="absolute inset-0 flex items-end justify-center bg-neutral-900/60 p-4 backdrop-blur-sm sm:items-center"
+    class="absolute inset-0 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm"
   >
     <div
       data-wishlist-card
@@ -88,8 +88,10 @@ const turnstileSiteKey = '0x4AAAAAADT8tR-a6EWOLJdC';
               class="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-accent-400 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent-500"
             />
 
-            <!-- Cloudflare Turnstile — rendered explicitly when the modal first opens. -->
-            <div id="wishlist-turnstile" data-sitekey={turnstileSiteKey} class="flex min-h-[65px] justify-center"></div>
+            <!-- Cloudflare Turnstile — rendered explicitly when the modal first opens.
+                 Invisible widget: 0 height and no extra gap (mt-0!) so the button sits
+                 directly under the email field. -->
+            <div id="wishlist-turnstile" data-sitekey={turnstileSiteKey} class="flex justify-center mt-0!"></div>
 
             <button
               type="submit"
