@@ -18,13 +18,14 @@ const INTERVAL_MS = Number(process.env.INTERVAL_MS ?? 3000);
 const ENDPOINT = `https://${HOST}/v1/telemetry`;
 
 // Each asset walks from its start point. Heading in radians; speed in km/h.
+// Starting around Kochi, Kerala, India.
 const assets = [
-  { id: 'truck1', lat: 37.7793, lng: -122.4193, heading: rad(45), speed: 35, color: 'orange' },
-  { id: 'truck2', lat: 37.7649, lng: -122.4194, heading: rad(200), speed: 28, color: 'blue' },
+  { id: 'truck1', lat: 9.9312, lng: 76.2673, heading: rad(45), speed: 35, color: 'orange' },
+  { id: 'truck2', lat: 9.9658, lng: 76.2999, heading: rad(200), speed: 28, color: 'blue' },
 ];
 
-// Keep the assets roughly within ~5km of downtown SF so they don't wander off.
-const CENTER = { lat: 37.7749, lng: -122.4194 };
+// Keep the assets roughly within ~5km of Kochi, Kerala so they don't wander off.
+const CENTER = { lat: 9.9312, lng: 76.2673 };
 const MAX_KM = 5;
 
 function required(name) {
