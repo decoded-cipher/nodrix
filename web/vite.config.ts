@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
@@ -13,6 +14,22 @@ export default defineConfig({
       },
     }),
     tailwindcss(),
+    // Installable PWA — generates + auto-registers the service worker; the
+    // manifest stays in public/site.webmanifest, so the plugin only owns the SW.
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      manifest: false,
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // og.png is only for social scrapers — no need to precache it offline.
+        globIgnores: ['**/og.png'],
+        navigateFallback: '/index.html',
+        // Never hijack API / WebSocket requests with the SPA fallback.
+        navigateFallbackDenylist: [/^\/v1/, /^\/ws/],
+        cleanupOutdatedCaches: true,
+      },
+    }),
   ],
   build: {
     outDir: 'dist',
