@@ -154,10 +154,10 @@ const WIDGET_CSS = `
   .popup-ts { color: var(--color-text-faint, #a3a3a3); font-size: 10px; margin-top: 2px; }
   /* Marker pin: a colored dot with a small expanding pulse ring behind it. */
   .map-pin-icon { background: none; border: none; }
-  .map-pin { position: relative; display: block; width: 16px; height: 16px; }
+  .map-pin { position: relative; display: block; width: 20px; height: 20px; }
   .map-pin-dot {
     position: absolute;
-    inset: 4px;
+    inset: 5px;
     border-radius: 50%;
     background: var(--pin, #ea580c);
     border: 2px solid #fff;
@@ -166,7 +166,7 @@ const WIDGET_CSS = `
   }
   .map-pin-pulse {
     position: absolute;
-    inset: 4px;
+    inset: 5px;
     border-radius: 50%;
     background: var(--pin, #ea580c);
     opacity: 0.5;
@@ -383,7 +383,7 @@ export class IotMapElement extends HTMLElement {
         const color = this.#markers[i]?.color || DEFAULT_COLOR;
         if (!layer) {
           const m = L.marker(latlng, { icon: this.makeIcon(color), keyboard: false }).addTo(this.#map);
-          m.bindTooltip(this.tooltipHtml(i), { direction: 'top', offset: [0, -8], opacity: 1 });
+          m.bindTooltip(this.tooltipHtml(i), { direction: 'top', offset: [0, -10], opacity: 1 });
           this.#layers[i] = m;
         } else {
           // Color is config-driven; a config change rebuilds all layers, so on a
@@ -441,8 +441,8 @@ export class IotMapElement extends HTMLElement {
     return L.divIcon({
       className: 'map-pin-icon',
       html: `<span class="map-pin" style="--pin:${esc(color)}"><span class="map-pin-pulse"></span><span class="map-pin-dot"></span></span>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
     });
   }
 

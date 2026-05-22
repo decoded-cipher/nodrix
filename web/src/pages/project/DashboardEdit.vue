@@ -238,9 +238,10 @@ function duplicateItem(id: string) {
   const newId = newWidgetId();
   const { x, y } = placeFor(src.w, src.h);
   // Deep-clone props so the copy's markers/series arrays are independent.
+  const props = JSON.parse(JSON.stringify(src.props)) as Record<string, unknown>;
   layout.value = {
     ...layout.value,
-    items: [...layout.value.items, { ...src, id: newId, x, y, props: structuredClone(src.props) }],
+    items: [...layout.value.items, { ...src, id: newId, x, y, props }],
   };
   selectedId.value = newId;
   dirty.value = true;
