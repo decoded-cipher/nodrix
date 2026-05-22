@@ -3,8 +3,7 @@
 // Attributes:
 //   - data-title
 //   - data-basemap     'auto' | 'streets' | 'light' | 'dark' | 'satellite'  (default 'auto')
-//   - data-auto-fit    'true' | 'false'   (default 'true')
-//   - data-zoom        fallback zoom when not auto-fitting   (default 13)
+//   - data-zoom        fallback zoom shown before any marker has a position  (default 13)
 //   - data-center-lat  fallback center lat                   (default 0)
 //   - data-center-lng  fallback center lng                   (default 0)
 //
@@ -167,7 +166,7 @@ export class IotMapElement extends HTMLElement {
   #themeObserver: MutationObserver | null = null;
 
   static get observedAttributes() {
-    return ['data-title', 'data-basemap', 'data-auto-fit', 'data-zoom', 'data-center-lat', 'data-center-lng'];
+    return ['data-title', 'data-basemap', 'data-zoom', 'data-center-lat', 'data-center-lng'];
   }
 
   constructor() {
@@ -284,12 +283,8 @@ export class IotMapElement extends HTMLElement {
   private initMap() {
     if (this.#map || !this.#host) return;
     this.#map = L.map(this.#host, {
-      zoomControl: true,
-      // Attribution control hidden by request. Note: OSM/CARTO/Esri tile terms
-      // ask for visible data attribution — re-enable if you switch providers.
+      zoomControl: false,
       attributionControl: false,
-      // Render circle markers on a canvas — efficient and avoids per-marker
-      // DOM nodes inside the shadow root.
       preferCanvas: true,
     });
     this.#map.setView([this.numAttr('data-center-lat', 0), this.numAttr('data-center-lng', 0)], this.numAttr('data-zoom', 13));
@@ -382,8 +377,9 @@ export class IotMapElement extends HTMLElement {
 
   private applyView(bounds: [number, number][]) {
     if (!this.#map) return;
-    const autoFit = this.boolAttr('data-auto-fit', true);
-    if (autoFit && bounds.length > 0) {
+    // Always auto-fit to the markers. The center/zoom is only a fallback shown
+    // before any marker has a resolved position.
+    if (bounds.length > 0) {
       this.#map.fitBounds(L.latLngBounds(bounds), { padding: [24, 24], maxZoom: 16 });
       this.#viewSet = true;
     } else if (this.#forceView || !this.#viewSet) {
@@ -436,12 +432,6 @@ export class IotMapElement extends HTMLElement {
     if (v === null) return dflt;
     const n = Number(v);
     return Number.isFinite(n) ? n : dflt;
-  }
-
-  private boolAttr(name: string, dflt: boolean): boolean {
-    const v = this.getAttribute(name);
-    if (v === null) return dflt;
-    return v === 'true' || v === '1' || v === 'yes';
   }
 }
 
