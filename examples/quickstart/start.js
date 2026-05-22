@@ -6,3 +6,4 @@
 
 import './sensors.js';
 import './controllers.js';
+import './gps.js';

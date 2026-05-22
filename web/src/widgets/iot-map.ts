@@ -145,10 +145,18 @@ const WIDGET_CSS = `
   .popup-title { font-weight: 600; }
   .popup-val { font-variant-numeric: tabular-nums; }
   .popup-ts { color: var(--color-text-faint, #a3a3a3); font-size: 10px; margin-top: 2px; }
+  /* Required data attribution, kept small + subtle. The "Leaflet" + flag
+     prefix is removed in initMap (setPrefix(false)) — that part is optional. */
   .leaflet-control-attribution {
-    background: var(--color-bg-elevated, rgba(255,255,255,0.8)) !important;
+    font-size: 9px !important;
+    line-height: 1.4 !important;
+    padding: 0 4px !important;
+    background: var(--color-bg-elevated, rgba(255,255,255,0.7)) !important;
     color: var(--color-text-faint, #a3a3a3) !important;
+    opacity: 0.7;
+    transition: opacity 120ms ease;
   }
+  .leaflet-control-attribution:hover { opacity: 1; }
   .leaflet-control-attribution a { color: var(--color-text-muted, #525252) !important; }
 `;
 
@@ -296,6 +304,9 @@ export class IotMapElement extends HTMLElement {
       preferCanvas: true,
     });
     this.#map.setView([this.numAttr('data-center-lat', 0), this.numAttr('data-center-lng', 0)], this.numAttr('data-zoom', 13));
+    // Drop Leaflet's own "Leaflet" + flag prefix (self-promotion, not required);
+    // the tile providers' data attribution stays.
+    this.#map.attributionControl.setPrefix(false);
     this.setBasemap();
 
     // Grid drag/resize doesn't fire a window resize — observe the host and
