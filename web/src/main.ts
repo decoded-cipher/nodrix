@@ -29,8 +29,10 @@ router.beforeEach((_to, _from, next) => {
   progress.start();
   next();
 });
-router.afterEach(() => {
+router.afterEach((to) => {
   progress.done();
+  const title = to.meta['title'] as string | undefined;
+  document.title = title ? `${title} · nodrix` : 'nodrix — your own IoT cloud, on Cloudflare';
 });
 router.onError(() => {
   progress.done();

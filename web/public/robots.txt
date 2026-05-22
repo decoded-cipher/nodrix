@@ -1,0 +1,4 @@
+# Allow crawling so each page's `noindex, follow` is honored: keeps the instance
+# out of search while the "Powered by nodrix" backlink still reaches nodrix.live.
+User-agent: *
+Allow: /

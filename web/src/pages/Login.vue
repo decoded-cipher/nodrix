@@ -189,5 +189,17 @@ async function signInWith(provider: 'google' | 'github') {
         <Spinner size="sm" label="Checking sign-in options…" />
       </div>
     </div>
+
+    <!-- Backlink to the project site (instance is noindex/follow, so equity flows). -->
+    <p class="mt-6 text-center text-xs text-neutral-400 dark:text-neutral-500">
+      Powered by
+      <a
+        href="https://nodrix.live"
+        target="_blank"
+        rel="noopener"
+        class="font-medium text-neutral-500 underline-offset-2 hover:text-accent-600 hover:underline dark:text-neutral-400"
+      >nodrix</a>
+      — your own IoT cloud, on Cloudflare.
+    </p>
   </main>
 </template>
