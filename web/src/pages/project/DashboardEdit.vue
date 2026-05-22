@@ -199,48 +199,50 @@ function mapVariableKeys(item: { props: Record<string, unknown> }): string[] {
   return [...keys];
 }
 
-function addWidget(type: WidgetType) {
-  const spec = specFor(type);
-  const id = `w_${Math.random().toString(36).slice(2, 10)}`;
-  const w = spec.defaultSize.w;
-  const h = spec.defaultSize.h;
+function newWidgetId(): string {
+  return `w_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Leftmost (x, y) where a w×h widget fits without overlapping — packs
+// horizontally first, then wraps to the next row.
+function placeFor(w: number, h: number): { x: number; y: number } {
   const cols = layout.value.grid.columns;
   const items = layout.value.items;
-  // Pack horizontally first, then wrap. Find leftmost (x, y) that fits.
-  let placedX = 0;
-  let placedY = 0;
-  outer: for (let y = 0; y < 1000; y++) {
+  for (let y = 0; y < 1000; y++) {
     for (let x = 0; x + w <= cols; x++) {
       const overlaps = items.some(
-        (it) =>
-          x < it.x + it.w &&
-          x + w > it.x &&
-          y < it.y + it.h &&
-          y + h > it.y
+        (it) => x < it.x + it.w && x + w > it.x && y < it.y + it.h && y + h > it.y
       );
-      if (!overlaps) {
-        placedX = x;
-        placedY = y;
-        break outer;
-      }
+      if (!overlaps) return { x, y };
     }
   }
+  return { x: 0, y: 0 };
+}
+
+function addWidget(type: WidgetType) {
+  const spec = specFor(type);
+  const id = newWidgetId();
+  const { w, h } = spec.defaultSize;
+  const { x, y } = placeFor(w, h);
   layout.value = {
     ...layout.value,
-    items: [
-      ...items,
-      {
-        id,
-        x: placedX,
-        y: placedY,
-        w,
-        h,
-        type,
-        props: { ...spec.defaultProps },
-      },
-    ],
+    items: [...layout.value.items, { id, x, y, w, h, type, props: { ...spec.defaultProps } }],
   };
   selectedId.value = id;
+  dirty.value = true;
+}
+
+function duplicateItem(id: string) {
+  const src = layout.value.items.find((it) => it.id === id);
+  if (!src) return;
+  const newId = newWidgetId();
+  const { x, y } = placeFor(src.w, src.h);
+  // Deep-clone props so the copy's markers/series arrays are independent.
+  layout.value = {
+    ...layout.value,
+    items: [...layout.value.items, { ...src, id: newId, x, y, props: structuredClone(src.props) }],
+  };
+  selectedId.value = newId;
   dirty.value = true;
 }
 
@@ -365,6 +367,7 @@ function exitToView() {
         :item="selected"
         @update="updateItem"
         @remove="removeItem"
+        @duplicate="duplicateItem"
         @close="selectedId = null"
       />
     </div>

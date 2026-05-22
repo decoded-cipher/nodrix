@@ -10,6 +10,7 @@ const props = defineProps<{ item: WidgetInstance | null }>();
 const emit = defineEmits<{
   update: [WidgetInstance];
   remove: [string];
+  duplicate: [string];
   close: [];
 }>();
 
@@ -81,16 +82,30 @@ function removeMarker(idx: number) {
       <div class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
         Widget config
       </div>
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1">
         <button
           type="button"
-          class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+          aria-label="Duplicate"
+          title="Duplicate widget"
+          class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+          @click="emit('duplicate', item.id)"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+        <button
+          type="button"
+          aria-label="Delete"
+          title="Delete widget"
+          class="rounded-md p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-red-950/40 dark:hover:text-red-400"
           @click="emit('remove', item.id)"
-        >Remove</button>
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
         <button
           type="button"
-          aria-label="Close"
-          class="rounded-md p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+          aria-label="Cancel"
+          title="Close panel"
+          class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
           @click="emit('close')"
         >
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
