@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useSessionStore } from '../../stores/session';
+import { useSessionStore, type ActiveSession } from '../../stores/session';
 import { confirm } from '../../lib/confirm';
+import { relativeTime } from '../../lib/time';
 import Dropdown from '../../components/Dropdown.vue';
 import type { InviteCreated } from '../../types';
 
@@ -97,6 +98,53 @@ async function save() {
   } finally {
     saving.value = false;
   }
+}
+
+// ─── Active sessions ──────────────────────────────────────────────────────────
+
+// Condense a raw User-Agent to "Browser on OS" + a device class for the icon.
+function parseAgent(ua: string | null): { label: string; device: 'desktop' | 'mobile' | 'tablet' } {
+  if (!ua) return { label: 'Unknown device', device: 'desktop' };
+  const browser =
+    /\bEdg\//.test(ua) ? 'Edge' :
+    /\bOPR\/|\bOpera/.test(ua) ? 'Opera' :
+    /\bSamsungBrowser\//.test(ua) ? 'Samsung Internet' :
+    /\bFirefox\//.test(ua) ? 'Firefox' :
+    /\bChrome\//.test(ua) ? 'Chrome' :
+    /\bSafari\//.test(ua) ? 'Safari' :
+    'Browser';
+  const os =
+    /iPhone|iPad|iPod/.test(ua) ? 'iOS' :
+    /Android/.test(ua) ? 'Android' :
+    /Windows NT/.test(ua) ? 'Windows' :
+    /Mac OS X|Macintosh/.test(ua) ? 'macOS' :
+    /CrOS/.test(ua) ? 'ChromeOS' :
+    /Linux/.test(ua) ? 'Linux' :
+    '';
+  const device: 'desktop' | 'mobile' | 'tablet' =
+    /iPad|Tablet/.test(ua) ? 'tablet' :
+    /Mobile|iPhone|Android/.test(ua) ? 'mobile' :
+    'desktop';
+  return { label: os ? `${browser} on ${os}` : browser, device };
+}
+
+const sessionRows = computed(() =>
+  session.activeSessions.map((s) => {
+    const a = parseAgent(s.user_agent);
+    return { ...s, agentLabel: a.label, device: a.device };
+  })
+);
+
+async function revokeDevice(s: ActiveSession) {
+  const a = parseAgent(s.user_agent);
+  const ok = await confirm({
+    title: 'Sign out this device?',
+    message: 'That session is signed out immediately and will need to log in again.',
+    details: [a.label, s.ip_address ? `IP: ${s.ip_address}` : ''].filter(Boolean) as string[],
+    confirmLabel: 'Sign out device',
+  });
+  if (!ok) return;
+  try { await session.revokeSession(s.id); } catch (e) { alert((e as Error).message); }
 }
 
 // ─── People (owner/admin) ─────────────────────────────────────────────────────
@@ -311,23 +359,50 @@ function inviteStatus(i: { expires_at: number | null }): string {
 
     <!-- Active sessions -->
     <section class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Active sessions</div>
+      <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <span class="text-sm font-semibold">Active sessions</span>
+        <span class="text-xs text-neutral-500 dark:text-neutral-400">
+          {{ sessionRows.length }} {{ sessionRows.length === 1 ? 'device' : 'devices' }}
+        </span>
+      </div>
       <ul class="divide-y divide-neutral-100 dark:divide-neutral-800">
-        <li v-for="s in session.activeSessions" :key="s.id" class="flex items-center justify-between px-4 py-3 text-sm">
+        <li v-for="s in sessionRows" :key="s.id" class="flex items-center gap-3 px-4 py-3">
+          <!-- Device icon -->
+          <div
+            class="grid h-9 w-9 shrink-0 place-items-center rounded-md"
+            :class="s.current ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'"
+          >
+            <svg v-if="s.device === 'mobile'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
+              <rect x="7" y="3" width="10" height="18" rx="2" /><path d="M11 18h2" />
+            </svg>
+            <svg v-else-if="s.device === 'tablet'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
+              <rect x="4" y="3" width="16" height="18" rx="2" /><path d="M11 18h2" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">
+              <rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" />
+            </svg>
+          </div>
+
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <span class="font-medium">{{ s.user_agent ?? 'Unknown device' }}</span>
-              <span v-if="s.current" class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">This device</span>
+              <span class="truncate text-sm font-medium">{{ s.agentLabel }}</span>
+              <span v-if="s.current" class="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">This device</span>
             </div>
-            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <div class="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
               <span v-if="s.ip_address" class="font-mono">{{ s.ip_address }}</span>
-              <span v-if="s.ip_address"> · </span>
-              <span>last seen {{ fmt(s.last_seen_at) }}</span>
+              <span v-if="s.ip_address" class="text-neutral-300 dark:text-neutral-600">·</span>
+              <span>active {{ relativeTime(s.last_seen_at) }}</span>
             </div>
           </div>
-          <button v-if="!s.current" type="button" class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40" @click="session.revokeSession(s.id)">Sign out</button>
+
+          <button
+            v-if="!s.current"
+            type="button"
+            class="shrink-0 rounded-md border border-neutral-300 px-3 py-1 text-xs text-neutral-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+            @click="revokeDevice(s)"
+          >Sign out</button>
         </li>
-        <li v-if="session.activeSessions.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">No active sessions.</li>
+        <li v-if="sessionRows.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">No active sessions.</li>
       </ul>
     </section>
 
