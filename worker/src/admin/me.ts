@@ -20,7 +20,7 @@ me.get('/', async (c) => {
     .first<{
       id: string;
       email: string;
-      role: 'owner' | 'admin' | 'viewer';
+      role: 'owner' | 'admin' | 'member';
       first_name: string | null;
       last_name: string | null;
       last_login_at: number | null;
@@ -28,24 +28,29 @@ me.get('/', async (c) => {
       updated_at: number;
     }>();
 
-  const projects = await c.env.DB
-    .prepare(
-      `SELECT p.id, p.name, p.description,
-              p.created_at, p.updated_at, p.archived_at
-         FROM projects p
-         JOIN project_members pm ON pm.project_id = p.id
-        WHERE pm.user_id = ?
-        ORDER BY p.created_at ASC`
-    )
-    .bind(user.id)
-    .all<{
-      id: string;
-      name: string;
-      description: string | null;
-      created_at: number;
-      updated_at: number;
-      archived_at: number | null;
-    }>();
+  // Instance owner/admin see every project (as admin); members see only theirs.
+  // Each project carries the caller's effective role so the UI can gate writes.
+  const instanceAdmin = user.role === 'owner' || user.role === 'admin';
+  const projects = instanceAdmin
+    ? await c.env.DB
+        .prepare(
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
+                  'admin' AS role
+             FROM projects p
+            ORDER BY p.created_at ASC`
+        )
+        .all()
+    : await c.env.DB
+        .prepare(
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
+                  pm.role AS role
+             FROM projects p
+             JOIN project_members pm ON pm.project_id = p.id
+            WHERE pm.user_id = ?
+            ORDER BY p.created_at ASC`
+        )
+        .bind(user.id)
+        .all();
 
   return c.json({ user: fullUser, projects: projects.results });
 });

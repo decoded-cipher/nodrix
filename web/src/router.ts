@@ -3,6 +3,8 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   // Login lives outside the app shell.
   { path: '/login', name: 'login', component: () => import('./pages/Login.vue'), meta: { title: 'Sign in' } },
+  // Invite acceptance — public, outside the app shell.
+  { path: '/invite/:token', name: 'invite', component: () => import('./pages/Invite.vue'), meta: { title: 'Accept invite' } },
   // Back-compat redirect for any bookmarks that still point at /setup.
   { path: '/setup', redirect: '/login' },
 
@@ -27,6 +29,7 @@ const routes: RouteRecordRaw[] = [
           { path: 'd/:dash', name: 'dashboard-view', component: () => import('./pages/project/DashboardView.vue'), meta: { title: 'Dashboard' } },
           { path: 'd/:dash/edit', name: 'dashboard-edit', component: () => import('./pages/project/DashboardEdit.vue'), meta: { title: 'Edit dashboard' } },
           { path: 'variables', name: 'variables', component: () => import('./pages/project/Variables.vue'), meta: { title: 'Variables' } },
+          { path: 'members', name: 'members', component: () => import('./pages/project/Members.vue'), meta: { title: 'Members' } },
           // Automations + Connections live under one hub with two tabs.
           {
             path: 'automations',

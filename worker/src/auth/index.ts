@@ -10,12 +10,14 @@
 
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { APIError } from 'better-auth/api';
 import { drizzle } from 'drizzle-orm/d1';
 import type { Env } from '../env';
 import * as schema from './schema';
 import { recordAudit } from '../lib/audit';
 import { decryptSecret } from '../lib/crypto';
 import { getOrCreateSigningSecret } from '../lib/auth-secret';
+import { findOpenInviteByEmail, consumeInvite } from '../lib/invites';
 
 // Shared with admin/auth-providers.ts — encryption info string for OAuth
 // client secrets at rest in D1. Changing this invalidates existing rows.
@@ -192,12 +194,19 @@ export async function buildAuth(env: Env, request?: Request) {
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
-      // Auto-link OAuth signins to an existing user with the same verified
-      // email. Without this, sign-in via Google for an email/password user
-      // would fail silently because Better Auth refuses to merge identities.
+      // Auto-link OAuth signins to an existing user with the same email.
+      // requireLocalEmailVerified:false is REQUIRED here: Better Auth's
+      // email/password sign-up stores email_verified=0, and account linking
+      // otherwise refuses to link a social login to an "unverified" local
+      // account (trustedProviders does NOT bypass that clause) — which made
+      // Google sign-in 401 for an existing email/password user. nodrix has no
+      // email-verification flow (all emails are treated as verified; new users
+      // are created with emailVerified:true in the create hook below), so this
+      // is the correct, consistent setting.
       accountLinking: {
         enabled: true,
         trustedProviders: ['google', 'github'],
+        requireLocalEmailVerified: false,
       },
     },
 
@@ -217,11 +226,27 @@ export async function buildAuth(env: Env, request?: Request) {
     databaseHooks: {
       user: {
         create: {
+          // Account creation is gated here for ALL paths (email/password,
+          // OAuth first sign-in, and server-side direct-create) — OAuth's
+          // createOAuthUser runs these hooks too. After bootstrap, creation is
+          // invite-only: an open invite must exist for the email. Role + verified
+          // status are assigned from the invite (or owner on bootstrap).
           before: async (user) => {
             const existing = await env.DB
               .prepare(`SELECT 1 AS one FROM users LIMIT 1`)
               .first<{ one: number }>();
-            return { data: { ...user, role: existing ? 'viewer' : 'owner' } };
+            if (!existing) {
+              return { data: { ...user, role: 'owner', emailVerified: true } };
+            }
+            const email = String((user as { email?: string }).email ?? '').toLowerCase();
+            const invite = email ? await findOpenInviteByEmail(env, email) : null;
+            if (!invite) {
+              throw new APIError('FORBIDDEN', {
+                message: 'Registration is invite-only on this deployment.',
+                code: 'REGISTRATION_CLOSED',
+              });
+            }
+            return { data: { ...user, role: invite.instance_role, emailVerified: true } };
           },
           after: async (user) => {
             const name = (user.name ?? '').trim();
@@ -233,6 +258,13 @@ export async function buildAuth(env: Env, request?: Request) {
                 .prepare(`UPDATE users SET first_name = ?, last_name = ? WHERE id = ?`)
                 .bind(firstName, lastName, user.id)
                 .run();
+            }
+            // Consume the matching invite (if any) and apply its pre-assigned
+            // project memberships. Bootstrap owner has no invite → no-op.
+            const email = (user.email ?? '').toLowerCase();
+            if (email) {
+              const invite = await findOpenInviteByEmail(env, email);
+              if (invite) await consumeInvite(env, invite, user.id);
             }
             await recordAudit(env, {
               projectId: null,

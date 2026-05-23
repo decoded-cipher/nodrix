@@ -7,7 +7,7 @@ export const MIGRATIONS: Migration[] = [
   {
     "name": "0001_init",
     "statements": [
-      "CREATE TABLE IF NOT EXISTS users (\n  id             TEXT PRIMARY KEY,\n  email          TEXT NOT NULL UNIQUE,\n  email_verified INTEGER NOT NULL DEFAULT 1,    \n  name           TEXT,                                      \n  image          TEXT,\n  role           TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),\n  first_name     TEXT,\n  last_name      TEXT,\n  last_login_at  INTEGER,\n  created_at     INTEGER NOT NULL,\n  updated_at     INTEGER NOT NULL\n)",
+      "CREATE TABLE IF NOT EXISTS users (\n  id             TEXT PRIMARY KEY,\n  email          TEXT NOT NULL UNIQUE,\n  email_verified INTEGER NOT NULL DEFAULT 1,    \n  name           TEXT,                                      \n  image          TEXT,\n  role           TEXT NOT NULL CHECK (role IN ('owner','admin','member')),\n  first_name     TEXT,\n  last_name      TEXT,\n  last_login_at  INTEGER,\n  created_at     INTEGER NOT NULL,\n  updated_at     INTEGER NOT NULL\n)",
       "CREATE TABLE IF NOT EXISTS accounts (\n  id                       TEXT PRIMARY KEY,\n  account_id               TEXT NOT NULL,\n  provider_id              TEXT NOT NULL,\n  user_id                  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  access_token             TEXT,\n  refresh_token            TEXT,\n  id_token                 TEXT,\n  access_token_expires_at  INTEGER,\n  refresh_token_expires_at INTEGER,\n  scope                    TEXT,\n  password                 TEXT,                            \n  created_at               INTEGER NOT NULL,\n  updated_at               INTEGER NOT NULL\n)",
       "CREATE INDEX IF NOT EXISTS idx_accounts_user     ON accounts(user_id)",
       "CREATE INDEX IF NOT EXISTS idx_accounts_provider ON accounts(provider_id, account_id)",
@@ -18,7 +18,7 @@ export const MIGRATIONS: Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_verifications_identifier ON verifications(identifier)",
       "CREATE TABLE IF NOT EXISTS auth_providers (\n  kind          TEXT PRIMARY KEY CHECK (kind IN ('google','github')),\n  client_id     TEXT NOT NULL,\n  client_secret TEXT NOT NULL,\n  enabled       INTEGER NOT NULL DEFAULT 1,\n  created_at    INTEGER NOT NULL,\n  updated_at    INTEGER NOT NULL\n)",
       "CREATE TABLE IF NOT EXISTS projects (\n  id          TEXT PRIMARY KEY,\n  name        TEXT NOT NULL,\n  description TEXT,\n  created_by  TEXT REFERENCES users(id),\n  created_at  INTEGER NOT NULL,\n  updated_at  INTEGER NOT NULL,\n  archived_at INTEGER\n)",
-      "CREATE TABLE IF NOT EXISTS project_members (\n  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  role       TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),\n  added_at   INTEGER NOT NULL,\n  added_by   TEXT REFERENCES users(id),\n  PRIMARY KEY (user_id, project_id)\n)",
+      "CREATE TABLE IF NOT EXISTS project_members (\n  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  role       TEXT NOT NULL CHECK (role IN ('admin','viewer')),\n  added_at   INTEGER NOT NULL,\n  added_by   TEXT REFERENCES users(id),\n  PRIMARY KEY (user_id, project_id)\n)",
       "CREATE TABLE IF NOT EXISTS project_variables (\n  id          TEXT PRIMARY KEY,\n  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  key         TEXT NOT NULL,                     \n  name        TEXT,                              \n  unit        TEXT,                              \n  created_at  INTEGER NOT NULL,\n  updated_at  INTEGER NOT NULL,\n  last_seen   INTEGER                            \n)",
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_project_variables_key\n  ON project_variables(project_id, key)",
       "CREATE TABLE IF NOT EXISTS project_tokens (\n  id           TEXT PRIMARY KEY,\n  project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name         TEXT,\n  hash         TEXT NOT NULL UNIQUE,            \n  created_by   TEXT REFERENCES users(id),\n  created_at   INTEGER NOT NULL,\n  last_used_at INTEGER,\n  revoked_at   INTEGER\n)",
@@ -38,7 +38,10 @@ export const MIGRATIONS: Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_audit_log_project ON audit_log(project_id, created_at DESC)",
       "CREATE INDEX IF NOT EXISTS idx_audit_log_target  ON audit_log(target_type, target_id)",
       "CREATE INDEX IF NOT EXISTS idx_audit_log_user    ON audit_log(user_id)",
-      "CREATE TABLE IF NOT EXISTS deployment_settings (\n  key        TEXT PRIMARY KEY,\n  value      TEXT NOT NULL,\n  updated_at INTEGER NOT NULL\n)"
+      "CREATE TABLE IF NOT EXISTS deployment_settings (\n  key        TEXT PRIMARY KEY,\n  value      TEXT NOT NULL,\n  updated_at INTEGER NOT NULL\n)",
+      "CREATE TABLE IF NOT EXISTS invites (\n  id            TEXT PRIMARY KEY,                              \n  email         TEXT,                                          \n  instance_role TEXT NOT NULL CHECK (instance_role IN ('admin','member')),\n  token_hash    TEXT NOT NULL UNIQUE,                          \n  created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,\n  created_at    INTEGER NOT NULL,\n  expires_at    INTEGER,                                       \n  accepted_at   INTEGER,                                       \n  accepted_user TEXT REFERENCES users(id) ON DELETE SET NULL,\n  revoked_at    INTEGER\n)",
+      "CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL",
+      "CREATE TABLE IF NOT EXISTS invite_projects (\n  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,\n  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  role       TEXT NOT NULL CHECK (role IN ('admin','viewer')),\n  PRIMARY KEY (invite_id, project_id)\n)"
     ]
   }
 ];

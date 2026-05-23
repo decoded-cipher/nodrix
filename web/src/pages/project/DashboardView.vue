@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useRoute } from 'vue-router';
 import { useProjectStore } from '../../stores/project';
+import { useSessionStore } from '../../stores/session';
 import { DashboardWs } from '../../ws';
 import {
   buildDataIndex,
@@ -20,6 +21,14 @@ import type {
 
 const route = useRoute();
 const project = useProjectStore();
+const session = useSessionStore();
+
+// Viewers can watch a dashboard but can't edit it (or control devices — the
+// server rejects control frames; we just hide the affordance).
+const canEdit = computed(() => {
+  const projId = route.params['proj'] as string;
+  return session.projects.find((p) => p.id === projId)?.role === 'admin';
+});
 
 const dashboard = ref<Dashboard | null>(null);
 const error = ref<string | null>(null);
@@ -223,7 +232,7 @@ function onCommand(e: Event) {
         <p class="font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ dashboard?.id }}</p>
       </div>
       <RouterLink
-        v-if="dashboard"
+        v-if="dashboard && canEdit"
         :to="`/p/${project.currentProjectId}/d/${dashboard.id}/edit`"
         class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
       >Edit</RouterLink>

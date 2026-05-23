@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified INTEGER NOT NULL DEFAULT 1,    -- nodrix has no email-verify flow; column kept only because Better Auth requires it
   name           TEXT,                                      -- Better Auth required
   image          TEXT,
-  role           TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),
+  role           TEXT NOT NULL CHECK (role IN ('owner','admin','member')),
   first_name     TEXT,
   last_name      TEXT,
   last_login_at  INTEGER,
@@ -88,11 +88,14 @@ CREATE TABLE IF NOT EXISTS projects (
   archived_at INTEGER
 );
 
--- Forward-compat for RBAC invites.
+-- Per-project membership + role. `admin` = full control of the project (incl.
+-- members + hardware tokens + delete); `viewer` = read-only. Instance owner/admin
+-- get implicit project-admin on every project (see resolve-project middleware), so
+-- they don't need a row here to access a project.
 CREATE TABLE IF NOT EXISTS project_members (
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  role       TEXT NOT NULL CHECK (role IN ('owner','admin','viewer')),
+  role       TEXT NOT NULL CHECK (role IN ('admin','viewer')),
   added_at   INTEGER NOT NULL,
   added_by   TEXT REFERENCES users(id),
   PRIMARY KEY (user_id, project_id)
@@ -226,4 +229,33 @@ CREATE TABLE IF NOT EXISTS deployment_settings (
   key        TEXT PRIMARY KEY,
   value      TEXT NOT NULL,
   updated_at INTEGER NOT NULL
+);
+
+-- Invites: the owner/instance-admins invite people to share this deployment.
+-- Two flows share this table: a self-serve LINK (invitee sets their own password
+-- at /invite/<token>) and DIRECT create (account made immediately with a temp
+-- password). `email` is optional; when set it binds the accept and lets a first
+-- OAuth sign-in for that address match the invite. Single-use (accepted_at) +
+-- expirable. instance_role is 'admin' or 'member' — you can't invite an owner.
+CREATE TABLE IF NOT EXISTS invites (
+  id            TEXT PRIMARY KEY,                              -- inv_xxx
+  email         TEXT,                                          -- optional; lowercased
+  instance_role TEXT NOT NULL CHECK (instance_role IN ('admin','member')),
+  token_hash    TEXT NOT NULL UNIQUE,                          -- sha256(token) hex
+  created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at    INTEGER NOT NULL,
+  expires_at    INTEGER,                                       -- NULL = never
+  accepted_at   INTEGER,                                       -- single-use marker
+  accepted_user TEXT REFERENCES users(id) ON DELETE SET NULL,
+  revoked_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL;
+
+-- Optional project memberships pre-assigned by an invite. Applied to the new user
+-- in the user.create.after hook when the invite is accepted.
+CREATE TABLE IF NOT EXISTS invite_projects (
+  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  role       TEXT NOT NULL CHECK (role IN ('admin','viewer')),
+  PRIMARY KEY (invite_id, project_id)
 );

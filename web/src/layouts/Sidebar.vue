@@ -57,6 +57,7 @@ const projectScoped = computed<NavItem[]>(() => {
       // Stay highlighted across the Connections tab and the editor too.
       matchPath: (path) => path.startsWith(`/p/${id}/automations`),
     },
+    { label: 'Members', to: `/p/${id}/members`, icon: 'users', disabled: !hasProject.value },
   ];
 });
 

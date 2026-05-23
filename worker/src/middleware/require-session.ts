@@ -5,7 +5,7 @@ import { buildAuth } from '../auth';
 export type SessionUser = {
   id: string;
   email: string;
-  role: 'owner' | 'admin' | 'viewer';
+  role: 'owner' | 'admin' | 'member';
   name: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -49,7 +49,7 @@ export const requireSession = createMiddleware<{
   c.set('user', {
     id: u.id,
     email: u.email,
-    role: (u.role ?? 'viewer') as SessionUser['role'],
+    role: (u.role ?? 'member') as SessionUser['role'],
     name: u.name ?? null,
     first_name: u.first_name ?? null,
     last_name: u.last_name ?? null,

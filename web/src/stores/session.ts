@@ -2,7 +2,14 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api, ApiError } from '../api';
 import { authClient } from '../lib/auth-client';
-import type { AuditLogEntry, Project, User } from '../types';
+import type {
+  AuditLogEntry,
+  Invite,
+  InviteCreated,
+  InstanceUser,
+  Project,
+  User,
+} from '../types';
 
 export type ActiveSession = {
   id: string;
@@ -26,6 +33,8 @@ export const useSessionStore = defineStore('session', () => {
   const auditLogTotal = ref(0);
   const activeSessions = ref<ActiveSession[]>([]);
   const oauthProviders = ref<('google' | 'github')[]>([]);
+  const instanceUsers = ref<InstanceUser[]>([]);
+  const invites = ref<Invite[]>([]);
 
   async function load(): Promise<void> {
     loading.value = true;
@@ -114,11 +123,61 @@ export const useSessionStore = defineStore('session', () => {
     auditLogTotal.value = data.total;
   }
 
+  // ─── Instance users (owner/admin) ────────────────────────────────────────────
+
+  async function loadUsers(): Promise<void> {
+    const data = await api.get<{ users: InstanceUser[] }>('/v1/admin/users');
+    instanceUsers.value = data.users;
+  }
+
+  async function setUserRole(id: string, role: 'admin' | 'member'): Promise<void> {
+    await api.patch<{ id: string; role: string }>(`/v1/admin/users/${id}`, { role });
+    instanceUsers.value = instanceUsers.value.map((u) => (u.id === id ? { ...u, role } : u));
+  }
+
+  async function removeUser(id: string): Promise<void> {
+    await api.del<void>(`/v1/admin/users/${id}`);
+    instanceUsers.value = instanceUsers.value.filter((u) => u.id !== id);
+  }
+
+  async function transferOwnership(id: string): Promise<void> {
+    await api.post<{ id: string; role: string }>(`/v1/admin/users/${id}/transfer-ownership`);
+    await loadUsers();
+    await load();
+  }
+
+  // ─── Invites (owner/admin) ────────────────────────────────────────────────────
+
+  async function loadInvites(): Promise<void> {
+    const data = await api.get<{ invites: Invite[] }>('/v1/admin/invites');
+    invites.value = data.invites;
+  }
+
+  async function createInvite(input: {
+    email: string;
+    instance_role: 'admin' | 'member';
+    mode: 'link' | 'direct';
+    projects?: Array<{ project_id: string; role: 'admin' | 'viewer' }>;
+    expires_in_days?: number | null;
+    name?: string | null;
+  }): Promise<InviteCreated> {
+    const created = await api.post<InviteCreated>('/v1/admin/invites', input);
+    await loadInvites();
+    return created;
+  }
+
+  async function revokeInvite(id: string): Promise<void> {
+    await api.del<void>(`/v1/admin/invites/${id}`);
+    invites.value = invites.value.filter((i) => i.id !== id);
+  }
+
   return {
     user, projects, loading, error,
     auditLog, auditLogPage, auditLogPageSize, auditLogPageCount, auditLogTotal,
-    activeSessions, oauthProviders,
+    activeSessions, oauthProviders, instanceUsers, invites,
     load, createProject, deleteProject, updateProject, loadAuditLog, updateMe,
     signOut, loadSessions, revokeSession, loadProviders,
+    loadUsers, setUserRole, removeUser, transferOwnership,
+    loadInvites, createInvite, revokeInvite,
   };
 });

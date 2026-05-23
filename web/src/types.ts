@@ -1,11 +1,15 @@
 // Shared types used across stores, pages, and widgets.
 
+export type InstanceRole = 'owner' | 'admin' | 'member';
+export type ProjectRole = 'admin' | 'viewer';
+
 export type User = {
   id: string;
   email: string;
-  role: 'owner' | 'admin' | 'viewer';
+  role: InstanceRole;
   first_name?: string | null;
   last_name?: string | null;
+  name?: string | null;
   last_login_at?: number | null;
   created_at?: number;
   updated_at?: number;
@@ -18,6 +22,61 @@ export type Project = {
   description?: string | null;
   updated_at?: number;
   archived_at?: number | null;
+  // Caller's effective role on this project (from /me + /projects).
+  role?: ProjectRole;
+};
+
+// A user row in the instance Users management list.
+export type InstanceUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: InstanceRole;
+  last_login_at: number | null;
+  created_at: number;
+};
+
+export type Invite = {
+  id: string;
+  email: string | null;
+  instance_role: 'admin' | 'member';
+  created_at: number;
+  expires_at: number | null;
+  accepted_at: number | null;
+  revoked_at: number | null;
+  inviter_email: string | null;
+};
+
+// Returned once on creation.
+export type InviteCreated = {
+  id: string;
+  email: string;
+  instance_role: 'admin' | 'member';
+  mode: 'link' | 'direct';
+  url?: string;            // link mode
+  token?: string;          // link mode
+  temp_password?: string;  // direct mode
+  expires_at?: number;
+};
+
+export type InvitePreview = {
+  valid: boolean;
+  email?: string | null;
+  instance_role?: 'admin' | 'member';
+  projects?: Array<{ project_id: string; role: ProjectRole; name: string }>;
+  inviter_email?: string | null;
+};
+
+export type ProjectMember = {
+  user_id: string;
+  email: string;
+  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: ProjectRole;
+  added_at: number;
 };
 
 export type Variable = {

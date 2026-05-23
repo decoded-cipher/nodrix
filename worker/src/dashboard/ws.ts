@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
+import { effectiveProjectRole } from '../lib/roles';
 
 const ws = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -12,23 +13,32 @@ ws.get('/:dashboard', async (c) => {
   const dashId = c.req.param('dashboard')!;
   const user = c.get('user');
 
-  // Confirm the user has access to the dashboard's project.
-  const row = await c.env.DB
-    .prepare(
-      `SELECT d.id
-         FROM dashboards d
-         JOIN project_members pm ON pm.project_id = d.project_id
-        WHERE d.id = ? AND pm.user_id = ?`
-    )
-    .bind(dashId, user.id)
-    .first<{ id: string }>();
-  if (!row) return c.json({ error: 'forbidden' }, 403);
+  // Confirm the user has access to the dashboard's project (membership OR the
+  // instance owner/admin override — they have no project_members row).
+  const dash = await c.env.DB
+    .prepare(`SELECT project_id FROM dashboards WHERE id = ?`)
+    .bind(dashId)
+    .first<{ project_id: string }>();
+  if (!dash) return c.json({ error: 'not_found' }, 404);
+
+  const role = await effectiveProjectRole(c.env, user.id, dash.project_id);
+  if (!role) return c.json({ error: 'forbidden' }, 403);
 
   const upgrade = c.req.header('upgrade');
   if (upgrade !== 'websocket') return c.text('expected websocket', 426);
 
+  // Forward to the DO with the authenticated user id stashed in a header so the
+  // DO can re-check the user's role per control frame (handles live demotion).
+  const headers = new Headers(c.req.raw.headers);
+  headers.set('x-nodrix-uid', user.id);
+  const fwd = new Request(c.req.raw.url, {
+    method: c.req.raw.method,
+    headers,
+    body: c.req.raw.body,
+  });
+
   const stub = c.env.DASHBOARD_DO.get(c.env.DASHBOARD_DO.idFromName(dashId));
-  return stub.fetch(c.req.raw);
+  return stub.fetch(fwd);
 });
 
 export default ws;
