@@ -67,10 +67,25 @@ rm -rf "${UPSTREAM_DIR}/.git"
 #    it, those processes end up with a CWD pointing to a deleted inode — wrangler
 #    silently hangs on its next filesystem op. `cp -Rf src/. dst` overwrites
 #    files in place (including read-only ones via -f) without touching the
-#    parent inode. We don't bother removing files that exist locally but not
-#    upstream — they just sit there unused (wrangler only bundles what
-#    wrangler.toml's `main` + assets dir reference).
+#    parent inode.
 cp -Rf "${UPSTREAM_DIR}"/. .
+
+# 3b. Mirror upstream DELETIONS. `cp -Rf` only adds/overwrites, so a file the
+#     upstream renamed or deleted (e.g. a removed Vue page) lingers in an existing
+#     deployment's tree — and since the build typechecks the whole src tree
+#     (vue-tsc), an orphan referencing now-removed code breaks the build. Delete
+#     any source file upstream no longer has. We remove individual FILES only,
+#     never a directory, so the worker/ CWD inode the parent process holds stays
+#     valid.
+for dir in web worker promo scripts examples; do
+  [ -d "$dir" ] || continue
+  find "$dir" -type f \
+    -not -path '*/node_modules/*' -not -path '*/dist/*' \
+    -not -path '*/.wrangler/*' -not -path '*/.astro/*' \
+    -print | while IFS= read -r f; do
+      [ -e "${UPSTREAM_DIR}/${f}" ] || rm -f "$f"
+    done
+done
 
 # 4. Restore user's wrangler.toml in case upstream had its own (which it does).
 cp "${WRANGLER_BACKUP}" wrangler.toml
