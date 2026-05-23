@@ -162,9 +162,9 @@ async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* ignore */ }
 }
 
-function inviteStatus(i: { accepted_at: number | null; revoked_at: number | null; expires_at: number | null }): string {
-  if (i.accepted_at) return 'Accepted';
-  if (i.revoked_at) return 'Revoked';
+// Invites are throwaway — a row only exists while pending, so this is just
+// pending vs (briefly) expired before the next prune.
+function inviteStatus(i: { expires_at: number | null }): string {
   if (i.expires_at && i.expires_at * 1000 < Date.now()) return 'Expired';
   return 'Pending';
 }

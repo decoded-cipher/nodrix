@@ -36,14 +36,6 @@ type SocialProviders = {
   github?: { clientId: string; clientSecret: string };
 };
 
-async function readClientSecret(signingSecret: string, stored: string): Promise<string> {
-  // Rows written before secret-at-rest encryption was added stored the value
-  // in plaintext. The encrypted format always starts with `v1:` (see
-  // lib/crypto.ts), so we can tell legacy rows apart and pass them through.
-  if (!stored.startsWith('v1:')) return stored;
-  return decryptSecret(signingSecret, stored, OAUTH_SECRET_ENC_INFO);
-}
-
 // OAuth provider config is read on every buildAuth() (i.e. every authenticated
 // request). It changes only when an owner edits Settings, so it's KV-cached.
 // We cache the RAW rows — secrets stay encrypted at rest in KV exactly as in D1;
@@ -92,7 +84,7 @@ async function loadProviders(env: Env, signingSecret: string): Promise<SocialPro
   const out: SocialProviders = {};
   for (const r of rows) {
     try {
-      const clientSecret = await readClientSecret(signingSecret, r.client_secret);
+      const clientSecret = await decryptSecret(signingSecret, r.client_secret, OAUTH_SECRET_ENC_INFO);
       out[r.kind] = { clientId: r.client_id, clientSecret };
     } catch {
       // Decrypt failed (corrupted row or signing secret rotated). Skip this

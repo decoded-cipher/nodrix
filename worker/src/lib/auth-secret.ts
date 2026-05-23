@@ -2,12 +2,9 @@
 //   - Better Auth session cookie signing
 //   - HKDF base for at-rest encryption of OAuth client secrets in D1
 //
-// First-boot bootstrap: on the very first read, we either reuse a value the
-// operator previously set via env.BETTER_AUTH_SECRET (legacy path — older
-// deploys came through "Deploy to Cloudflare" with a Workers Secret), or
-// generate 32 random bytes. Either way the result is persisted to
-// deployment_settings so subsequent reads are stable and the env var
-// becomes optional.
+// First-boot bootstrap: on the very first read we generate 32 random bytes and
+// persist them to deployment_settings, so subsequent reads are stable. No env
+// var or operator setup is required.
 //
 // Reads after the first are KV-cached by getSetting (5 min TTL), so the
 // hot path is at most one KV hit per cache window.
@@ -36,9 +33,7 @@ export async function getOrCreateSigningSecret(env: Env): Promise<string> {
     cachedSecret = existing;
     return existing;
   }
-  // Seed from env on legacy deploys so the upgrade doesn't invalidate live
-  // sessions; otherwise generate fresh.
-  const seed = (env.BETTER_AUTH_SECRET ?? '').trim() || generate();
+  const seed = generate();
   await setSetting(env, KEY, seed);
   cachedSecret = seed;
   return seed;

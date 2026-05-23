@@ -234,20 +234,20 @@ CREATE TABLE IF NOT EXISTS deployment_settings (
 -- Invites: the owner/instance-admins invite people to share this deployment.
 -- Two flows share this table: a self-serve LINK (invitee sets their own password
 -- at /invite/<token>) and DIRECT create (account made immediately with a temp
--- password). `email` is optional; when set it binds the accept and lets a first
--- OAuth sign-in for that address match the invite. Single-use (accepted_at) +
--- expirable. instance_role is 'admin' or 'member' — you can't invite an owner.
+-- password). `email` binds the accept and lets a first OAuth sign-in for that
+-- address match the invite. instance_role is 'admin' or 'member' (no owner).
+--
+-- Invites are throwaway: a row exists only while pending. Accepting OR revoking
+-- DELETEs it (cascading invite_projects); expired rows are pruned on listing.
+-- History lives in the audit log (invite.create / user.register / invite.revoke).
 CREATE TABLE IF NOT EXISTS invites (
   id            TEXT PRIMARY KEY,                              -- inv_xxx
-  email         TEXT,                                          -- optional; lowercased
+  email         TEXT,                                          -- lowercased
   instance_role TEXT NOT NULL CHECK (instance_role IN ('admin','member')),
   token_hash    TEXT NOT NULL UNIQUE,                          -- sha256(token) hex
   created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at    INTEGER NOT NULL,
-  expires_at    INTEGER,                                       -- NULL = never
-  accepted_at   INTEGER,                                       -- single-use marker
-  accepted_user TEXT REFERENCES users(id) ON DELETE SET NULL,
-  revoked_at    INTEGER
+  expires_at    INTEGER                                        -- NULL = never
 );
 CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL;
 
