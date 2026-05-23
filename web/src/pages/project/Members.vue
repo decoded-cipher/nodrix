@@ -4,7 +4,13 @@ import { useRoute } from 'vue-router';
 import { useSessionStore } from '../../stores/session';
 import { useProjectStore } from '../../stores/project';
 import { confirm } from '../../lib/confirm';
+import Dropdown from '../../components/Dropdown.vue';
 import type { ProjectRole } from '../../types';
+
+const roleOptions: { value: ProjectRole; label: string }[] = [
+  { value: 'viewer', label: 'Viewer' },
+  { value: 'admin', label: 'Admin' },
+];
 
 const route = useRoute();
 const session = useSessionStore();
@@ -87,10 +93,7 @@ function nameOf(m: { first_name: string | null; last_name: string | null; email:
           </label>
           <label class="block">
             <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Role</span>
-            <select v-model="addForm.role" class="mt-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-              <option value="viewer">Viewer</option>
-              <option value="admin">Admin</option>
-            </select>
+            <Dropdown v-model="addForm.role" :options="roleOptions" class="mt-1 w-32" />
           </label>
           <button type="submit" :disabled="adding" class="rounded-md bg-accent-600 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50">{{ adding ? '...' : 'Add' }}</button>
         </form>
@@ -106,10 +109,13 @@ function nameOf(m: { first_name: string | null; last_name: string | null; email:
               <div class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ m.email }}</div>
             </div>
             <div class="flex shrink-0 items-center gap-2">
-              <select :value="m.role" class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-950" @change="changeRole(m.user_id, ($event.target as HTMLSelectElement).value as ProjectRole)">
-                <option value="viewer">Viewer</option>
-                <option value="admin">Admin</option>
-              </select>
+              <Dropdown
+                :model-value="m.role"
+                :options="roleOptions"
+                size="sm"
+                class="w-28"
+                @update:model-value="(v) => changeRole(m.user_id, v as ProjectRole)"
+              />
               <button type="button" class="rounded-md border border-red-300 px-2 py-1 text-[11px] text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40" @click="remove(m.user_id, m.email)">Remove</button>
             </div>
           </li>

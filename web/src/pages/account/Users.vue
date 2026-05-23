@@ -2,12 +2,30 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useSessionStore } from '../../stores/session';
 import { confirm } from '../../lib/confirm';
+import Dropdown from '../../components/Dropdown.vue';
 import type { InviteCreated } from '../../types';
 
 const session = useSessionStore();
 
 const isOwner = computed(() => session.user?.role === 'owner');
 const isAdmin = computed(() => session.user?.role === 'owner' || session.user?.role === 'admin');
+
+// Dropdown option lists.
+const instanceRoleOptions: { value: 'admin' | 'member'; label: string }[] = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'member', label: 'Member' },
+];
+const inviteRoleOptions = computed<{ value: 'admin' | 'member'; label: string }[]>(() =>
+  isOwner.value ? instanceRoleOptions : [{ value: 'member', label: 'Member' }]
+);
+const inviteModeOptions: { value: 'link' | 'direct'; label: string }[] = [
+  { value: 'link', label: 'Share a link' },
+  { value: 'direct', label: 'Create with temp password' },
+];
+const projectAccessOptions: { value: 'admin' | 'viewer'; label: string }[] = [
+  { value: 'viewer', label: 'Viewer' },
+  { value: 'admin', label: 'Admin' },
+];
 
 onMounted(async () => {
   if (!session.user) await session.load();
@@ -243,15 +261,14 @@ function inviteStatus(i: { expires_at: number | null }): string {
           </div>
           <div class="flex shrink-0 items-center gap-2">
             <span v-if="u.role === 'owner'" class="rounded-full bg-accent-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">Owner</span>
-            <select
+            <Dropdown
               v-else-if="isOwner && u.id !== session.user?.id"
-              :value="u.role"
-              class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-950"
-              @change="changeRole(u.id, ($event.target as HTMLSelectElement).value as 'admin' | 'member')"
-            >
-              <option value="admin">Admin</option>
-              <option value="member">Member</option>
-            </select>
+              :model-value="u.role"
+              :options="instanceRoleOptions"
+              size="sm"
+              class="w-28"
+              @update:model-value="(v) => changeRole(u.id, v as 'admin' | 'member')"
+            />
             <span v-else class="text-[11px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ u.role }}</span>
 
             <button v-if="isOwner && u.role === 'admin' && u.id !== session.user?.id" type="button" class="rounded-md border border-neutral-300 px-2 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="makeOwner(u.id, u.email)">Make owner</button>
@@ -329,17 +346,11 @@ function inviteStatus(i: { expires_at: number | null }): string {
             <div class="grid grid-cols-2 gap-3">
               <label class="block">
                 <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Instance role</span>
-                <select v-model="invite.instance_role" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-                  <option value="member">Member</option>
-                  <option v-if="isOwner" value="admin">Admin</option>
-                </select>
+                <Dropdown v-model="invite.instance_role" :options="inviteRoleOptions" class="mt-1" />
               </label>
               <label class="block">
                 <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Method</span>
-                <select v-model="invite.mode" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950">
-                  <option value="link">Share a link</option>
-                  <option value="direct">Create with temp password</option>
-                </select>
+                <Dropdown v-model="invite.mode" :options="inviteModeOptions" class="mt-1" />
               </label>
             </div>
 
@@ -348,11 +359,14 @@ function inviteStatus(i: { expires_at: number | null }): string {
               <div class="mt-1 max-h-40 space-y-1 overflow-auto rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
                 <div v-for="p in session.projects" :key="p.id" class="flex items-center justify-between gap-2 text-sm">
                   <span class="truncate">{{ p.name }}</span>
-                  <select v-model="invite.projects[p.id]" class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-950">
-                    <option value="">No access</option>
-                    <option value="viewer">Viewer</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  <Dropdown
+                    :model-value="invite.projects[p.id] ?? ''"
+                    :options="projectAccessOptions"
+                    placeholder="No access"
+                    size="sm"
+                    class="w-32 shrink-0"
+                    @update:model-value="(v) => { invite.projects[p.id] = v as 'admin' | 'viewer' | ''; }"
+                  />
                 </div>
               </div>
             </div>
