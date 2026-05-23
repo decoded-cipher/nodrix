@@ -14,6 +14,10 @@ import auditLog from './admin/audit-log';
 import authProviders, { publicAuthProviders } from './admin/auth-providers';
 import versionInfo from './admin/version';
 import sessionsRouter from './admin/sessions';
+import invitesRouter from './admin/invites';
+import usersRouter from './admin/users';
+import membersRouter from './admin/members';
+import publicInvite from './public/invite';
 import telemetry from './device/telemetry';
 import control from './device/control';
 import events from './device/events';
@@ -126,16 +130,22 @@ app.get('/v1/public/bootstrap-status', async (c) => {
   return c.json({ bootstrap: row === null });
 });
 
+// Public invite preview + accept (no session).
+app.route('/v1/public/invite', publicInvite);
+
 // Admin (session-gated):
 app.route('/v1/admin/me', me);
 app.route('/v1/admin/sessions', sessionsRouter);
 app.route('/v1/admin/auth-providers', authProviders);
 app.route('/v1/admin/version', versionInfo);
+app.route('/v1/admin/users', usersRouter);
+app.route('/v1/admin/invites', invitesRouter);
 app.route('/v1/admin/projects', projects);
 app.route('/v1/admin/projects/:proj/variables', variables);
 app.route('/v1/admin/projects/:proj/dashboards', dashboards);
 app.route('/v1/admin/projects/:proj/automations', automations);
 app.route('/v1/admin/projects/:proj/integrations', integrations);
+app.route('/v1/admin/projects/:proj/members', membersRouter);
 app.route('/v1/admin/tokens', tokens);
 app.route('/v1/admin/audit-log', auditLog);
 

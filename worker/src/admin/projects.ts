@@ -9,26 +9,47 @@ const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
 projects.use('*', requireSession);
 
+// Effective project role: instance owner/admin → 'admin' on every project;
+// otherwise the project_members.role, or null if the user has no access.
+async function effectiveRole(
+  env: Env,
+  user: { id: string; role: string },
+  projId: string
+): Promise<'admin' | 'viewer' | null> {
+  if (user.role === 'owner' || user.role === 'admin') return 'admin';
+  const m = await env.DB
+    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
+    .bind(user.id, projId)
+    .first<{ role: 'admin' | 'viewer' }>();
+  return m?.role ?? null;
+}
+
 projects.get('/', async (c) => {
   const user = c.get('user');
-  const rows = await c.env.DB
-    .prepare(
-      `SELECT p.id, p.name, p.description,
-              p.created_at, p.updated_at, p.archived_at
-         FROM projects p
-         JOIN project_members pm ON pm.project_id = p.id
-        WHERE pm.user_id = ?
-        ORDER BY p.created_at ASC`
-    )
-    .bind(user.id)
-    .all<{
-      id: string;
-      name: string;
-      description: string | null;
-      created_at: number;
-      updated_at: number;
-      archived_at: number | null;
-    }>();
+  const instanceAdmin = user.role === 'owner' || user.role === 'admin';
+
+  // Instance owner/admin see every project (as admin); members see only the
+  // projects they belong to, tagged with their role so the UI can gate writes.
+  const rows = instanceAdmin
+    ? await c.env.DB
+        .prepare(
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
+                  'admin' AS role
+             FROM projects p
+            ORDER BY p.created_at ASC`
+        )
+        .all()
+    : await c.env.DB
+        .prepare(
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
+                  pm.role AS role
+             FROM projects p
+             JOIN project_members pm ON pm.project_id = p.id
+            WHERE pm.user_id = ?
+            ORDER BY p.created_at ASC`
+        )
+        .bind(user.id)
+        .all();
   return c.json({ projects: rows.results });
 });
 
@@ -51,7 +72,7 @@ projects.post('/', async (c) => {
     c.env.DB
       .prepare(
         `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
-         VALUES (?, ?, 'owner', ?, ?)`
+         VALUES (?, ?, 'admin', ?, ?)`
       )
       .bind(user.id, id, now, user.id),
   ]);
@@ -75,11 +96,7 @@ projects.patch('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
 
-  const member = await c.env.DB
-    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
-    .bind(user.id, projId)
-    .first<{ role: string }>();
-  if (!member) return c.json({ error: 'forbidden' }, 403);
+  if ((await effectiveRole(c.env, user, projId)) !== 'admin') return c.json({ error: 'forbidden' }, 403);
 
   const body = await c.req.json<{
     name?: string;
@@ -130,11 +147,7 @@ projects.patch('/:proj', async (c) => {
 projects.post('/:proj/flush', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
-  const member = await c.env.DB
-    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
-    .bind(user.id, projId)
-    .first<{ role: string }>();
-  if (!member) return c.json({ error: 'forbidden' }, 403);
+  if ((await effectiveRole(c.env, user, projId)) !== 'admin') return c.json({ error: 'forbidden' }, 403);
 
   const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(projId)) as unknown as ProjectDO;
   const result = await stub.flushNow();
@@ -153,11 +166,7 @@ projects.delete('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
 
-  const member = await c.env.DB
-    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
-    .bind(user.id, projId)
-    .first<{ role: string }>();
-  if (!member || member.role !== 'owner') return c.json({ error: 'forbidden' }, 403);
+  if ((await effectiveRole(c.env, user, projId)) !== 'admin') return c.json({ error: 'forbidden' }, 403);
 
   // The project's own DO holds all variable state + R2 telemetry history.
   try {

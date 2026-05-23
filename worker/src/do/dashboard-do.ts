@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import type { ProjectDO } from './project-do';
 import { validateLayout, variablesFromLayout, chartVariablesFromLayout, type Layout } from '../lib/layout';
 import { newId } from '../lib/ids';
+import { effectiveProjectRole } from '../lib/roles';
 
 // Dashboard Durable Object. One per dashboard id (ctx.id.name === dashboard_id).
 //
@@ -57,6 +58,12 @@ export class DashboardDO extends DurableObject<Env> {
 
     // Hibernation: this is the line that makes idle tabs cheap.
     this.ctx.acceptWebSocket(server);
+
+    // Stash the authenticated user id (set by the WS route after auth) so control
+    // frames can be re-authorized against the user's current project role — this
+    // makes a live demotion take effect on an already-open socket.
+    const uid = request.headers.get('x-nodrix-uid');
+    if (uid) server.serializeAttachment({ userId: uid });
 
     // Bootstrap (load layout, subscribe, send snapshot) runs in parallel with
     // the handshake completing. Any send is queued until the client is ready.
@@ -228,6 +235,15 @@ export class DashboardDO extends DurableObject<Env> {
       .first<{ project_id: string; variable_id: string | null }>();
     if (!row) return ack(false, 'dashboard_not_found');
     if (!row.variable_id) return ack(false, 'variable_not_in_project');
+
+    // Re-authorize the control write against the user's CURRENT role (viewers
+    // can't operate devices). Re-read per frame so a demotion mid-session takes
+    // effect on this already-open socket.
+    const att = ws.deserializeAttachment() as { userId?: string } | null;
+    const uid = att?.userId;
+    if (!uid) return ack(false, 'forbidden');
+    const role = await effectiveProjectRole(this.env, uid, row.project_id);
+    if (role !== 'admin') return ack(false, 'forbidden');
 
     const cmdId = newId('control');
     const stub = this.env.PROJECT_DO.get(

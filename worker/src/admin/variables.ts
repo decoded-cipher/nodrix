@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
-import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
+import { resolveProject, requireProjectAdminForWrites, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId, newToken, sha256Hex } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import type { ProjectDO } from '../do/project-do';
@@ -10,6 +10,7 @@ const variables = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
 variables.use('*', requireSession);
 variables.use('*', resolveProject);
+variables.use('*', requireProjectAdminForWrites);
 
 // ---- Variables -------------------------------------------------------------
 
