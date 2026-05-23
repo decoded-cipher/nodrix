@@ -18,6 +18,7 @@ import { recordAudit } from '../lib/audit';
 import { decryptSecret } from '../lib/crypto';
 import { getOrCreateSigningSecret } from '../lib/auth-secret';
 import { findOpenInviteByEmail, consumeInvite } from '../lib/invites';
+import { hashPassword as pbkdf2Hash, verifyPassword as pbkdf2Verify } from '../lib/password';
 
 // Shared with admin/auth-providers.ts — encryption info string for OAuth
 // client secrets at rest in D1. Changing this invalidates existing rows.
@@ -141,6 +142,14 @@ export async function buildAuth(env: Env, request?: Request) {
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
+      // Hash with PBKDF2 (native Web Crypto, ~tens of ms) instead of Better
+      // Auth's default scrypt, which on Workers runs as pure-JS @noble scrypt
+      // (~2.5s CPU) and intermittently trips the Worker CPU limit on sign-in
+      // (503 exceededCpu).
+      password: {
+        hash: pbkdf2Hash,
+        verify: ({ hash, password }) => pbkdf2Verify(hash, password),
+      },
     },
 
     socialProviders,
