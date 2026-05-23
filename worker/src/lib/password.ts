@@ -9,7 +9,7 @@
 // self-describing — `pbkdf2$<iterations>$<saltB64>$<hashB64>` — so the iteration
 // count can be raised later without breaking existing hashes.
 
-const ITERATIONS = 600_000; // OWASP 2023 floor for PBKDF2-HMAC-SHA256
+const ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const KEY_BITS = 256;
 const PREFIX = 'pbkdf2';
