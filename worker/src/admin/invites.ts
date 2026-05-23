@@ -39,25 +39,36 @@ function normalizeProjects(raw: unknown): ProjectAssignment[] {
   return out;
 }
 
-// GET /v1/admin/invites — pending + recently accepted invites.
+// GET /v1/admin/invites — pending invites only (a row exists only while pending).
 invites.get('/', async (c) => {
+  const now = Math.floor(Date.now() / 1000);
+  // Self-prune expired rows so the table only holds live invites.
+  c.executionCtx.waitUntil(
+    c.env.DB
+      .prepare(`DELETE FROM invites WHERE expires_at IS NOT NULL AND expires_at <= ?`)
+      .bind(now)
+      .run()
+      .then(() => undefined)
+      .catch(() => undefined)
+  );
+
   const rows = await c.env.DB
     .prepare(
       `SELECT i.id, i.email, i.instance_role, i.created_at, i.expires_at,
-              i.accepted_at, i.revoked_at, u.email AS inviter_email
+              u.email AS inviter_email
          FROM invites i
          LEFT JOIN users u ON u.id = i.created_by
+        WHERE i.expires_at IS NULL OR i.expires_at > ?
         ORDER BY i.created_at DESC
         LIMIT 200`
     )
+    .bind(now)
     .all<{
       id: string;
       email: string | null;
       instance_role: string;
       created_at: number;
       expires_at: number | null;
-      accepted_at: number | null;
-      revoked_at: number | null;
       inviter_email: string | null;
     }>();
   return c.json({ invites: rows.results });
@@ -159,14 +170,14 @@ invites.post('/', async (c) => {
   );
 });
 
-// DELETE /v1/admin/invites/:id — revoke a pending invite.
+// DELETE /v1/admin/invites/:id — revoke a pending invite (deletes the row;
+// invite_projects cascade away).
 invites.delete('/:id', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
-  const now = Math.floor(Date.now() / 1000);
   const res = await c.env.DB
-    .prepare(`UPDATE invites SET revoked_at = ? WHERE id = ? AND accepted_at IS NULL AND revoked_at IS NULL`)
-    .bind(now, id)
+    .prepare(`DELETE FROM invites WHERE id = ?`)
+    .bind(id)
     .run();
   if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
 

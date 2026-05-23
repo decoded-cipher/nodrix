@@ -17,13 +17,11 @@ export type InviteRow = {
   created_by: string | null;
   created_at: number;
   expires_at: number | null;
-  accepted_at: number | null;
-  accepted_user: string | null;
-  revoked_at: number | null;
 };
 
-// Usable = not accepted, not revoked, not expired.
-const OPEN = `accepted_at IS NULL AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)`;
+// A row only exists while pending (accept/revoke delete it), so "open" is just
+// "not expired".
+const OPEN = `(expires_at IS NULL OR expires_at > ?)`;
 
 export async function findOpenInviteByEmail(env: Env, email: string): Promise<InviteRow | null> {
   const now = Math.floor(Date.now() / 1000);
@@ -42,31 +40,33 @@ export async function findOpenInviteByToken(env: Env, token: string): Promise<In
     .first<InviteRow>();
 }
 
-// Mark the invite accepted and apply its pre-assigned project memberships to the
-// new user. Called from the user.create.after hook. The accepted_at guard makes
-// concurrent accepts a no-op for the loser.
+// Apply the invite's pre-assigned project memberships to the new user, then
+// DELETE the invite (throwaway). Called from the user.create.after hook. We read
+// invite_projects first, then delete by email — which removes this invite plus
+// any other pending invites for the same address (now a registered user), and
+// cascades all their invite_projects rows.
 export async function consumeInvite(env: Env, invite: InviteRow, userId: string): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
-  await env.DB
-    .prepare(`UPDATE invites SET accepted_at = ?, accepted_user = ? WHERE id = ? AND accepted_at IS NULL`)
-    .bind(now, userId, invite.id)
-    .run();
 
   const projs = await env.DB
     .prepare(`SELECT project_id, role FROM invite_projects WHERE invite_id = ?`)
     .bind(invite.id)
     .all<{ project_id: string; role: ProjectRole }>();
-  if (projs.results.length === 0) return;
 
-  await env.DB.batch(
-    projs.results.map((p) =>
-      env.DB
-        .prepare(
-          `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(user_id, project_id) DO UPDATE SET role = excluded.role`
-        )
-        .bind(userId, p.project_id, p.role, now, invite.created_by)
-    )
+  const stmts = projs.results.map((p) =>
+    env.DB
+      .prepare(
+        `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, project_id) DO UPDATE SET role = excluded.role`
+      )
+      .bind(userId, p.project_id, p.role, now, invite.created_by)
   );
+  stmts.push(
+    invite.email
+      ? env.DB.prepare(`DELETE FROM invites WHERE email = ?`).bind(invite.email)
+      : env.DB.prepare(`DELETE FROM invites WHERE id = ?`).bind(invite.id)
+  );
+
+  await env.DB.batch(stmts);
 }

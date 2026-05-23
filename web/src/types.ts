@@ -44,8 +44,6 @@ export type Invite = {
   instance_role: 'admin' | 'member';
   created_at: number;
   expires_at: number | null;
-  accepted_at: number | null;
-  revoked_at: number | null;
   inviter_email: string | null;
 };
 

@@ -1,10 +1,10 @@
 // AES-GCM helper for at-rest encryption of small secrets stored in D1
 // (currently: the owner's Cloudflare API token used by the Update flow).
 //
-// The key is derived from BETTER_AUTH_SECRET via HKDF-SHA-256 with a
-// fixed info string per use case, so different secret stores can't be
-// cross-decrypted even though they share the same base secret. Format
-// is `v1:<base64-iv>:<base64-ciphertext>` to leave room for future
+// The key is derived from the deployment signing secret (see lib/auth-secret.ts)
+// via HKDF-SHA-256 with a fixed info string per use case, so different secret
+// stores can't be cross-decrypted even though they share the same base secret.
+// Format is `v1:<base64-iv>:<base64-ciphertext>` to leave room for future
 // algorithm changes.
 
 const ENC_VERSION = 'v1';
