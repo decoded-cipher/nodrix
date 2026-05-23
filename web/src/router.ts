@@ -29,7 +29,6 @@ const routes: RouteRecordRaw[] = [
           { path: 'd/:dash', name: 'dashboard-view', component: () => import('./pages/project/DashboardView.vue'), meta: { title: 'Dashboard' } },
           { path: 'd/:dash/edit', name: 'dashboard-edit', component: () => import('./pages/project/DashboardEdit.vue'), meta: { title: 'Edit dashboard' } },
           { path: 'variables', name: 'variables', component: () => import('./pages/project/Variables.vue'), meta: { title: 'Variables' } },
-          { path: 'members', name: 'members', component: () => import('./pages/project/Members.vue'), meta: { title: 'Members' } },
           // Automations + Connections live under one hub with two tabs.
           {
             path: 'automations',

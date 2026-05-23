@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
 import { confirm } from '../lib/confirm';
+import ShareProjectModal from '../components/ShareProjectModal.vue';
 import type { Project } from '../types';
 
 const session = useSessionStore();
@@ -22,6 +23,14 @@ const editing = ref<Project | null>(null);
 const form = ref({ name: '', description: '' });
 const saving = ref(false);
 const saveError = ref<string | null>(null);
+
+// Share (access) modal state.
+const sharingProject = ref<Project | null>(null);
+function openShare(p: Project, event: Event) {
+  event.stopPropagation();
+  openMenuFor.value = null;
+  sharingProject.value = p;
+}
 
 async function create() {
   const n = newName.value.trim();
@@ -198,8 +207,8 @@ watch(
           class="pointer-events-none absolute bottom-3 right-3 rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
         >Current</span>
 
-        <!-- Kebab menu -->
-        <div class="absolute right-2 top-2">
+        <!-- Kebab menu (project admins only) -->
+        <div v-if="p.role === 'admin'" class="absolute right-2 top-2">
           <button
             type="button"
             class="rounded-md p-1 text-neutral-400 opacity-0 transition group-hover:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
@@ -224,6 +233,11 @@ watch(
               class="block w-full px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
               @click="startEdit(p, $event)"
             >Edit project</button>
+            <button
+              type="button"
+              class="block w-full px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              @click="openShare(p, $event)"
+            >Share access</button>
             <button
               type="button"
               class="block w-full px-3 py-1.5 text-left text-xs text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
@@ -311,5 +325,12 @@ watch(
         </form>
       </div>
     </div>
+
+    <!-- Share (access) modal -->
+    <ShareProjectModal
+      v-if="sharingProject"
+      :project="sharingProject"
+      @close="sharingProject = null"
+    />
   </div>
 </template>
