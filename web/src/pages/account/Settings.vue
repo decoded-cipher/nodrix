@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../../stores/session';
 import { useThemeStore, type ThemeMode } from '../../stores/theme';
@@ -11,6 +11,46 @@ const session = useSessionStore();
 const theme = useThemeStore();
 const accent = useAccentStore();
 const router = useRouter();
+
+// ─── Your profile (name) ──────────────────────────────────────────────────────
+const profileForm = ref({ first_name: '', last_name: '' });
+const savingProfile = ref(false);
+const profileError = ref<string | null>(null);
+const profileSaved = ref(false);
+
+watch(
+  () => session.user,
+  (u) => {
+    if (!u) return;
+    profileForm.value.first_name = u.first_name ?? '';
+    profileForm.value.last_name = u.last_name ?? '';
+  },
+  { immediate: true }
+);
+
+const profileDirty = computed(
+  () =>
+    profileForm.value.first_name !== (session.user?.first_name ?? '') ||
+    profileForm.value.last_name !== (session.user?.last_name ?? '')
+);
+
+async function saveProfile() {
+  savingProfile.value = true;
+  profileError.value = null;
+  profileSaved.value = false;
+  try {
+    await session.updateMe({
+      first_name: profileForm.value.first_name.trim() || null,
+      last_name: profileForm.value.last_name.trim() || null,
+    });
+    profileSaved.value = true;
+    setTimeout(() => (profileSaved.value = false), 1500);
+  } catch (e) {
+    profileError.value = (e as Error).message;
+  } finally {
+    savingProfile.value = false;
+  }
+}
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -251,7 +291,7 @@ const PROVIDER_META = {
     <!-- Account -->
     <section class="mb-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Account</div>
-      <div class="space-y-3 px-4 py-4 text-sm">
+      <div class="space-y-4 px-4 py-4 text-sm">
         <div class="flex items-center justify-between">
           <div>
             <div class="text-neutral-500 dark:text-neutral-400">Email</div>
@@ -261,7 +301,31 @@ const PROVIDER_META = {
             {{ session.user?.role ?? '' }}
           </span>
         </div>
-        <div>
+
+        <!-- Your name -->
+        <form class="space-y-3 border-t border-neutral-100 pt-3 dark:border-neutral-800" @submit.prevent="saveProfile">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label class="block">
+              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
+              <input v-model="profileForm.first_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
+            </label>
+            <label class="block">
+              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Last name</span>
+              <input v-model="profileForm.last_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
+            </label>
+          </div>
+          <p v-if="profileError" class="text-xs text-red-600 dark:text-red-400">{{ profileError }}</p>
+          <div class="flex items-center gap-3">
+            <button
+              type="submit"
+              :disabled="savingProfile || !profileDirty"
+              class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+            >{{ savingProfile ? 'Saving…' : 'Save name' }}</button>
+            <span v-if="profileSaved" class="text-xs text-emerald-600 dark:text-emerald-400">Saved</span>
+          </div>
+        </form>
+
+        <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
           <button
             type="button"
             class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"

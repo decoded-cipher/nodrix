@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useSessionStore, type ActiveSession } from '../../stores/session';
 import { confirm } from '../../lib/confirm';
 import { relativeTime } from '../../lib/time';
@@ -36,68 +36,13 @@ onMounted(async () => {
   }
 });
 
-// ─── Profile (self) ───────────────────────────────────────────────────────────
-
-const editing = ref(false);
-const form = ref({ first_name: '', last_name: '' });
-const saving = ref(false);
-const saveError = ref<string | null>(null);
-
-watch(
-  () => session.user,
-  (u) => {
-    if (!u) return;
-    form.value.first_name = u.first_name ?? '';
-    form.value.last_name = u.last_name ?? '';
-  },
-  { immediate: true }
-);
-
-const displayName = computed(() => {
-  const u = session.user;
-  if (!u) return '';
-  const parts = [u.first_name, u.last_name].filter((s): s is string => !!s && !!s.trim());
-  return parts.length > 0 ? parts.join(' ') : u.email;
-});
-
+// Avatar initials from a user's name/email (used in the People list).
 function initialsOf(email: string, first?: string | null, last?: string | null): string {
   const f = (first ?? '').trim();
   const l = (last ?? '').trim();
   if (f && l) return (f.charAt(0) + l.charAt(0)).toUpperCase();
   if (f) return f.slice(0, 2).toUpperCase();
   return (email.split('@')[0] ?? '').slice(0, 2).toUpperCase();
-}
-
-const initials = computed(() =>
-  session.user ? initialsOf(session.user.email, session.user.first_name, session.user.last_name) : '?'
-);
-
-function fmt(ts: number | null | undefined): string {
-  return ts ? new Date(ts * 1000).toLocaleString() : '—';
-}
-
-function startEdit() {
-  if (!session.user) return;
-  form.value.first_name = session.user.first_name ?? '';
-  form.value.last_name = session.user.last_name ?? '';
-  saveError.value = null;
-  editing.value = true;
-}
-function cancel() { editing.value = false; saveError.value = null; }
-async function save() {
-  saving.value = true;
-  saveError.value = null;
-  try {
-    await session.updateMe({
-      first_name: form.value.first_name.trim() || null,
-      last_name: form.value.last_name.trim() || null,
-    });
-    editing.value = false;
-  } catch (e) {
-    saveError.value = (e as Error).message;
-  } finally {
-    saving.value = false;
-  }
 }
 
 // ─── Active sessions ──────────────────────────────────────────────────────────
@@ -246,50 +191,6 @@ function inviteStatus(i: { expires_at: number | null }): string {
       </p>
     </header>
 
-    <!-- Profile -->
-    <section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div v-if="session.user && !editing" class="flex items-center justify-between px-4 py-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
-            {{ initials }}
-          </div>
-          <div class="min-w-0">
-            <div class="truncate text-sm font-medium">{{ displayName }}</div>
-            <div v-if="displayName !== session.user.email" class="truncate text-xs text-neutral-500 dark:text-neutral-400">
-              {{ session.user.email }}
-            </div>
-            <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-              <span>{{ session.user.role }}</span>
-              <span>·</span>
-              <span class="normal-case tracking-normal">last login: {{ fmt(session.user.last_login_at) }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">You</span>
-          <button type="button" class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="startEdit">Edit</button>
-        </div>
-      </div>
-
-      <form v-else-if="session.user" class="space-y-3 px-4 py-4" @submit.prevent="save">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label class="block">
-            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
-            <input v-model="form.first_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
-          </label>
-          <label class="block">
-            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Last name</span>
-            <input v-model="form.last_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
-          </label>
-        </div>
-        <p v-if="saveError" class="text-xs text-red-600 dark:text-red-400">{{ saveError }}</p>
-        <div class="flex justify-end gap-2 pt-1">
-          <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="cancel">Cancel</button>
-          <button type="submit" :disabled="saving" class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50">{{ saving ? 'Saving…' : 'Save' }}</button>
-        </div>
-      </form>
-    </section>
-
     <!-- People (owner/admin) -->
     <section v-if="isAdmin" class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
@@ -303,7 +204,10 @@ function inviteStatus(i: { expires_at: number | null }): string {
               {{ initialsOf(u.email, u.first_name, u.last_name) }}
             </div>
             <div class="min-w-0">
-              <div class="truncate font-medium">{{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}</div>
+              <div class="flex items-center gap-2">
+                <span class="truncate font-medium">{{ [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email }}</span>
+                <span v-if="u.id === session.user?.id" class="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">You</span>
+              </div>
               <div class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ u.email }}</div>
             </div>
           </div>
