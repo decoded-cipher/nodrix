@@ -14,8 +14,6 @@ import type {
   IntegrationTestResult,
   Layout,
   UserToken,
-  ProjectMember,
-  ProjectRole,
 } from '../types';
 
 export const useProjectStore = defineStore('project', () => {
@@ -26,7 +24,6 @@ export const useProjectStore = defineStore('project', () => {
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
   const integrations = ref<Integration[]>([]);
-  const members = ref<ProjectMember[]>([]);
 
   async function switchTo(projectId: string): Promise<void> {
     if (currentProjectId.value === projectId && variables.value.length + dashboards.value.length > 0) {
@@ -321,34 +318,6 @@ export const useProjectStore = defineStore('project', () => {
     return res;
   }
 
-  // ─── Project members (sharing) ────────────────────────────────────────────────
-
-  async function loadMembers(): Promise<void> {
-    if (!currentProjectId.value) return;
-    const data = await api.get<{ members: ProjectMember[] }>(
-      `/v1/admin/projects/${currentProjectId.value}/members`
-    );
-    members.value = data.members;
-  }
-
-  async function addMember(email: string, role: ProjectRole): Promise<void> {
-    if (!currentProjectId.value) throw new Error('no project');
-    await api.post(`/v1/admin/projects/${currentProjectId.value}/members`, { email, role });
-    await loadMembers();
-  }
-
-  async function setMemberRole(userId: string, role: ProjectRole): Promise<void> {
-    if (!currentProjectId.value) return;
-    await api.patch(`/v1/admin/projects/${currentProjectId.value}/members/${userId}`, { role });
-    members.value = members.value.map((m) => (m.user_id === userId ? { ...m, role } : m));
-  }
-
-  async function removeMember(userId: string): Promise<void> {
-    if (!currentProjectId.value) return;
-    await api.del<void>(`/v1/admin/projects/${currentProjectId.value}/members/${userId}`);
-    members.value = members.value.filter((m) => m.user_id !== userId);
-  }
-
   return {
     currentProjectId,
     variables,
@@ -357,11 +326,6 @@ export const useProjectStore = defineStore('project', () => {
     tokens,
     automations,
     integrations,
-    members,
-    loadMembers,
-    addMember,
-    setMemberRole,
-    removeMember,
     switchTo,
     loadVariables,
     createVariable,
