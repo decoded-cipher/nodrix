@@ -20,7 +20,7 @@ const spec = computed(() => (props.item ? specFor(props.item.type) : null));
 const variableOptions = computed(() =>
   project.variables.map((v) => ({
     value: v.key,
-    label: v.name ? `${v.name} (${v.key})` : v.key,
+    label: v.key,
     hint: v.unit ?? undefined,
   }))
 );
@@ -28,6 +28,18 @@ const variableOptions = computed(() =>
 function setProp(key: string, v: unknown) {
   if (!props.item) return;
   emit('update', { ...props.item, props: { ...props.item.props, [key]: v } });
+}
+
+// Selecting a variable also prefills the widget's `unit` from the variable's
+// unit — but only when the widget has a unit field and the user hasn't set one,
+// so we never clobber a manual override.
+function selectVariable(key: string, varKey: string) {
+  if (!props.item) return;
+  const patch: Record<string, unknown> = { [key]: varKey };
+  const hasUnitField = spec.value?.fields?.some((f) => f.key === 'unit');
+  const unit = project.variables.find((v) => v.key === varKey)?.unit;
+  if (hasUnitField && unit && !props.item.props['unit']) patch['unit'] = unit;
+  emit('update', { ...props.item, props: { ...props.item.props, ...patch } });
 }
 
 function updateSeries(idx: number, key: string, v: unknown) {
@@ -155,7 +167,7 @@ function removeMarker(idx: number) {
             :model-value="(item.props[f.key] as string) ?? ''"
             :options="variableOptions"
             placeholder="Select a variable"
-            @update:model-value="(v) => setProp(f.key, v)"
+            @update:model-value="(v) => selectVariable(f.key, v as string)"
           />
         </div>
 

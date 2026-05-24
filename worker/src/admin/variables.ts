@@ -18,14 +18,13 @@ variables.get('/', async (c) => {
   const project = c.get('project');
   const rows = await c.env.DB
     .prepare(
-      `SELECT id, key, name, unit, created_at, updated_at, last_seen
+      `SELECT id, key, unit, created_at, updated_at, last_seen
          FROM project_variables WHERE project_id = ? ORDER BY key ASC`
     )
     .bind(project.id)
     .all<{
       id: string;
       key: string;
-      name: string | null;
       unit: string | null;
       created_at: number;
       updated_at: number;
@@ -34,10 +33,10 @@ variables.get('/', async (c) => {
   return c.json({ variables: rows.results });
 });
 
-// POST /v1/admin/projects/:proj/variables  body: { key, name?, unit? }
+// POST /v1/admin/projects/:proj/variables  body: { key, unit? }
 // Manual declaration (telemetry also auto-creates variables on first sight).
 variables.post('/', async (c) => {
-  const body = await c.req.json<{ key?: string; name?: string | null; unit?: string | null }>();
+  const body = await c.req.json<{ key?: string; unit?: string | null }>();
   const key = (body.key ?? '').trim();
   if (!key) return c.json({ error: 'bad_request', reason: 'missing_key' }, 400);
 
@@ -49,10 +48,10 @@ variables.post('/', async (c) => {
   try {
     await c.env.DB
       .prepare(
-        `INSERT INTO project_variables (id, project_id, key, name, unit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO project_variables (id, project_id, key, unit, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, project.id, key, body.name ?? null, body.unit ?? null, now, now)
+      .bind(id, project.id, key, body.unit ?? null, now, now)
       .run();
   } catch {
     return c.json({ error: 'conflict', reason: 'duplicate_key' }, 409);
@@ -69,33 +68,26 @@ variables.post('/', async (c) => {
     })
   );
 
-  return c.json({ id, key, name: body.name ?? null, unit: body.unit ?? null, created_at: now, updated_at: now }, 201);
+  return c.json({ id, key, unit: body.unit ?? null, created_at: now, updated_at: now }, 201);
 });
 
-// PATCH /v1/admin/projects/:proj/variables/:id  body: { name?, unit? }
+// PATCH /v1/admin/projects/:proj/variables/:id  body: { unit? }
 variables.patch('/:id', async (c) => {
   const project = c.get('project');
   const id = c.req.param('id');
-  const body = await c.req.json<{ name?: string | null; unit?: string | null }>();
+  const body = await c.req.json<{ unit?: string | null }>();
 
-  const sets: string[] = [];
-  const vals: unknown[] = [];
-  if ('name' in body) { sets.push('name = ?'); vals.push(body.name ?? null); }
-  if ('unit' in body) { sets.push('unit = ?'); vals.push(body.unit ?? null); }
-  if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
+  if (!('unit' in body)) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
 
   const now = Math.floor(Date.now() / 1000);
-  sets.push('updated_at = ?'); vals.push(now);
-  vals.push(id, project.id);
-
   const res = await c.env.DB
-    .prepare(`UPDATE project_variables SET ${sets.join(', ')} WHERE id = ? AND project_id = ?`)
-    .bind(...vals)
+    .prepare(`UPDATE project_variables SET unit = ?, updated_at = ? WHERE id = ? AND project_id = ?`)
+    .bind(body.unit ?? null, now, id, project.id)
     .run();
   if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
 
   const row = await c.env.DB
-    .prepare(`SELECT id, key, name, unit, created_at, updated_at, last_seen FROM project_variables WHERE id = ?`)
+    .prepare(`SELECT id, key, unit, created_at, updated_at, last_seen FROM project_variables WHERE id = ?`)
     .bind(id)
     .first();
   return c.json(row);

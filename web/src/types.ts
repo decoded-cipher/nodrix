@@ -61,7 +61,6 @@ export type InvitePreview = {
 export type Variable = {
   id: string;
   key: string;
-  name?: string | null;
   unit?: string | null;
   created_at: number;
   updated_at: number;

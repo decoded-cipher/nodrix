@@ -50,7 +50,7 @@ export const useProjectStore = defineStore('project', () => {
     variables.value = data.variables;
   }
 
-  async function createVariable(input: { key: string; name?: string | null; unit?: string | null }): Promise<Variable> {
+  async function createVariable(input: { key: string; unit?: string | null }): Promise<Variable> {
     const pid = requireProjectId();
     const v = await api.post<Variable>(
       `/v1/admin/projects/${pid}/variables`,
@@ -62,7 +62,7 @@ export const useProjectStore = defineStore('project', () => {
 
   async function updateVariable(
     id: string,
-    patch: { name?: string | null; unit?: string | null }
+    patch: { unit?: string | null }
   ): Promise<Variable> {
     const pid = requireProjectId();
     const v = await api.patch<Variable>(

@@ -11,7 +11,7 @@ list.get('/', async (c) => {
   const proj = c.req.param('proj')!;
   const rows = await c.env.DB
     .prepare(
-      `SELECT id, key, name, unit, created_at, updated_at, last_seen
+      `SELECT id, key, unit, created_at, updated_at, last_seen
          FROM project_variables
         WHERE project_id = ?
         ORDER BY key ASC`
@@ -20,7 +20,6 @@ list.get('/', async (c) => {
     .all<{
       id: string;
       key: string;
-      name: string | null;
       unit: string | null;
       created_at: number;
       updated_at: number;

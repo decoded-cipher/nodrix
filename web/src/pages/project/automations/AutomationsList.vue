@@ -11,7 +11,7 @@ const router = useRouter();
 
 const variableLabel = (key: string): string => {
   const v = project.variables.find((x) => x.key === key);
-  return v?.name || v?.key || key || '—';
+  return v?.key || key || '—';
 };
 const integrationLabel = (id: string): string => {
   const i = project.integrations.find((x) => x.id === id);
