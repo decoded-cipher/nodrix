@@ -36,10 +36,10 @@ const tone: Record<ToastKind, { chip: string; bar: string }> = {
           <p class="min-w-0 flex-1 text-sm font-medium text-neutral-800 dark:text-neutral-100">{{ t.message }}</p>
         </div>
 
-        <!-- Duration progress bar: slim, inset, shrinks over the toast's TTL. -->
-        <div v-if="t.ttl > 0" class="mx-3.5 mb-2.5 h-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+        <!-- Duration progress bar: full-width, flush with the bottom edge. -->
+        <div v-if="t.ttl > 0" class="h-1 w-full bg-neutral-100 dark:bg-neutral-800">
           <div
-            class="toast-bar h-full origin-left rounded-full"
+            class="toast-bar h-full origin-left"
             :class="tone[t.kind].bar"
             :style="{ animationDuration: t.ttl + 'ms' }"
           />
