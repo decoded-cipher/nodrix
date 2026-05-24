@@ -60,12 +60,21 @@ const projectScoped = computed<NavItem[]>(() => {
   ];
 });
 
-const globalBottom = computed<NavItem[]>(() => [
-  { label: 'Users', to: '/users', icon: 'users' },
-  { label: 'API tokens', to: '/tokens', icon: 'key' },
-  { label: 'Audit log', to: '/audit-log', icon: 'audit' },
-  { label: 'Settings', to: '/settings', icon: 'settings' },
-]);
+// Role-gated account nav. Owner sees everything; admin loses the audit log;
+// members also lose Users + API tokens. Everyone keeps Settings.
+const isOwner = computed(() => session.user?.role === 'owner');
+const isAdmin = computed(() => session.user?.role === 'owner' || session.user?.role === 'admin');
+
+const globalBottom = computed<NavItem[]>(() => {
+  const items: NavItem[] = [];
+  if (isAdmin.value) {
+    items.push({ label: 'Users', to: '/users', icon: 'users' });
+    items.push({ label: 'API tokens', to: '/tokens', icon: 'key' });
+  }
+  if (isOwner.value) items.push({ label: 'Audit log', to: '/audit-log', icon: 'audit' });
+  items.push({ label: 'Settings', to: '/settings', icon: 'settings' });
+  return items;
+});
 
 const ACTIVE_CLASSES =
   'bg-accent-50 text-accent-700 font-medium hover:bg-accent-100 dark:bg-accent-500/15 dark:text-accent-400 dark:hover:bg-accent-500/20';

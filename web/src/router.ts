@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { useSessionStore } from './stores/session';
 
 const routes: RouteRecordRaw[] = [
   // Login lives outside the app shell.
@@ -15,9 +16,9 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', name: 'home', component: () => import('./pages/Home.vue'), meta: { title: 'Home' } },
       { path: 'projects', name: 'projects', component: () => import('./pages/Projects.vue'), meta: { title: 'Projects' } },
-      { path: 'users', name: 'users', component: () => import('./pages/account/Users.vue'), meta: { title: 'Users' } },
-      { path: 'tokens', name: 'tokens', component: () => import('./pages/account/Tokens.vue'), meta: { title: 'Tokens' } },
-      { path: 'audit-log', name: 'audit-log', component: () => import('./pages/account/AuditLog.vue'), meta: { title: 'Audit log' } },
+      { path: 'users', name: 'users', component: () => import('./pages/account/Users.vue'), meta: { title: 'Users', roles: ['owner', 'admin'] } },
+      { path: 'tokens', name: 'tokens', component: () => import('./pages/account/Tokens.vue'), meta: { title: 'Tokens', roles: ['owner', 'admin'] } },
+      { path: 'audit-log', name: 'audit-log', component: () => import('./pages/account/AuditLog.vue'), meta: { title: 'Audit log', roles: ['owner'] } },
       { path: 'settings', name: 'settings', component: () => import('./pages/account/Settings.vue'), meta: { title: 'Settings' } },
 
       // Project-scoped routes.
@@ -51,4 +52,21 @@ const routes: RouteRecordRaw[] = [
 export const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+// Role gate: routes can declare `meta.roles`. Members can't reach Users / API
+// tokens; only the owner reaches the audit log. The backend enforces this too —
+// this just keeps the UI honest on direct navigation. Falls through to '/' when
+// the signed-in user's role isn't allowed.
+router.beforeEach(async (to) => {
+  const roles = to.meta['roles'] as string[] | undefined;
+  if (!roles) return true;
+
+  const session = useSessionStore();
+  if (!session.user) {
+    try { await session.load(); } catch { /* unauthenticated — AppShell redirects to /login */ }
+  }
+  const role = session.user?.role;
+  if (role && !roles.includes(role)) return { path: '/' };
+  return true;
 });

@@ -41,15 +41,6 @@ export type InstanceUser = {
   projects: ProjectRef[];
 };
 
-export type Invite = {
-  id: string;
-  email: string | null;
-  instance_role: 'admin' | 'member';
-  created_at: number;
-  expires_at: number | null;
-  inviter_email: string | null;
-};
-
 // Returned once on creation.
 export type InviteCreated = {
   id: string;
