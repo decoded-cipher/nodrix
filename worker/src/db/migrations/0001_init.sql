@@ -108,8 +108,7 @@ CREATE TABLE IF NOT EXISTS project_variables (
   id          TEXT PRIMARY KEY,
   project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   key         TEXT NOT NULL,                     -- telemetry JSON field name, e.g. 'pm25'
-  name        TEXT,                              -- display name (optional)
-  unit        TEXT,                              -- optional
+  unit        TEXT,                              -- optional; prefills a widget's unit when bound
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL,
   last_seen   INTEGER                            -- last telemetry timestamp (unix seconds)

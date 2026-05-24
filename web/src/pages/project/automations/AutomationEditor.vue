@@ -68,7 +68,7 @@ if (recipeId) {
 }
 
 // Dropdown option lists.
-const variableOptions = computed(() => project.variables.map((v) => ({ value: v.key, label: v.name || v.key })));
+const variableOptions = computed(() => project.variables.map((v) => ({ value: v.key, label: v.key })));
 const integrationOptions = computed(() =>
   project.integrations.map((i) => ({ value: i.id, label: i.name, hint: connSpec(i.kind).label }))
 );
