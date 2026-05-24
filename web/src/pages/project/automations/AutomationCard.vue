@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '../../../stores/project';
 import { confirm } from '../../../lib/confirm';
+import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
 import Toggle from '../../../components/Toggle.vue';
 import StatusPill from '../../../components/StatusPill.vue';
@@ -40,7 +41,11 @@ function edit() {
 }
 
 async function toggle() {
-  await project.updateAutomation(props.automation.id, { enabled: !props.automation.enabled });
+  try {
+    await project.updateAutomation(props.automation.id, { enabled: !props.automation.enabled });
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function run() {
@@ -53,6 +58,8 @@ async function run() {
       text: res.status === 'error' ? (res.error ?? 'error') : `${res.status} · ran ${res.actionsRun} action(s)`,
     };
     setTimeout(() => { runMsg.value = null; }, 4000);
+  } catch (e) {
+    toast.error((e as Error).message);
   } finally {
     running.value = false;
   }
@@ -60,13 +67,17 @@ async function run() {
 
 async function duplicate() {
   menuOpen.value = false;
-  await project.createAutomation({
-    name: `${props.automation.name} (copy)`,
-    description: props.automation.description,
-    trigger_type: props.automation.trigger_type,
-    trigger_config: props.automation.trigger_config,
-    actions: props.automation.actions,
-  });
+  try {
+    await project.createAutomation({
+      name: `${props.automation.name} (copy)`,
+      description: props.automation.description,
+      trigger_type: props.automation.trigger_type,
+      trigger_config: props.automation.trigger_config,
+      actions: props.automation.actions,
+    });
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function remove() {
@@ -81,7 +92,11 @@ async function remove() {
     confirmLabel: 'Delete automation',
   });
   if (!ok) return;
-  await project.deleteAutomation(props.automation.id);
+  try {
+    await project.deleteAutomation(props.automation.id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 </script>
 

@@ -45,8 +45,8 @@ onMounted(async () => {
     await project.switchTo(projId);
     dashboard.value = await project.fetchDashboard(dashId);
     mountGrid(dashboard.value.layout);
-  } catch (e) {
-    error.value = (e as Error).message;
+  } catch {
+    error.value = 'This dashboard could not be loaded. It may have been removed, or you may not have access to it.';
     return;
   }
 

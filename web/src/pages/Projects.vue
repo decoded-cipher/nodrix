@@ -93,7 +93,12 @@ async function removeProject(p: Project) {
     confirmLabel: 'Delete project',
   });
   if (!ok) return;
-  await session.deleteProject(p.id);
+  try {
+    await session.deleteProject(p.id);
+  } catch (e) {
+    toast.error((e as Error).message);
+    return;
+  }
   if (ui.currentProject?.id === p.id && session.projects[0]) {
     ui.setCurrentProject(session.projects[0].id);
   }

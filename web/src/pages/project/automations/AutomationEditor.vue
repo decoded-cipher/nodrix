@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useProjectStore } from '../../../stores/project';
+import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
 import Dropdown from '../../../components/Dropdown.vue';
 import Spinner from '../../../components/Spinner.vue';
@@ -188,6 +189,8 @@ async function save() {
       });
     }
     backToList();
+  } catch (e) {
+    toast.error((e as Error).message);
   } finally {
     saving.value = false;
   }

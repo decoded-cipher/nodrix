@@ -4,6 +4,7 @@ import { useProjectStore } from '../../stores/project';
 import RevealOnce from '../../components/RevealOnce.vue';
 import Dropdown from '../../components/Dropdown.vue';
 import { confirm } from '../../lib/confirm';
+import { toast } from '../../lib/toast';
 
 const scopeOptions = [
   { value: 'read' as const, label: 'read', hint: 'Can read data and stream updates.' },
@@ -23,13 +24,17 @@ async function create() {
   const expiresAt = typeof expiresInDays.value === 'number' && expiresInDays.value > 0
     ? Math.floor(Date.now() / 1000) + expiresInDays.value * 86400
     : null;
-  const t = await project.createToken(scope.value, projectScoped.value, {
-    name: tokenName.value.trim() || null,
-    expires_at: expiresAt,
-  });
-  justCreatedToken.value = t.token;
-  tokenName.value = '';
-  expiresInDays.value = '';
+  try {
+    const t = await project.createToken(scope.value, projectScoped.value, {
+      name: tokenName.value.trim() || null,
+      expires_at: expiresAt,
+    });
+    justCreatedToken.value = t.token;
+    tokenName.value = '';
+    expiresInDays.value = '';
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function revoke(id: string) {
@@ -45,7 +50,11 @@ async function revoke(id: string) {
     confirmLabel: 'Revoke token',
   });
   if (!ok) return;
-  await project.revokeToken(id);
+  try {
+    await project.revokeToken(id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 function fmt(ts: number | null): string {

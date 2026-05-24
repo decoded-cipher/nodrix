@@ -74,8 +74,8 @@ onMounted(async () => {
     dashboard.value = await project.fetchDashboard(dashId);
     layout.value = dashboard.value.layout;
     dirty.value = false;
-  } catch (e) {
-    err.value = (e as Error).message;
+  } catch {
+    err.value = 'This dashboard could not be loaded. It may have been removed, or you may not have access to it.';
     return;
   }
 

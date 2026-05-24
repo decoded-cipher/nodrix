@@ -7,7 +7,15 @@ import { progress } from './lib/progress';
 
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown) {
-    super(`HTTP ${status}`);
+    // Use the real server-provided message so `error.message` is meaningful at
+    // call sites (the JSON body is { error, reason, message? }); fall back to the
+    // status when the response carried no body.
+    super(ApiError.messageFrom(status, body));
+  }
+
+  private static messageFrom(status: number, body: unknown): string {
+    const b = body as { error?: string; reason?: string; message?: string } | null;
+    return b?.message || b?.reason || b?.error || `HTTP ${status}`;
   }
 }
 
