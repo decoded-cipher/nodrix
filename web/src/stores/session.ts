@@ -19,6 +19,11 @@ export type ActiveSession = {
   last_seen_at: number;
   expires_at: number;
   current: boolean;
+  // Whose session this is (the owner-only list spans all users).
+  user_id: string;
+  user_email: string;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 export const useSessionStore = defineStore('session', () => {

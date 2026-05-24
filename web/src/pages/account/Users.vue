@@ -14,9 +14,12 @@ const isAdmin = computed(() => session.user?.role === 'owner' || session.user?.r
 
 onMounted(async () => {
   if (!session.user) await session.load();
-  try { await session.loadSessions(); } catch { /* ignore */ }
   if (isAdmin.value) {
     try { await session.loadUsers(); } catch { /* ignore */ }
+  }
+  // Active sessions span every user — owner-only.
+  if (isOwner.value) {
+    try { await session.loadSessions(); } catch { /* ignore */ }
   }
 });
 
@@ -60,16 +63,18 @@ function parseAgent(ua: string | null): { label: string; device: 'desktop' | 'mo
 const sessionRows = computed(() =>
   session.activeSessions.map((s) => {
     const a = parseAgent(s.user_agent);
-    return { ...s, agentLabel: a.label, device: a.device };
+    const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.user_email;
+    return { ...s, agentLabel: a.label, device: a.device, userName: name };
   })
 );
 
 async function revokeDevice(s: ActiveSession) {
   const a = parseAgent(s.user_agent);
+  const who = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.user_email;
   const ok = await confirm({
     title: 'Sign out this device?',
     message: 'That session is signed out immediately and will need to log in again.',
-    details: [a.label, s.ip_address ? `IP: ${s.ip_address}` : ''].filter(Boolean) as string[],
+    details: [who, a.label, s.ip_address ? `IP: ${s.ip_address}` : ''].filter(Boolean) as string[],
     confirmLabel: 'Sign out device',
   });
   if (!ok) return;
@@ -166,8 +171,8 @@ async function removeUser(u: InstanceUser) {
       </ul>
     </section>
 
-    <!-- Active sessions -->
-    <section class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <!-- Active sessions (owner-only) — every user's signed-in devices. -->
+    <section v-if="isOwner" class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <span class="text-sm font-semibold">Active sessions</span>
         <span class="text-xs text-neutral-500 dark:text-neutral-400">
@@ -194,12 +199,15 @@ async function removeUser(u: InstanceUser) {
 
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <span class="truncate text-sm font-medium">{{ s.agentLabel }}</span>
-              <span v-if="s.current" class="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">This device</span>
+              <span class="truncate text-sm font-medium">{{ s.userName }}</span>
+              <span v-if="s.user_id === session.user?.id" class="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">You</span>
+              <span v-if="s.current" class="shrink-0 rounded-full bg-accent-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">This device</span>
             </div>
             <div class="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-              <span v-if="s.ip_address" class="font-mono">{{ s.ip_address }}</span>
+              <span class="truncate">{{ s.agentLabel }}</span>
               <span v-if="s.ip_address" class="text-neutral-300 dark:text-neutral-600">·</span>
+              <span v-if="s.ip_address" class="font-mono">{{ s.ip_address }}</span>
+              <span class="text-neutral-300 dark:text-neutral-600">·</span>
               <span>active {{ relativeTime(s.last_seen_at) }}</span>
             </div>
           </div>
