@@ -18,13 +18,19 @@ const projectOptions = computed(() => [
   { value: '', label: 'All projects' },
   ...session.projects.map((p) => ({ value: p.id, label: p.name })),
 ]);
-const expiryOptions = [
-  { value: 7, label: '7 days' },
-  { value: 30, label: '30 days' },
-  { value: 60, label: '60 days' },
-  { value: 90, label: '90 days' },
+const expiryDate = (days: number) =>
+  new Date(Date.now() + days * 86400_000).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+const expiryOptions = computed(() => [
+  { value: 7, label: '7 days', meta: expiryDate(7) },
+  { value: 30, label: '30 days', meta: expiryDate(30) },
+  { value: 60, label: '60 days', meta: expiryDate(60) },
+  { value: 90, label: '90 days', meta: expiryDate(90) },
   { value: 0, label: 'Never' },
-];
+]);
 
 const scope = ref<'read' | 'admin'>('read');
 const projectId = ref<string>(''); // '' = all projects
