@@ -3,12 +3,11 @@ import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
 import { newId, newToken, sha256Hex } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
-import { buildAuth } from '../auth';
 
-// Invite management — owner/instance-admin only. Two flows share the invites
-// table: a self-serve LINK (invitee sets their own password at /invite/<token>)
-// and DIRECT create (account made now with a temp password). Both bind an email
-// so the Better Auth create-gate (auth/index.ts) authorizes the signup.
+// Invite management — owner/instance-admin only. An invite is a self-serve LINK:
+// the invitee sets their own password at /invite/<token>. It binds an email so
+// the Better Auth create-gate (auth/index.ts) authorizes the signup and carries
+// the instance role. Projects are assigned afterward from the Users page.
 
 const invites = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -57,18 +56,12 @@ invites.get('/', async (c) => {
 });
 
 // POST /v1/admin/invites
-// body: { email, instance_role:'admin'|'member', expires_in_days?, mode:'link'|'direct', name? }
-// Invites only onboard a user with an instance role; projects are assigned later
+// body: { email, instance_role:'admin'|'member' }
+// Returns a one-time accept link (shown once). Projects are assigned afterward
 // from the Users page.
 invites.post('/', async (c) => {
   const user = c.get('user');
-  const body = await c.req.json<{
-    email?: string;
-    instance_role?: string;
-    expires_in_days?: number | null;
-    mode?: string;
-    name?: string | null;
-  }>();
+  const body = await c.req.json<{ email?: string; instance_role?: string }>();
 
   const email = (body.email ?? '').trim().toLowerCase();
   if (!email || !email.includes('@')) return c.json({ error: 'bad_request', reason: 'invalid_email' }, 400);
@@ -80,8 +73,6 @@ invites.post('/', async (c) => {
     return c.json({ error: 'forbidden', reason: 'owner_only_admin_invite' }, 403);
   }
 
-  const mode = body.mode === 'direct' ? 'direct' : 'link';
-
   // Block inviting an email that already has an account — change an existing
   // user's role or project assignments from the Users page instead.
   const existing = await c.env.DB
@@ -91,8 +82,7 @@ invites.post('/', async (c) => {
   if (existing) return c.json({ error: 'conflict', reason: 'user_exists' }, 409);
 
   const now = Math.floor(Date.now() / 1000);
-  const days = typeof body.expires_in_days === 'number' && body.expires_in_days > 0 ? body.expires_in_days : null;
-  const expiresAt = days ? now + days * 24 * 60 * 60 : now + DEFAULT_EXPIRY_SECONDS;
+  const expiresAt = now + DEFAULT_EXPIRY_SECONDS;
 
   const id = newId('token').replace(/^tok_/, 'inv_');
   const token = newToken();
@@ -113,30 +103,14 @@ invites.post('/', async (c) => {
       action: 'invite.create',
       targetType: 'user',
       targetId: id,
-      metadata: { email, instance_role: instanceRole, mode },
+      metadata: { email, instance_role: instanceRole },
     })
   );
 
-  if (mode === 'direct') {
-    // Create the account now with a temp password. The Better Auth create-gate
-    // finds this invite by email → authorizes + assigns role; the after-hook
-    // consumes it + applies project memberships. We do NOT forward the new
-    // user's session — the inviter stays logged in as themselves.
-    const tempPassword = newToken();
-    const name = (body.name ?? '').trim() || email.split('@')[0]!;
-    try {
-      const auth = await buildAuth(c.env, c.req.raw);
-      await auth.api.signUpEmail({ body: { email, password: tempPassword, name } });
-    } catch (e) {
-      return c.json({ error: 'signup_failed', reason: (e as Error).message }, 500);
-    }
-    return c.json({ id, email, instance_role: instanceRole, mode, temp_password: tempPassword }, 201);
-  }
-
-  // Link mode: return the one-time accept URL + token (shown once).
+  // One-time accept URL + token (shown once).
   const origin = new URL(c.req.url).origin;
   return c.json(
-    { id, email, instance_role: instanceRole, mode, token, url: `${origin}/invite/${token}`, expires_at: expiresAt },
+    { id, email, instance_role: instanceRole, token, url: `${origin}/invite/${token}`, expires_at: expiresAt },
     201
   );
 });

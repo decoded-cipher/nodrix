@@ -41,15 +41,13 @@ export type InstanceUser = {
   projects: ProjectRef[];
 };
 
-// Returned once on creation.
+// Returned once on creation — a one-time accept link.
 export type InviteCreated = {
   id: string;
   email: string;
   instance_role: 'admin' | 'member';
-  mode: 'link' | 'direct';
-  url?: string;            // link mode
-  token?: string;          // link mode
-  temp_password?: string;  // direct mode
+  url: string;
+  token?: string;
   expires_at?: number;
 };
 

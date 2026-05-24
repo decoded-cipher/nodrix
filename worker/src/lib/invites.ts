@@ -39,10 +39,11 @@ export async function findOpenInviteByToken(env: Env, token: string): Promise<In
     .first<InviteRow>();
 }
 
-// Delete the now-accepted invite (throwaway). The new user's role + project were
-// applied at INSERT by the user.create.before hook, so this just cleans up:
-// delete by email — which removes this invite plus any other pending invites for
-// the same address (now a registered user). Called from user.create.after.
+// Delete the now-accepted invite (throwaway). The new user's role was applied at
+// INSERT by the user.create.before hook; projects are assigned later from the
+// Users page. Delete by email — which removes this invite plus any other pending
+// invites for the same address (now a registered user). Called from
+// user.create.after.
 export async function consumeInvite(env: Env, invite: InviteRow): Promise<void> {
   await (invite.email
     ? env.DB.prepare(`DELETE FROM invites WHERE email = ?`).bind(invite.email)
