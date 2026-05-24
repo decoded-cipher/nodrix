@@ -6,8 +6,9 @@ import { recordAudit } from '../lib/audit';
 
 // Invite management — owner/instance-admin only. An invite is a self-serve LINK:
 // the invitee sets their own password at /invite/<token>. It binds an email so
-// the Better Auth create-gate (auth/index.ts) authorizes the signup and carries
-// the instance role. Projects are assigned afterward from the Users page.
+// the Better Auth create-gate (auth/index.ts) authorizes the signup. Every
+// invite onboards a `member`; role + projects are set afterward from the Users
+// page (promoting to admin is owner-only).
 
 const invites = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -56,22 +57,17 @@ invites.get('/', async (c) => {
 });
 
 // POST /v1/admin/invites
-// body: { email, instance_role:'admin'|'member' }
-// Returns a one-time accept link (shown once). Projects are assigned afterward
-// from the Users page.
+// body: { email }
+// Returns a one-time accept link (shown once). Every invite onboards a member;
+// role + projects are set afterward from the Users page.
 invites.post('/', async (c) => {
   const user = c.get('user');
-  const body = await c.req.json<{ email?: string; instance_role?: string }>();
+  const body = await c.req.json<{ email?: string }>();
 
   const email = (body.email ?? '').trim().toLowerCase();
   if (!email || !email.includes('@')) return c.json({ error: 'bad_request', reason: 'invalid_email' }, 400);
 
-  const instanceRole = body.instance_role === 'admin' ? 'admin' : body.instance_role === 'member' ? 'member' : null;
-  if (!instanceRole) return c.json({ error: 'bad_request', reason: 'invalid_role' }, 400);
-  // Only the owner may mint instance-admins.
-  if (instanceRole === 'admin' && user.role !== 'owner') {
-    return c.json({ error: 'forbidden', reason: 'owner_only_admin_invite' }, 403);
-  }
+  const instanceRole = 'member';
 
   // Block inviting an email that already has an account — change an existing
   // user's role or project assignments from the Users page instead.

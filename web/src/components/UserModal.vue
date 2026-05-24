@@ -18,12 +18,12 @@ const emit = defineEmits<{ close: [] }>();
 const session = useSessionStore();
 const isOwner = computed(() => session.user?.role === 'owner');
 
+// Role is only editable when the owner edits an existing user. Invites always
+// create members; promote to admin afterward from the People list.
 const roleOptions: { value: 'admin' | 'member'; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'member', label: 'Member' },
 ];
-// A non-owner admin can only mint members.
-const roleChoices = computed(() => (isOwner.value ? roleOptions : [{ value: 'member' as const, label: 'Member' }]));
 
 // Form state, seeded from the user in edit mode.
 const email = ref(props.user?.email ?? '');
@@ -56,12 +56,9 @@ async function submit() {
   submitting.value = true;
   try {
     if (props.mode === 'invite') {
-      // Invites only onboard the user with a role; projects are assigned after
-      // they join, from the People list.
-      inviteResult.value = await session.createInvite({
-        email: email.value.trim(),
-        instance_role: role.value,
-      });
+      // Invites always onboard a member; role + projects are set afterward from
+      // the People list.
+      inviteResult.value = await session.createInvite({ email: email.value.trim() });
       // Stay open to reveal the one-time link.
     } else if (props.user) {
       const u = props.user;
@@ -135,10 +132,10 @@ async function copyLink(text: string) {
           </label>
         </template>
 
-        <!-- Role: editable for invite, or for owner editing someone. -->
-        <label v-if="mode === 'invite' || isOwner" class="block">
+        <!-- Role: only the owner can change an existing user's role. -->
+        <label v-if="mode === 'edit' && isOwner" class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Role</span>
-          <Dropdown v-model="role" :options="roleChoices" class="mt-1" />
+          <Dropdown v-model="role" :options="roleOptions" class="mt-1" />
         </label>
 
         <!-- Project access. Admins reach everything; members are scoped to
