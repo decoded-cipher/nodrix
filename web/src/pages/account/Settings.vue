@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../../stores/session';
 import { useThemeStore, type ThemeMode } from '../../stores/theme';
@@ -13,38 +13,33 @@ const accent = useAccentStore();
 const router = useRouter();
 
 // ─── Your profile (name) ──────────────────────────────────────────────────────
+// Read-only by default; the form opens only after clicking "Edit".
 const profileForm = ref({ first_name: '', last_name: '' });
+const editingProfile = ref(false);
 const savingProfile = ref(false);
 const profileError = ref<string | null>(null);
-const profileSaved = ref(false);
 
-watch(
-  () => session.user,
-  (u) => {
-    if (!u) return;
-    profileForm.value.first_name = u.first_name ?? '';
-    profileForm.value.last_name = u.last_name ?? '';
-  },
-  { immediate: true }
+const fullName = computed(
+  () => [session.user?.first_name, session.user?.last_name].filter(Boolean).join(' ') || null
 );
 
-const profileDirty = computed(
-  () =>
-    profileForm.value.first_name !== (session.user?.first_name ?? '') ||
-    profileForm.value.last_name !== (session.user?.last_name ?? '')
-);
+// Open/close the form, seeding inputs from the stored user each time.
+function editProfile(on: boolean) {
+  profileForm.value.first_name = session.user?.first_name ?? '';
+  profileForm.value.last_name = session.user?.last_name ?? '';
+  profileError.value = null;
+  editingProfile.value = on;
+}
 
 async function saveProfile() {
   savingProfile.value = true;
   profileError.value = null;
-  profileSaved.value = false;
   try {
     await session.updateMe({
       first_name: profileForm.value.first_name.trim() || null,
       last_name: profileForm.value.last_name.trim() || null,
     });
-    profileSaved.value = true;
-    setTimeout(() => (profileSaved.value = false), 1500);
+    editingProfile.value = false;
   } catch (e) {
     profileError.value = (e as Error).message;
   } finally {
@@ -303,27 +298,47 @@ const PROVIDER_META = {
         </div>
 
         <!-- Your name -->
-        <form class="space-y-3 border-t border-neutral-100 pt-3 dark:border-neutral-800" @submit.prevent="saveProfile">
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label class="block">
-              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
-              <input v-model="profileForm.first_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
-            </label>
-            <label class="block">
-              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Last name</span>
-              <input v-model="profileForm.last_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
-            </label>
-          </div>
-          <p v-if="profileError" class="text-xs text-red-600 dark:text-red-400">{{ profileError }}</p>
-          <div class="flex items-center gap-3">
+        <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
+          <!-- Read-only view -->
+          <div v-if="!editingProfile" class="flex items-center justify-between gap-4">
+            <div>
+              <div class="text-neutral-500 dark:text-neutral-400">Name</div>
+              <div :class="fullName ? 'font-medium' : 'text-neutral-400 dark:text-neutral-500'">{{ fullName ?? 'Not set' }}</div>
+            </div>
             <button
-              type="submit"
-              :disabled="savingProfile || !profileDirty"
-              class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
-            >{{ savingProfile ? 'Saving…' : 'Save name' }}</button>
-            <span v-if="profileSaved" class="text-xs text-emerald-600 dark:text-emerald-400">Saved</span>
+              type="button"
+              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="editProfile(true)"
+            >Edit</button>
           </div>
-        </form>
+
+          <!-- Edit form -->
+          <form v-else class="space-y-3" @submit.prevent="saveProfile">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label class="block">
+                <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
+                <input v-model="profileForm.first_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
+              </label>
+              <label class="block">
+                <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Last name</span>
+                <input v-model="profileForm.last_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
+              </label>
+            </div>
+            <p v-if="profileError" class="text-xs text-red-600 dark:text-red-400">{{ profileError }}</p>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                @click="editProfile(false)"
+              >Cancel</button>
+              <button
+                type="submit"
+                :disabled="savingProfile"
+                class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+              >{{ savingProfile ? 'Saving…' : 'Save' }}</button>
+            </div>
+          </form>
+        </div>
 
         <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
           <button
