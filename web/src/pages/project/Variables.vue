@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import RevealOnce from '../../components/RevealOnce.vue';
+import Combobox from '../../components/Combobox.vue';
 import { confirm } from '../../lib/confirm';
 import { toast } from '../../lib/toast';
 import { relativeTime, formatAbsolute } from '../../lib/time';
 import type { ProjectTokenWithSecret, Variable } from '../../types';
+
+// Common telemetry units suggested in the unit combobox; any custom value works.
+const UNIT_OPTIONS = [
+  '°C', '°F', 'K', '%', 'µg/m³', 'mg/m³', 'ppm', 'ppb',
+  'Pa', 'hPa', 'kPa', 'bar', 'psi', 'V', 'mV', 'A', 'mA', 'W', 'kW', 'Wh', 'kWh',
+  'Hz', 'rpm', 'lux', 'dB', 'm', 'cm', 'mm', 'km', 'm/s', 'km/h',
+  'L', 'mL', 'm³', 'g', 'kg', 's', 'min', 'h',
+];
 
 const project = useProjectStore();
 const newKey = ref('');
@@ -34,9 +43,28 @@ async function createVariable() {
   }
 }
 
-async function saveUnit(v: Variable, e: Event) {
-  const next = (e.target as HTMLInputElement).value.trim() || null;
-  if (next === (v.unit ?? null)) return; // no-op on unchanged blur
+// Inline unit editing, toggled by the per-row edit (pencil) button. Only one
+// row edits at a time; Enter saves, Esc cancels.
+const editingId = ref<string | null>(null);
+const editValue = ref('');
+const comboRef = ref<{ focus: () => void } | null>(null);
+
+async function startEdit(v: Variable) {
+  editingId.value = v.id;
+  editValue.value = v.unit ?? '';
+  await nextTick();
+  comboRef.value?.focus();
+}
+
+function cancelEdit() {
+  editingId.value = null;
+  editValue.value = '';
+}
+
+async function saveEdit(v: Variable) {
+  const next = editValue.value.trim() || null;
+  editingId.value = null;
+  if (next === (v.unit ?? null)) return; // unchanged
   try {
     await project.updateVariable(v.id, { unit: next });
   } catch (err) {
@@ -170,28 +198,66 @@ const variableCount = computed(() => project.variables.length);
               </div>
             </td>
             <td class="px-4 py-2.5">
-              <input
-                :value="v.unit ?? ''"
-                type="text"
-                placeholder="—"
-                class="w-24 rounded border border-transparent bg-transparent px-2 py-1 text-xs text-neutral-700 hover:border-neutral-300 focus:border-accent-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-accent-500/30 dark:text-neutral-300 dark:hover:border-neutral-700 dark:focus:bg-neutral-950"
-                @change="saveUnit(v, $event)"
+              <Combobox
+                v-if="editingId === v.id"
+                ref="comboRef"
+                v-model="editValue"
+                :options="UNIT_OPTIONS"
+                class="w-28"
+                @commit="saveEdit(v)"
+                @cancel="cancelEdit"
               />
+              <span v-else class="text-xs text-neutral-600 dark:text-neutral-300">
+                {{ v.unit || '—' }}
+              </span>
             </td>
             <td class="px-4 py-2.5 text-xs text-neutral-500 dark:text-neutral-400">
               <span v-if="v.last_seen" :title="formatAbsolute(v.last_seen)">{{ relativeTime(v.last_seen) }}</span>
               <span v-else class="italic text-neutral-400 dark:text-neutral-600">Never</span>
             </td>
-            <td class="px-4 py-2.5 text-right">
-              <button
-                type="button"
-                aria-label="Delete variable"
-                title="Delete variable"
-                class="rounded-md p-1.5 text-neutral-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-                @click="removeVariable(v.id)"
-              >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-              </button>
+            <td class="px-4 py-2.5">
+              <div class="flex items-center justify-end gap-1">
+                <template v-if="editingId === v.id">
+                  <button
+                    type="button"
+                    aria-label="Save unit"
+                    title="Save"
+                    class="rounded-md p-1.5 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                    @click="saveEdit(v)"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Cancel"
+                    title="Cancel"
+                    class="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                    @click="cancelEdit"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                  </button>
+                </template>
+                <template v-else>
+                  <button
+                    type="button"
+                    aria-label="Edit unit"
+                    title="Edit unit"
+                    class="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                    @click="startEdit(v)"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Delete variable"
+                    title="Delete variable"
+                    class="rounded-md p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                    @click="removeVariable(v.id)"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                  </button>
+                </template>
+              </div>
             </td>
           </tr>
         </tbody>
