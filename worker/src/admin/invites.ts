@@ -6,9 +6,9 @@ import { recordAudit } from '../lib/audit';
 
 // Invite management — owner/instance-admin only. An invite is a self-serve LINK:
 // the invitee sets their own password at /invite/<token>. It binds an email so
-// the Better Auth create-gate (auth/index.ts) authorizes the signup. Every
-// invite onboards a `member` with optional pre-assigned projects; promoting to
-// admin happens afterward from the Users page (owner-only).
+// the Better Auth create-gate (auth/index.ts) authorizes the signup. Invites
+// onboard a `member` with optional pre-assigned projects; the owner may instead
+// invite an `admin` (who reaches every project, so no project selection applies).
 
 const invites = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -57,21 +57,27 @@ invites.get('/', async (c) => {
 });
 
 // POST /v1/admin/invites
-// body: { email, project_ids?: string[] }
-// Returns a one-time accept link (shown once). Every invite onboards a member;
-// project_ids are pre-assigned and applied when the invite is accepted.
+// body: { email, instance_role?: 'admin' | 'member', project_ids?: string[] }
+// Returns a one-time accept link (shown once). Defaults to a member with the
+// given project_ids pre-assigned. Only the owner may invite an admin, who
+// reaches every project — so project_ids are ignored for admin invites.
 invites.post('/', async (c) => {
   const user = c.get('user');
-  const body = await c.req.json<{ email?: string; project_ids?: unknown }>();
+  const body = await c.req.json<{ email?: string; instance_role?: string; project_ids?: unknown }>();
 
   const email = (body.email ?? '').trim().toLowerCase();
   if (!email || !email.includes('@')) return c.json({ error: 'bad_request', reason: 'invalid_email' }, 400);
 
-  const instanceRole = 'member';
+  // Only the owner can mint an admin invite; admins can onboard members only.
+  const instanceRole: 'admin' | 'member' = body.instance_role === 'admin' ? 'admin' : 'member';
+  if (instanceRole === 'admin' && user.role !== 'owner') {
+    return c.json({ error: 'forbidden', reason: 'admin_invite_owner_only' }, 403);
+  }
 
+  // Admins reach every project, so project pre-assignment only applies to members.
   // Keep only project ids that actually exist (optional).
   let projectIds: string[] = [];
-  if (Array.isArray(body.project_ids)) {
+  if (instanceRole === 'member' && Array.isArray(body.project_ids)) {
     const requested = [...new Set(body.project_ids.filter((p): p is string => typeof p === 'string' && p.length > 0))];
     if (requested.length) {
       const projRows = await c.env.DB.prepare(`SELECT id FROM projects`).all<{ id: string }>();
