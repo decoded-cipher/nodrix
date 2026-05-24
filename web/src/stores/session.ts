@@ -181,7 +181,7 @@ export const useSessionStore = defineStore('session', () => {
   // Create-only: the invite returns a one-time link/temp-password shown in a
   // modal. There's no pending-invites list (invites are throwaway).
 
-  async function createInvite(input: { email: string }): Promise<InviteCreated> {
+  async function createInvite(input: { email: string; project_ids?: string[] }): Promise<InviteCreated> {
     return api.post<InviteCreated>('/v1/admin/invites', input);
   }
 

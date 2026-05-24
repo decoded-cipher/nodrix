@@ -7,8 +7,8 @@ import { recordAudit } from '../lib/audit';
 // Invite management — owner/instance-admin only. An invite is a self-serve LINK:
 // the invitee sets their own password at /invite/<token>. It binds an email so
 // the Better Auth create-gate (auth/index.ts) authorizes the signup. Every
-// invite onboards a `member`; role + projects are set afterward from the Users
-// page (promoting to admin is owner-only).
+// invite onboards a `member` with optional pre-assigned projects; promoting to
+// admin happens afterward from the Users page (owner-only).
 
 const invites = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -57,17 +57,28 @@ invites.get('/', async (c) => {
 });
 
 // POST /v1/admin/invites
-// body: { email }
+// body: { email, project_ids?: string[] }
 // Returns a one-time accept link (shown once). Every invite onboards a member;
-// role + projects are set afterward from the Users page.
+// project_ids are pre-assigned and applied when the invite is accepted.
 invites.post('/', async (c) => {
   const user = c.get('user');
-  const body = await c.req.json<{ email?: string }>();
+  const body = await c.req.json<{ email?: string; project_ids?: unknown }>();
 
   const email = (body.email ?? '').trim().toLowerCase();
   if (!email || !email.includes('@')) return c.json({ error: 'bad_request', reason: 'invalid_email' }, 400);
 
   const instanceRole = 'member';
+
+  // Keep only project ids that actually exist (optional).
+  let projectIds: string[] = [];
+  if (Array.isArray(body.project_ids)) {
+    const requested = [...new Set(body.project_ids.filter((p): p is string => typeof p === 'string' && p.length > 0))];
+    if (requested.length) {
+      const projRows = await c.env.DB.prepare(`SELECT id FROM projects`).all<{ id: string }>();
+      const valid = new Set(projRows.results.map((r) => r.id));
+      projectIds = requested.filter((p) => valid.has(p));
+    }
+  }
 
   // Block inviting an email that already has an account — change an existing
   // user's role or project assignments from the Users page instead.
@@ -84,13 +95,17 @@ invites.post('/', async (c) => {
   const token = newToken();
   const tokenHash = await sha256Hex(token);
 
-  await c.env.DB
-    .prepare(
-      `INSERT INTO invites (id, email, instance_role, token_hash, created_by, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(id, email, instanceRole, tokenHash, user.id, now, expiresAt)
-    .run();
+  await c.env.DB.batch([
+    c.env.DB
+      .prepare(
+        `INSERT INTO invites (id, email, instance_role, token_hash, created_by, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(id, email, instanceRole, tokenHash, user.id, now, expiresAt),
+    ...projectIds.map((pid) =>
+      c.env.DB.prepare(`INSERT INTO invite_projects (invite_id, project_id) VALUES (?, ?)`).bind(id, pid)
+    ),
+  ]);
 
   c.executionCtx.waitUntil(
     recordAudit(c.env, {
@@ -99,7 +114,7 @@ invites.post('/', async (c) => {
       action: 'invite.create',
       targetType: 'user',
       targetId: id,
-      metadata: { email, instance_role: instanceRole },
+      metadata: { email, instance_role: instanceRole, projects: projectIds.length },
     })
   );
 

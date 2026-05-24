@@ -40,7 +40,8 @@ export const MIGRATIONS: Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_audit_log_user    ON audit_log(user_id)",
       "CREATE TABLE IF NOT EXISTS deployment_settings (\n  key        TEXT PRIMARY KEY,\n  value      TEXT NOT NULL,\n  updated_at INTEGER NOT NULL\n)",
       "CREATE TABLE IF NOT EXISTS invites (\n  id            TEXT PRIMARY KEY,                              \n  email         TEXT,                                          \n  instance_role TEXT NOT NULL CHECK (instance_role IN ('admin','member')),\n  token_hash    TEXT NOT NULL UNIQUE,                          \n  created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,\n  created_at    INTEGER NOT NULL,\n  expires_at    INTEGER                                        \n)",
-      "CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL"
+      "CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL",
+      "CREATE TABLE IF NOT EXISTS invite_projects (\n  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,\n  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  PRIMARY KEY (invite_id, project_id)\n)"
     ]
   }
 ];
