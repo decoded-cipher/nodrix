@@ -7,6 +7,8 @@ const auditLog = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 auditLog.use('*', requireSession);
 
 // GET /v1/admin/audit-log?limit=15&page=1
+//   &action=<category>  (prefix, e.g. "project" → project.create/update/…)
+//   &project=<id|none>  &user=<id|system>  &from=<unix>  &to=<unix>
 // Account-wide log. Owner/admin see every entry; a member sees entries from the
 // projects they're assigned to, plus project-less entries they authored.
 // Page-based pagination (offset under the hood) — fine at our scale.
@@ -31,17 +33,38 @@ auditLog.get('/', async (c) => {
     created_at: number;
   };
 
-  // Owner/admin: no filter. Member: their projects + their project-less entries.
-  const baseWhere = instanceAdmin
-    ? `1 = 1`
-    : `(a.project_id IN (SELECT project_id FROM project_members WHERE user_id = ?)
-        OR (a.project_id IS NULL AND a.user_id = ?))`;
-  const whereBinds = instanceAdmin ? [] : [user.id, user.id];
+  // Owner/admin: no scope filter. Member: their projects + own project-less entries.
+  const conds: string[] = [
+    instanceAdmin
+      ? `1 = 1`
+      : `(a.project_id IN (SELECT project_id FROM project_members WHERE user_id = ?)
+          OR (a.project_id IS NULL AND a.user_id = ?))`,
+  ];
+  const binds: unknown[] = instanceAdmin ? [] : [user.id, user.id];
+
+  // Optional filters (AND-ed onto the scope).
+  const action = (c.req.query('action') ?? '').trim();
+  if (action) { conds.push(`a.action LIKE ?`); binds.push(`${action}.%`); }
+
+  const project = (c.req.query('project') ?? '').trim();
+  if (project === 'none') conds.push(`a.project_id IS NULL`);
+  else if (project) { conds.push(`a.project_id = ?`); binds.push(project); }
+
+  const actor = (c.req.query('user') ?? '').trim();
+  if (actor === 'system') conds.push(`a.user_id IS NULL`);
+  else if (actor) { conds.push(`a.user_id = ?`); binds.push(actor); }
+
+  const from = parseInt(c.req.query('from') ?? '', 10);
+  if (Number.isFinite(from)) { conds.push(`a.created_at >= ?`); binds.push(from); }
+  const to = parseInt(c.req.query('to') ?? '', 10);
+  if (Number.isFinite(to)) { conds.push(`a.created_at <= ?`); binds.push(to); }
+
+  const where = conds.join(' AND ');
 
   const [totalRow, rows] = await Promise.all([
     c.env.DB
-      .prepare(`SELECT COUNT(*) AS n FROM audit_log a WHERE ${baseWhere}`)
-      .bind(...whereBinds)
+      .prepare(`SELECT COUNT(*) AS n FROM audit_log a WHERE ${where}`)
+      .bind(...binds)
       .first<{ n: number }>(),
     c.env.DB
       .prepare(
@@ -51,11 +74,11 @@ auditLog.get('/', async (c) => {
            FROM audit_log a
            LEFT JOIN users u    ON u.id = a.user_id
            LEFT JOIN projects p ON p.id = a.project_id
-          WHERE ${baseWhere}
+          WHERE ${where}
           ORDER BY a.id DESC
           LIMIT ? OFFSET ?`
       )
-      .bind(...whereBinds, limit, offset)
+      .bind(...binds, limit, offset)
       .all<Row>(),
   ]);
 

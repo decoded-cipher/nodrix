@@ -118,14 +118,23 @@ export const useSessionStore = defineStore('session', () => {
     oauthProviders.value = data.providers;
   }
 
-  async function loadAuditLog(page = 1): Promise<void> {
+  async function loadAuditLog(
+    page = 1,
+    filters: { action?: string; project?: string; user?: string; from?: number; to?: number } = {}
+  ): Promise<void> {
+    const params = new URLSearchParams({ page: String(page), limit: String(auditLogPageSize.value) });
+    if (filters.action) params.set('action', filters.action);
+    if (filters.project) params.set('project', filters.project);
+    if (filters.user) params.set('user', filters.user);
+    if (filters.from) params.set('from', String(filters.from));
+    if (filters.to) params.set('to', String(filters.to));
     const data = await api.get<{
       entries: AuditLogEntry[];
       total: number;
       page: number;
       page_size: number;
       page_count: number;
-    }>(`/v1/admin/audit-log?page=${page}&limit=${auditLogPageSize.value}`);
+    }>(`/v1/admin/audit-log?${params.toString()}`);
     auditLog.value = data.entries;
     auditLogPage.value = data.page;
     auditLogPageSize.value = data.page_size;
