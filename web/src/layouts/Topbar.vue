@@ -17,8 +17,11 @@ const themeTitle = computed(() => {
 });
 
 // Pages can teleport context-specific actions into #topbar-actions; when they
-// do, swap out the default GitHub link rather than stacking both.
-const hasPageActions = computed(() => route.path.endsWith('/edit'));
+// do, swap out the default theme + GitHub controls rather than stacking both.
+// Both dashboard view (Edit) and dashboard edit (Done/Save) teleport actions.
+const hasPageActions = computed(
+  () => route.name === 'dashboard-view' || route.name === 'dashboard-edit'
+);
 
 type Crumb = { label: string; to?: string };
 
