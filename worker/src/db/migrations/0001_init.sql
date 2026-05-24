@@ -252,3 +252,13 @@ CREATE TABLE IF NOT EXISTS invites (
   expires_at    INTEGER                                        -- NULL = never
 );
 CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL;
+
+-- Projects an invite pre-assigns (invites always onboard a member). Applied to
+-- project_members in the user.create.after hook when the invite is accepted;
+-- rows cascade away with the invite. No role — everyone with access has full
+-- control of the project.
+CREATE TABLE IF NOT EXISTS invite_projects (
+  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  PRIMARY KEY (invite_id, project_id)
+);

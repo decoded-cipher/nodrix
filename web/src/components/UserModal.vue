@@ -56,9 +56,11 @@ async function submit() {
   submitting.value = true;
   try {
     if (props.mode === 'invite') {
-      // Invites always onboard a member; role + projects are set afterward from
-      // the People list.
-      inviteResult.value = await session.createInvite({ email: email.value.trim() });
+      // Invites onboard a member with optionally pre-assigned projects.
+      inviteResult.value = await session.createInvite({
+        email: email.value.trim(),
+        project_ids: [...projectIds.value],
+      });
       // Stay open to reveal the one-time link.
     } else if (props.user) {
       const u = props.user;
@@ -138,14 +140,10 @@ async function copyLink(text: string) {
           <Dropdown v-model="role" :options="roleOptions" class="mt-1" />
         </label>
 
-        <!-- Project access. Admins reach everything; members are scoped to
-             specific projects, assigned here when editing (invites onboard the
-             person first, then you assign projects from the People list). -->
+        <!-- Project access. Members are scoped to specific projects (assignable
+             at invite time or when editing); admins reach everything. -->
         <p v-if="role === 'admin'" class="rounded-md bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
           Admins reach every project automatically.
-        </p>
-        <p v-else-if="mode === 'invite'" class="rounded-md bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-          After they accept, assign projects from the People list.
         </p>
         <div v-else>
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Project access</span>

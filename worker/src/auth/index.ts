@@ -262,12 +262,13 @@ export async function buildAuth(env: Env, request?: Request) {
                 .bind(firstName, lastName, user.id)
                 .run();
             }
-            // Delete the matching invite (if any); the role was applied at
-            // INSERT by the before-hook. Bootstrap owner has no invite → no-op.
+            // Consume the matching invite (if any): apply its pre-assigned
+            // project memberships, then delete it. Role was applied at INSERT by
+            // the before-hook. Bootstrap owner has no invite → no-op.
             const email = (user.email ?? '').toLowerCase();
             if (email) {
               const invite = await findOpenInviteByEmail(env, email);
-              if (invite) await consumeInvite(env, invite);
+              if (invite) await consumeInvite(env, invite, user.id);
             }
             await recordAudit(env, {
               projectId: null,
