@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
-import { resolveProject, requireProjectAdminForWrites, type ProjectContextVars } from '../middleware/resolve-project';
+import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { validateLayout } from '../lib/layout';
@@ -10,7 +10,6 @@ const dashboards = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
 dashboards.use('*', requireSession);
 dashboards.use('*', resolveProject);
-dashboards.use('*', requireProjectAdminForWrites);
 
 // GET /v1/admin/projects/:proj/dashboards
 dashboards.get('/', async (c) => {

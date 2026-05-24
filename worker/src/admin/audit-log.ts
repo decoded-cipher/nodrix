@@ -7,11 +7,12 @@ const auditLog = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 auditLog.use('*', requireSession);
 
 // GET /v1/admin/audit-log?limit=15&page=1
-// Account-wide log: entries from every project the caller is a member of,
-// plus entries with project_id IS NULL authored by the caller. Page-based
-// pagination (offset under the hood) — fine at our scale.
+// Account-wide log. Owner/admin see every entry; a member sees entries from the
+// projects they're assigned to, plus project-less entries they authored.
+// Page-based pagination (offset under the hood) — fine at our scale.
 auditLog.get('/', async (c) => {
   const user = c.get('user');
+  const instanceAdmin = user.role === 'owner' || user.role === 'admin';
 
   const limit = clampInt(c.req.query('limit'), 1, 200, 15);
   const page = clampInt(c.req.query('page'), 1, Number.MAX_SAFE_INTEGER, 1);
@@ -30,15 +31,17 @@ auditLog.get('/', async (c) => {
     created_at: number;
   };
 
-  const baseWhere = `
-    (a.project_id IN (SELECT project_id FROM project_members WHERE user_id = ?1)
-     OR (a.project_id IS NULL AND a.user_id = ?1))
-  `;
+  // Owner/admin: no filter. Member: their projects + their project-less entries.
+  const baseWhere = instanceAdmin
+    ? `1 = 1`
+    : `(a.project_id IN (SELECT project_id FROM project_members WHERE user_id = ?)
+        OR (a.project_id IS NULL AND a.user_id = ?))`;
+  const whereBinds = instanceAdmin ? [] : [user.id, user.id];
 
   const [totalRow, rows] = await Promise.all([
     c.env.DB
       .prepare(`SELECT COUNT(*) AS n FROM audit_log a WHERE ${baseWhere}`)
-      .bind(user.id)
+      .bind(...whereBinds)
       .first<{ n: number }>(),
     c.env.DB
       .prepare(
@@ -50,9 +53,9 @@ auditLog.get('/', async (c) => {
            LEFT JOIN projects p ON p.id = a.project_id
           WHERE ${baseWhere}
           ORDER BY a.id DESC
-          LIMIT ?2 OFFSET ?3`
+          LIMIT ? OFFSET ?`
       )
-      .bind(user.id, limit, offset)
+      .bind(...whereBinds, limit, offset)
       .all<Row>(),
   ]);
 

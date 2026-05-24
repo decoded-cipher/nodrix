@@ -7,7 +7,6 @@ import type { Env } from '../env';
 import { sha256Hex } from './ids';
 
 export type InstanceRole = 'owner' | 'admin' | 'member';
-export type ProjectRole = 'admin' | 'viewer';
 
 export type InviteRow = {
   id: string;
@@ -40,33 +39,13 @@ export async function findOpenInviteByToken(env: Env, token: string): Promise<In
     .first<InviteRow>();
 }
 
-// Apply the invite's pre-assigned project memberships to the new user, then
-// DELETE the invite (throwaway). Called from the user.create.after hook. We read
-// invite_projects first, then delete by email — which removes this invite plus
-// any other pending invites for the same address (now a registered user), and
-// cascades all their invite_projects rows.
-export async function consumeInvite(env: Env, invite: InviteRow, userId: string): Promise<void> {
-  const now = Math.floor(Date.now() / 1000);
-
-  const projs = await env.DB
-    .prepare(`SELECT project_id, role FROM invite_projects WHERE invite_id = ?`)
-    .bind(invite.id)
-    .all<{ project_id: string; role: ProjectRole }>();
-
-  const stmts = projs.results.map((p) =>
-    env.DB
-      .prepare(
-        `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(user_id, project_id) DO UPDATE SET role = excluded.role`
-      )
-      .bind(userId, p.project_id, p.role, now, invite.created_by)
-  );
-  stmts.push(
-    invite.email
-      ? env.DB.prepare(`DELETE FROM invites WHERE email = ?`).bind(invite.email)
-      : env.DB.prepare(`DELETE FROM invites WHERE id = ?`).bind(invite.id)
-  );
-
-  await env.DB.batch(stmts);
+// Delete the now-accepted invite (throwaway). The new user's role + project were
+// applied at INSERT by the user.create.before hook, so this just cleans up:
+// delete by email — which removes this invite plus any other pending invites for
+// the same address (now a registered user). Called from user.create.after.
+export async function consumeInvite(env: Env, invite: InviteRow): Promise<void> {
+  await (invite.email
+    ? env.DB.prepare(`DELETE FROM invites WHERE email = ?`).bind(invite.email)
+    : env.DB.prepare(`DELETE FROM invites WHERE id = ?`).bind(invite.id)
+  ).run();
 }

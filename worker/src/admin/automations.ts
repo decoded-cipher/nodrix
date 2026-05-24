@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
-import { resolveProject, requireProjectAdminForWrites, type ProjectContextVars } from '../middleware/resolve-project';
+import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { runAutomation } from '../engine/run';
@@ -18,7 +18,6 @@ function isScheduled(triggerType: string | undefined): boolean {
 
 automations.use('*', requireSession);
 automations.use('*', resolveProject);
-automations.use('*', requireProjectAdminForWrites);
 
 const TRIGGER_TYPES = ['variable', 'scene', 'schedule', 'sunset_sunrise', 'event'] as const;
 type TriggerType = (typeof TRIGGER_TYPES)[number];

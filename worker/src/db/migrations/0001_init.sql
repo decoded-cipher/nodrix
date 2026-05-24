@@ -88,14 +88,14 @@ CREATE TABLE IF NOT EXISTS projects (
   archived_at INTEGER
 );
 
--- Per-project membership + role. `admin` = full control of the project (incl.
--- members + hardware tokens + delete); `viewer` = read-only. Instance owner/admin
--- get implicit project-admin on every project (see resolve-project middleware), so
--- they don't need a row here to access a project.
+-- Per-project membership. A `member` reaches a project iff they have a row here;
+-- they may be assigned to any number of projects. Instance owner/admin reach
+-- every project implicitly (no row needed). There is no per-project role —
+-- everyone with access has full control. Assignments are managed from the Users
+-- page (admin/users routes), not per-project.
 CREATE TABLE IF NOT EXISTS project_members (
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  role       TEXT NOT NULL CHECK (role IN ('admin','viewer')),
   added_at   INTEGER NOT NULL,
   added_by   TEXT REFERENCES users(id),
   PRIMARY KEY (user_id, project_id)
@@ -231,15 +231,17 @@ CREATE TABLE IF NOT EXISTS deployment_settings (
   updated_at INTEGER NOT NULL
 );
 
--- Invites: the owner/instance-admins invite people to share this deployment.
--- Two flows share this table: a self-serve LINK (invitee sets their own password
--- at /invite/<token>) and DIRECT create (account made immediately with a temp
--- password). `email` binds the accept and lets a first OAuth sign-in for that
--- address match the invite. instance_role is 'admin' or 'member' (no owner).
+-- Invites: the owner/instance-admins invite people to JOIN this deployment. An
+-- invite only onboards a user with an instance_role ('admin' or 'member', never
+-- owner); it does NOT assign projects. Project membership is managed afterward
+-- from the Users page (project_members). Two flows share this table: a self-serve
+-- LINK (invitee sets their own password at /invite/<token>) and DIRECT create
+-- (account made immediately with a temp password). `email` binds the accept and
+-- lets a first OAuth sign-in for that address match the invite.
 --
 -- Invites are throwaway: a row exists only while pending. Accepting OR revoking
--- DELETEs it (cascading invite_projects); expired rows are pruned on listing.
--- History lives in the audit log (invite.create / user.register / invite.revoke).
+-- DELETEs it; expired rows are pruned on listing. History lives in the audit log
+-- (invite.create / user.register / invite.revoke).
 CREATE TABLE IF NOT EXISTS invites (
   id            TEXT PRIMARY KEY,                              -- inv_xxx
   email         TEXT,                                          -- lowercased
@@ -250,12 +252,3 @@ CREATE TABLE IF NOT EXISTS invites (
   expires_at    INTEGER                                        -- NULL = never
 );
 CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL;
-
--- Optional project memberships pre-assigned by an invite. Applied to the new user
--- in the user.create.after hook when the invite is accepted.
-CREATE TABLE IF NOT EXISTS invite_projects (
-  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,
-  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  role       TEXT NOT NULL CHECK (role IN ('admin','viewer')),
-  PRIMARY KEY (invite_id, project_id)
-);

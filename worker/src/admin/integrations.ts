@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
-import { resolveProject, requireProjectAdminForWrites, type ProjectContextVars } from '../middleware/resolve-project';
+import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { executeIntegration, recordIntegrationRun } from '../engine/integrations';
@@ -11,7 +11,6 @@ const integrations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>(
 
 integrations.use('*', requireSession);
 integrations.use('*', resolveProject);
-integrations.use('*', requireProjectAdminForWrites);
 
 const KINDS = ['webhook', 'code_block', 'slack', 'email', 'mqtt', 'http_service'] as const;
 type Kind = (typeof KINDS)[number];

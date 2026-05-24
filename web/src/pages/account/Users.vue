@@ -4,7 +4,7 @@ import { useSessionStore, type ActiveSession } from '../../stores/session';
 import { confirm } from '../../lib/confirm';
 import { relativeTime } from '../../lib/time';
 import Dropdown from '../../components/Dropdown.vue';
-import type { InviteCreated } from '../../types';
+import type { InstanceUser, InviteCreated } from '../../types';
 
 const session = useSessionStore();
 
@@ -22,10 +22,6 @@ const inviteRoleOptions = computed<{ value: 'admin' | 'member'; label: string }[
 const inviteModeOptions: { value: 'link' | 'direct'; label: string }[] = [
   { value: 'link', label: 'Share a link' },
   { value: 'direct', label: 'Create with temp password' },
-];
-const projectAccessOptions: { value: 'admin' | 'viewer'; label: string }[] = [
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'admin', label: 'Admin' },
 ];
 
 onMounted(async () => {
@@ -98,6 +94,37 @@ async function changeRole(id: string, role: 'admin' | 'member') {
   try { await session.setUserRole(id, role); } catch (e) { alert((e as Error).message); }
 }
 
+// ─── Project assignments (members only) ───────────────────────────────────────
+// Members reach only the projects assigned here; owner/admin reach everything.
+
+const projectUser = ref<InstanceUser | null>(null);
+const projectSelection = ref<Set<string>>(new Set());
+const savingProjects = ref(false);
+
+function openProjects(u: InstanceUser) {
+  projectUser.value = u;
+  projectSelection.value = new Set(u.projects.map((p) => p.id));
+}
+
+function toggleProject(id: string) {
+  const next = new Set(projectSelection.value);
+  next.has(id) ? next.delete(id) : next.add(id);
+  projectSelection.value = next;
+}
+
+async function saveProjects() {
+  if (!projectUser.value) return;
+  savingProjects.value = true;
+  try {
+    await session.setUserProjects(projectUser.value.id, [...projectSelection.value]);
+    projectUser.value = null;
+  } catch (e) {
+    alert((e as Error).message);
+  } finally {
+    savingProjects.value = false;
+  }
+}
+
 async function removeUser(id: string, email: string) {
   const ok = await confirm({
     title: `Remove ${email}?`,
@@ -125,14 +152,13 @@ const invite = ref<{
   email: string;
   instance_role: 'admin' | 'member';
   mode: 'link' | 'direct';
-  projects: Record<string, 'admin' | 'viewer' | ''>;
-}>({ email: '', instance_role: 'member', mode: 'link', projects: {} });
+}>({ email: '', instance_role: 'member', mode: 'link' });
 const inviteSubmitting = ref(false);
 const inviteError = ref<string | null>(null);
 const inviteResult = ref<InviteCreated | null>(null);
 
 function openInvite() {
-  invite.value = { email: '', instance_role: 'member', mode: 'link', projects: {} };
+  invite.value = { email: '', instance_role: 'member', mode: 'link' };
   inviteError.value = null;
   inviteResult.value = null;
   inviteOpen.value = true;
@@ -142,14 +168,10 @@ async function submitInvite() {
   inviteError.value = null;
   inviteSubmitting.value = true;
   try {
-    const projects = Object.entries(invite.value.projects)
-      .filter(([, role]) => role === 'admin' || role === 'viewer')
-      .map(([project_id, role]) => ({ project_id, role: role as 'admin' | 'viewer' }));
     inviteResult.value = await session.createInvite({
       email: invite.value.email.trim(),
       instance_role: invite.value.instance_role,
       mode: invite.value.mode,
-      projects,
     });
   } catch (e) {
     inviteError.value = (e as Error).message;
@@ -209,6 +231,16 @@ function inviteStatus(i: { expires_at: number | null }): string {
                 <span v-if="u.id === session.user?.id" class="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">You</span>
               </div>
               <div class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ u.email }}</div>
+              <!-- Members are scoped to specific projects; owner/admin reach all. -->
+              <div v-if="u.role === 'member'" class="mt-1 flex flex-wrap items-center gap-1">
+                <span
+                  v-for="p in u.projects"
+                  :key="p.id"
+                  class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                >{{ p.name }}</span>
+                <span v-if="u.projects.length === 0" class="text-[11px] italic text-neutral-400 dark:text-neutral-500">No projects assigned</span>
+              </div>
+              <div v-else-if="u.role !== 'owner'" class="mt-1 text-[11px] text-neutral-400 dark:text-neutral-500">All projects</div>
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
@@ -223,6 +255,12 @@ function inviteStatus(i: { expires_at: number | null }): string {
             />
             <span v-else class="text-[11px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ u.role }}</span>
 
+            <button
+              v-if="u.role === 'member'"
+              type="button"
+              class="rounded-md border border-neutral-300 px-2 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="openProjects(u)"
+            >Projects</button>
             <button v-if="isOwner && u.role === 'admin' && u.id !== session.user?.id" type="button" class="rounded-md border border-neutral-300 px-2 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="makeOwner(u.id, u.email)">Make owner</button>
             <button
               v-if="u.role !== 'owner' && u.id !== session.user?.id && (isOwner || u.role === 'member')"
@@ -333,22 +371,10 @@ function inviteStatus(i: { expires_at: number | null }): string {
               </label>
             </div>
 
-            <div v-if="session.projects.length > 0">
-              <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Project access (optional)</span>
-              <div class="mt-1 max-h-40 space-y-1 overflow-auto rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
-                <div v-for="p in session.projects" :key="p.id" class="flex items-center justify-between gap-2 text-sm">
-                  <span class="truncate">{{ p.name }}</span>
-                  <Dropdown
-                    :model-value="invite.projects[p.id] ?? ''"
-                    :options="projectAccessOptions"
-                    placeholder="No access"
-                    size="sm"
-                    class="w-32 shrink-0"
-                    @update:model-value="(v) => { invite.projects[p.id] = v as 'admin' | 'viewer' | ''; }"
-                  />
-                </div>
-              </div>
-            </div>
+            <p class="rounded-md bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+              <span v-if="invite.instance_role === 'admin'">Admins reach every project automatically.</span>
+              <span v-else>After they join, assign projects from the People list.</span>
+            </p>
 
             <p v-if="inviteError" class="text-xs text-red-600 dark:text-red-400">{{ inviteError }}</p>
             <div class="flex justify-end gap-2 pt-1">
@@ -383,6 +409,33 @@ function inviteStatus(i: { expires_at: number | null }): string {
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Assign-projects modal (members only) -->
+    <div v-if="projectUser" class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" @click.self="projectUser = null">
+      <div class="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+        <h2 class="text-lg font-semibold">Project access</h2>
+        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+          Choose which projects <span class="font-medium">{{ projectUser.email }}</span> can access. They have full control of each.
+        </p>
+
+        <div v-if="session.projects.length > 0" class="mt-4 max-h-64 space-y-1 overflow-auto rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
+          <label
+            v-for="p in session.projects"
+            :key="p.id"
+            class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
+            <input type="checkbox" :checked="projectSelection.has(p.id)" @change="toggleProject(p.id)" />
+            <span class="truncate">{{ p.name }}</span>
+          </label>
+        </div>
+        <p v-else class="mt-4 text-sm text-neutral-500 dark:text-neutral-400">No projects exist yet.</p>
+
+        <div class="mt-5 flex justify-end gap-2">
+          <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="projectUser = null">Cancel</button>
+          <button type="button" :disabled="savingProjects" class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50" @click="saveProjects">{{ savingProjects ? 'Saving…' : 'Save' }}</button>
+        </div>
       </div>
     </div>
   </div>

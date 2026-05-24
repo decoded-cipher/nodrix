@@ -132,7 +132,23 @@ export const useSessionStore = defineStore('session', () => {
 
   async function setUserRole(id: string, role: 'admin' | 'member'): Promise<void> {
     await api.patch<{ id: string; role: string }>(`/v1/admin/users/${id}`, { role });
-    instanceUsers.value = instanceUsers.value.map((u) => (u.id === id ? { ...u, role } : u));
+    // Promoting to admin clears explicit project rows server-side (admins reach
+    // all projects); mirror that locally.
+    instanceUsers.value = instanceUsers.value.map((u) =>
+      u.id === id ? { ...u, role, projects: role === 'admin' ? [] : u.projects } : u
+    );
+  }
+
+  // Replace a member's project assignments. Returns the stored set.
+  async function setUserProjects(id: string, projectIds: string[]): Promise<void> {
+    const res = await api.put<{ id: string; project_ids: string[] }>(
+      `/v1/admin/users/${id}/projects`,
+      { project_ids: projectIds }
+    );
+    const stored = new Set(res.project_ids);
+    instanceUsers.value = instanceUsers.value.map((u) =>
+      u.id === id ? { ...u, projects: projects.value.filter((p) => stored.has(p.id)) } : u
+    );
   }
 
   async function removeUser(id: string): Promise<void> {
@@ -157,7 +173,6 @@ export const useSessionStore = defineStore('session', () => {
     email: string;
     instance_role: 'admin' | 'member';
     mode: 'link' | 'direct';
-    projects?: Array<{ project_id: string; role: 'admin' | 'viewer' }>;
     expires_in_days?: number | null;
     name?: string | null;
   }): Promise<InviteCreated> {
@@ -177,7 +192,7 @@ export const useSessionStore = defineStore('session', () => {
     activeSessions, oauthProviders, instanceUsers, invites,
     load, createProject, deleteProject, updateProject, loadAuditLog, updateMe,
     signOut, loadSessions, revokeSession, loadProviders,
-    loadUsers, setUserRole, removeUser, transferOwnership,
+    loadUsers, setUserRole, setUserProjects, removeUser, transferOwnership,
     loadInvites, createInvite, revokeInvite,
   };
 });

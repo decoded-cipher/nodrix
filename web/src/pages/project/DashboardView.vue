@@ -23,11 +23,12 @@ const route = useRoute();
 const project = useProjectStore();
 const session = useSessionStore();
 
-// Viewers can watch a dashboard but can't edit it (or control devices — the
-// server rejects control frames; we just hide the affordance).
+// Anyone with access to the project has full control. If the project is in the
+// caller's project list they can edit/control; otherwise (e.g. a public share
+// view with no membership) it's read-only.
 const canEdit = computed(() => {
   const projId = route.params['proj'] as string;
-  return session.projects.find((p) => p.id === projId)?.role === 'admin';
+  return session.projects.some((p) => p.id === projId);
 });
 
 const dashboard = ref<Dashboard | null>(null);

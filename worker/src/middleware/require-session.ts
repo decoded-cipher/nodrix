@@ -39,7 +39,7 @@ export const requireSession = createMiddleware<{
   const u = result.user as unknown as {
     id: string;
     email: string;
-    role?: 'owner' | 'admin' | 'viewer';
+    role?: 'owner' | 'admin' | 'member';
     name?: string | null;
     first_name?: string | null;
     last_name?: string | null;

@@ -126,15 +126,6 @@ async function submit() {
             />
           </label>
 
-          <div v-if="preview.projects && preview.projects.length > 0" class="rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-            You'll get access to:
-            <ul class="mt-1 space-y-0.5">
-              <li v-for="p in preview.projects" :key="p.project_id">
-                <span class="font-medium">{{ p.name }}</span> — {{ p.role }}
-              </li>
-            </ul>
-          </div>
-
           <p v-if="error" class="text-xs text-red-600 dark:text-red-400">{{ error }}</p>
 
           <button

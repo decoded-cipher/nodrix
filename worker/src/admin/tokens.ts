@@ -46,13 +46,17 @@ tokens.post('/', async (c) => {
 
   const user = c.get('user');
 
-  // If a project_id is given, the user must be a member.
+  // If a project_id is given, the user must have access to it: owner/admin reach
+  // every project; a member must be assigned to it.
   if (body.project_id) {
-    const m = await c.env.DB
-      .prepare(`SELECT 1 AS ok FROM project_members WHERE user_id = ? AND project_id = ?`)
-      .bind(user.id, body.project_id)
-      .first<{ ok: number }>();
-    if (!m) return c.json({ error: 'forbidden' }, 403);
+    const instanceAdmin = user.role === 'owner' || user.role === 'admin';
+    if (!instanceAdmin) {
+      const m = await c.env.DB
+        .prepare(`SELECT 1 AS ok FROM project_members WHERE user_id = ? AND project_id = ?`)
+        .bind(user.id, body.project_id)
+        .first<{ ok: number }>();
+      if (!m) return c.json({ error: 'forbidden' }, 403);
+    }
   }
 
   const id = newId('token');

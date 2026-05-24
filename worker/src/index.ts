@@ -16,7 +16,6 @@ import versionInfo from './admin/version';
 import sessionsRouter from './admin/sessions';
 import invitesRouter from './admin/invites';
 import usersRouter from './admin/users';
-import membersRouter from './admin/members';
 import publicInvite from './public/invite';
 import telemetry from './device/telemetry';
 import control from './device/control';
@@ -145,7 +144,6 @@ app.route('/v1/admin/projects/:proj/variables', variables);
 app.route('/v1/admin/projects/:proj/dashboards', dashboards);
 app.route('/v1/admin/projects/:proj/automations', automations);
 app.route('/v1/admin/projects/:proj/integrations', integrations);
-app.route('/v1/admin/projects/:proj/members', membersRouter);
 app.route('/v1/admin/tokens', tokens);
 app.route('/v1/admin/audit-log', auditLog);
 
