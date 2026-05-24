@@ -186,7 +186,7 @@ export const useProjectStore = defineStore('project', () => {
 
   async function createToken(
     scope: 'read' | 'admin',
-    projectScoped: boolean,
+    projectId: string | null,
     extras: { name?: string | null; expires_at?: number | null } = {}
   ): Promise<UserToken & { token: string }> {
     const body: {
@@ -195,7 +195,7 @@ export const useProjectStore = defineStore('project', () => {
       name?: string | null;
       expires_at?: number | null;
     } = { scope };
-    if (projectScoped && currentProjectId.value) body.project_id = currentProjectId.value;
+    if (projectId) body.project_id = projectId;
     if (extras.name) body.name = extras.name;
     if (extras.expires_at) body.expires_at = extras.expires_at;
     const t = await api.post<UserToken & { token: string }>('/v1/admin/tokens', body);

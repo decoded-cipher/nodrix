@@ -1,51 +1,67 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
+import { useSessionStore } from '../../stores/session';
 import RevealOnce from '../../components/RevealOnce.vue';
 import Dropdown from '../../components/Dropdown.vue';
 import { confirm } from '../../lib/confirm';
 import { toast } from '../../lib/toast';
 
-const scopeOptions = [
-  { value: 'read' as const, label: 'read', hint: 'Can read data and stream updates.' },
-  { value: 'admin' as const, label: 'admin', hint: 'Full control: read, write, manage.' },
-];
-
 const project = useProjectStore();
+const session = useSessionStore();
+
+const scopeOptions = [
+  { value: 'read' as const, label: 'Read', hint: 'Read data and stream updates.' },
+  { value: 'admin' as const, label: 'Admin', hint: 'Full control: read, write, manage.' },
+];
+const projectOptions = computed(() => [
+  { value: '', label: 'All projects' },
+  ...session.projects.map((p) => ({ value: p.id, label: p.name })),
+]);
+
 const scope = ref<'read' | 'admin'>('read');
-const projectScoped = ref(true);
+const projectId = ref<string>(''); // '' = all projects
 const tokenName = ref('');
 const expiresInDays = ref<number | ''>('');
+const creating = ref(false);
 const justCreatedToken = ref<string | null>(null);
 
-onMounted(() => project.loadTokens());
+onMounted(() => { project.loadTokens(); });
+
+const projectName = (id: string | null) =>
+  id ? session.projects.find((p) => p.id === id)?.name ?? id : null;
 
 async function create() {
-  const expiresAt = typeof expiresInDays.value === 'number' && expiresInDays.value > 0
-    ? Math.floor(Date.now() / 1000) + expiresInDays.value * 86400
-    : null;
+  const expiresAt =
+    typeof expiresInDays.value === 'number' && expiresInDays.value > 0
+      ? Math.floor(Date.now() / 1000) + expiresInDays.value * 86400
+      : null;
+  creating.value = true;
   try {
-    const t = await project.createToken(scope.value, projectScoped.value, {
+    const t = await project.createToken(scope.value, projectId.value || null, {
       name: tokenName.value.trim() || null,
       expires_at: expiresAt,
     });
     justCreatedToken.value = t.token;
     tokenName.value = '';
     expiresInDays.value = '';
+    scope.value = 'read';
+    projectId.value = '';
   } catch (e) {
     toast.error((e as Error).message);
+  } finally {
+    creating.value = false;
   }
 }
 
 async function revoke(id: string) {
   const t = project.tokens.find((x) => x.id === id);
-  const label = t?.name ?? id;
   const ok = await confirm({
-    title: `Revoke API token "${label}"?`,
-    message: 'The token stops working immediately. Any scripts or integrations using it will fail until you issue a new token.',
+    title: `Revoke API token "${t?.name ?? id}"?`,
+    message: 'The token stops working immediately. Any scripts or integrations using it will fail until you issue a new one.',
     details: [
       `Scope: ${t?.scope ?? 'unknown'}`,
-      t?.project_id ? `Project: ${t.project_id}` : 'Scope: all projects',
+      t?.project_id ? `Project: ${projectName(t.project_id)}` : 'All projects',
     ],
     confirmLabel: 'Revoke token',
   });
@@ -71,84 +87,94 @@ function expiryLabel(ts: number | null | undefined): string {
 
 <template>
   <main class="mx-auto max-w-4xl px-6 py-8">
-    <h2 class="text-xl font-semibold tracking-tight">API tokens</h2>
-    <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-      For external apps (Grafana, scripts, dashboards). Browser sessions use signed-in cookies.
-    </p>
+    <header class="mb-6">
+      <h1 class="text-xl font-semibold tracking-tight">API tokens</h1>
+      <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+        For external apps — Grafana, scripts, dashboards. Browser sessions use signed-in cookies, not these.
+      </p>
+    </header>
 
-    <RevealOnce
-      v-if="justCreatedToken"
-      :value="justCreatedToken"
-      label="API token"
-      class="mt-6"
-    />
+    <RevealOnce v-if="justCreatedToken" :value="justCreatedToken" label="New API token" class="mb-6" />
 
-    <section class="mt-6 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <label class="block">
-          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name (optional)</span>
-          <input
-            v-model="tokenName"
-            type="text"
-            placeholder="e.g. Grafana — read-only"
-            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-          />
-        </label>
-        <label class="block">
-          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Expires in (days)</span>
-          <input
-            v-model.number="expiresInDays"
-            type="number"
-            min="1"
-            placeholder="leave blank for no expiry"
-            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-          />
-        </label>
-        <div class="block">
-          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Scope</span>
-          <Dropdown
-            v-model="scope"
-            class="mt-1"
-            :options="scopeOptions"
-          />
+    <!-- Create -->
+    <section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Create a token</div>
+      <form class="space-y-4 px-4 py-4" @submit.prevent="create">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name</span>
+            <input
+              v-model="tokenName"
+              type="text"
+              placeholder="e.g. Grafana — read-only"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Expires in (days)</span>
+            <input
+              v-model.number="expiresInDays"
+              type="number"
+              min="1"
+              placeholder="Blank = never"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            />
+          </label>
+          <div class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Scope</span>
+            <Dropdown v-model="scope" :options="scopeOptions" class="mt-1" />
+          </div>
+          <div class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Project</span>
+            <Dropdown v-model="projectId" :options="projectOptions" class="mt-1" />
+          </div>
         </div>
-        <label class="flex items-end gap-2 text-sm">
-          <input v-model="projectScoped" type="checkbox" class="mb-2.5" />
-          <span class="mb-2.5">Limit to this project</span>
-        </label>
-      </div>
-      <div class="mt-3 flex justify-end">
-        <button
-          class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700"
-          @click="create"
-        >Create token</button>
-      </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
+            {{ projectId ? 'Scoped to one project.' : 'Works across every project.' }}
+          </p>
+          <button
+            type="submit"
+            :disabled="creating"
+            class="shrink-0 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+          >{{ creating ? 'Creating…' : 'Create token' }}</button>
+        </div>
+      </form>
     </section>
 
-    <ul class="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
-      <li v-for="t in project.tokens" :key="t.id" class="flex items-start justify-between gap-4 px-4 py-3 text-sm">
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="font-medium">{{ t.name ?? 'Unnamed token' }}</span>
-            <span class="rounded bg-neutral-100 px-2 py-0.5 text-xs dark:bg-neutral-800 dark:text-neutral-300">{{ t.scope }}</span>
-            <span v-if="t.project_id" class="rounded bg-blue-50 px-2 py-0.5 text-xs dark:bg-blue-900/30 dark:text-blue-300">{{ t.project_id }}</span>
-            <span v-else class="rounded bg-amber-50 px-2 py-0.5 text-xs dark:bg-amber-900/30 dark:text-amber-300">all projects</span>
-            <span v-if="t.revoked_at" class="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">revoked</span>
+    <!-- List -->
+    <section class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Your tokens</div>
+      <ul class="divide-y divide-neutral-100 dark:divide-neutral-800">
+        <li v-for="t in project.tokens" :key="t.id" class="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-medium" :class="t.revoked_at ? 'text-neutral-400 line-through dark:text-neutral-500' : ''">{{ t.name ?? 'Unnamed token' }}</span>
+              <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{{ t.scope }}</span>
+              <span
+                class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                :class="t.project_id
+                  ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'
+                  : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'"
+              >{{ t.project_id ? projectName(t.project_id) : 'All projects' }}</span>
+              <span v-if="t.revoked_at" class="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-700 dark:bg-red-900/30 dark:text-red-300">Revoked</span>
+            </div>
+            <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+              Created {{ fmt(t.created_at) }} · last used {{ fmt(t.last_used_at) }} · {{ expiryLabel(t.expires_at) }}
+            </div>
           </div>
-          <div class="mt-1 font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ t.id }}</div>
-          <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-            created {{ fmt(t.created_at) }} · last used {{ fmt(t.last_used_at) }} · {{ expiryLabel(t.expires_at) }}
-          </div>
-        </div>
-        <button
-          v-if="!t.revoked_at"
-          class="rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-          @click="revoke(t.id)"
-        >Revoke</button>
-      </li>
-      <li v-if="project.tokens.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">
-        No tokens yet.
-      </li>
-    </ul>
+          <button
+            v-if="!t.revoked_at"
+            type="button"
+            class="shrink-0 rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+            @click="revoke(t.id)"
+          >Revoke</button>
+        </li>
+        <li v-if="project.tokens.length === 0" class="px-4 py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">
+          No tokens yet.
+        </li>
+      </ul>
+    </section>
   </main>
 </template>
