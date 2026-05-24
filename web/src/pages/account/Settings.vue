@@ -688,11 +688,11 @@ const PROVIDER_META = {
       </div>
     </section>
 
-    <!-- More -->
-    <section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <!-- More (owner-only) -->
+    <section v-if="isOwner" class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">More</div>
       <ul class="divide-y divide-neutral-100 text-sm dark:divide-neutral-800">
-        <li v-if="isOwner" class="flex items-center justify-between gap-4 px-4 py-3">
+        <li class="flex items-center justify-between gap-4 px-4 py-3">
           <div class="min-w-0">
             <div class="font-medium">Audit log</div>
             <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
