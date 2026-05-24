@@ -179,9 +179,6 @@ export const useSessionStore = defineStore('session', () => {
   async function createInvite(input: {
     email: string;
     instance_role: 'admin' | 'member';
-    mode: 'link' | 'direct';
-    expires_in_days?: number | null;
-    name?: string | null;
   }): Promise<InviteCreated> {
     return api.post<InviteCreated>('/v1/admin/invites', input);
   }
