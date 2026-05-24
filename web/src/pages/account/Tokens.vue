@@ -18,11 +18,18 @@ const projectOptions = computed(() => [
   { value: '', label: 'All projects' },
   ...session.projects.map((p) => ({ value: p.id, label: p.name })),
 ]);
+const expiryOptions = [
+  { value: 7, label: '7 days' },
+  { value: 30, label: '30 days' },
+  { value: 60, label: '60 days' },
+  { value: 90, label: '90 days' },
+  { value: 0, label: 'Never' },
+];
 
 const scope = ref<'read' | 'admin'>('read');
 const projectId = ref<string>(''); // '' = all projects
 const tokenName = ref('');
-const expiresInDays = ref<number | ''>('');
+const expiresInDays = ref<number>(0); // 0 = never
 const creating = ref(false);
 const justCreatedToken = ref<string | null>(null);
 
@@ -33,7 +40,7 @@ const projectName = (id: string | null) =>
 
 async function create() {
   const expiresAt =
-    typeof expiresInDays.value === 'number' && expiresInDays.value > 0
+    expiresInDays.value > 0
       ? Math.floor(Date.now() / 1000) + expiresInDays.value * 86400
       : null;
   creating.value = true;
@@ -44,7 +51,7 @@ async function create() {
     });
     justCreatedToken.value = t.token;
     tokenName.value = '';
-    expiresInDays.value = '';
+    expiresInDays.value = 0;
     scope.value = 'read';
     projectId.value = '';
   } catch (e) {
@@ -111,14 +118,8 @@ function expiryLabel(ts: number | null | undefined): string {
             />
           </label>
           <label class="block">
-            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Expires in (days)</span>
-            <input
-              v-model.number="expiresInDays"
-              type="number"
-              min="1"
-              placeholder="Blank = never"
-              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-            />
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Expires in</span>
+            <Dropdown v-model="expiresInDays" :options="expiryOptions" class="mt-1" />
           </label>
           <div class="block">
             <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Scope</span>

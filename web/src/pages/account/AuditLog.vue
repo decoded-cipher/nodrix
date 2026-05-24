@@ -132,25 +132,25 @@ const rangeEnd = computed(() =>
 
     <!-- Filters -->
     <div class="mb-4 flex flex-wrap items-end gap-2">
-      <label class="block">
+      <label class="block min-w-40 flex-1">
         <span class="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Action</span>
-        <Dropdown v-model="filters.action" :options="actionOptions" placeholder="All actions" size="sm" class="mt-1 w-40" />
+        <Dropdown v-model="filters.action" :options="actionOptions" placeholder="All actions" size="sm" class="mt-1 w-full" />
       </label>
-      <label class="block">
+      <label class="block min-w-40 flex-1">
         <span class="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Project</span>
-        <Dropdown v-model="filters.project" :options="projectOptions" placeholder="All projects" size="sm" class="mt-1 w-44" />
+        <Dropdown v-model="filters.project" :options="projectOptions" placeholder="All projects" size="sm" class="mt-1 w-full" />
       </label>
-      <label class="block">
+      <label class="block min-w-40 flex-1">
         <span class="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">User</span>
-        <Dropdown v-model="filters.user" :options="userOptions" placeholder="All users" size="sm" class="mt-1 w-44" />
+        <Dropdown v-model="filters.user" :options="userOptions" placeholder="All users" size="sm" class="mt-1 w-full" />
       </label>
-      <label class="block">
+      <label class="block min-w-40 flex-1">
         <span class="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">From</span>
-        <DatePicker v-model="filters.from" placeholder="Any date" :max="filters.to || todayISO" class="mt-1 w-40" />
+        <DatePicker v-model="filters.from" placeholder="Any date" :max="filters.to || todayISO" class="mt-1 w-full" />
       </label>
-      <label class="block">
+      <label class="block min-w-40 flex-1">
         <span class="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">To</span>
-        <DatePicker v-model="filters.to" placeholder="Any date" :min="filters.from" :max="todayISO" class="mt-1 w-40" />
+        <DatePicker v-model="filters.to" placeholder="Any date" :min="filters.from" :max="todayISO" class="mt-1 w-full" />
       </label>
       <button
         v-if="hasFilters"
