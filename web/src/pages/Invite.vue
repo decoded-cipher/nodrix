@@ -43,8 +43,9 @@ async function submit() {
       body: JSON.stringify({ token: token.value, password: form.value.password, name }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { reason?: string } | null;
-      throw new Error(body?.reason || 'Could not accept invite');
+      const body = (await res.json().catch(() => null)) as { error?: string; reason?: string } | null;
+      toast.error(body?.reason || body?.error || `Request failed (${res.status})`);
+      return;
     }
     await session.load();
     router.replace('/');

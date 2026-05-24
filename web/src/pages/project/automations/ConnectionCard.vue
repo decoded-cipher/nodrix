@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import { confirm } from '../../../lib/confirm';
+import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
 import Toggle from '../../../components/Toggle.vue';
 import StatusPill from '../../../components/StatusPill.vue';
@@ -24,7 +25,11 @@ const testing = ref(false);
 const testMsg = ref<{ ok: boolean; text: string } | null>(null);
 
 async function toggle() {
-  await project.updateIntegration(props.integration.id, { enabled: !props.integration.enabled });
+  try {
+    await project.updateIntegration(props.integration.id, { enabled: !props.integration.enabled });
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function test() {
@@ -37,6 +42,8 @@ async function test() {
       text: res.status === 'ok' ? `Delivered${res.detail ? ` (${res.detail})` : ''}` : `${res.status}: ${res.detail ?? ''}`,
     };
     setTimeout(() => { testMsg.value = null; }, 5000);
+  } catch (e) {
+    toast.error((e as Error).message);
   } finally {
     testing.value = false;
   }
@@ -56,7 +63,11 @@ async function remove() {
     confirmLabel: 'Delete connection',
   });
   if (!ok) return;
-  await project.deleteIntegration(props.integration.id);
+  try {
+    await project.deleteIntegration(props.integration.id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 </script>
 

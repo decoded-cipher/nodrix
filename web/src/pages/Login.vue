@@ -55,13 +55,13 @@ async function submit() {
         password: form.value.password,
         name,
       });
-      if (res.error) throw new Error(res.error.message ?? 'Sign-up failed');
+      if (res.error) { toast.error(res.error.message ?? `Sign-up failed (${res.error.status})`); return; }
     } else {
       const res = await authClient.signIn.email({
         email: form.value.email.trim(),
         password: form.value.password,
       });
-      if (res.error) throw new Error(res.error.message ?? 'Sign-in failed');
+      if (res.error) { toast.error(res.error.message ?? `Sign-in failed (${res.error.status})`); return; }
     }
     await session.load();
     router.replace('/');

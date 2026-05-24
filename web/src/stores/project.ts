@@ -33,6 +33,15 @@ export const useProjectStore = defineStore('project', () => {
     await Promise.all([loadVariables(), loadDashboards()]);
   }
 
+  // Guard for write actions: returns the active project id, or throws. The UI
+  // only exposes these from inside a project, so this is a safety net rather
+  // than expected flow — the message stays graceful in case it ever surfaces.
+  function requireProjectId(): string {
+    const id = currentProjectId.value;
+    if (!id) throw new Error('No project is selected.');
+    return id;
+  }
+
   async function loadVariables(): Promise<void> {
     if (!currentProjectId.value) return;
     const data = await api.get<{ variables: Variable[] }>(
@@ -42,9 +51,9 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function createVariable(input: { key: string; name?: string | null; unit?: string | null }): Promise<Variable> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const v = await api.post<Variable>(
-      `/v1/admin/projects/${currentProjectId.value}/variables`,
+      `/v1/admin/projects/${pid}/variables`,
       input
     );
     variables.value = [...variables.value, v];
@@ -55,9 +64,9 @@ export const useProjectStore = defineStore('project', () => {
     id: string,
     patch: { name?: string | null; unit?: string | null }
   ): Promise<Variable> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const v = await api.patch<Variable>(
-      `/v1/admin/projects/${currentProjectId.value}/variables/${id}`,
+      `/v1/admin/projects/${pid}/variables/${id}`,
       patch
     );
     variables.value = variables.value.map((x) => (x.id === id ? v : x));
@@ -81,9 +90,9 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function createProjectToken(name?: string | null): Promise<ProjectTokenWithSecret> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const t = await api.post<ProjectTokenWithSecret>(
-      `/v1/admin/projects/${currentProjectId.value}/variables/tokens`,
+      `/v1/admin/projects/${pid}/variables/tokens`,
       { name: name ?? null }
     );
     projectTokens.value = [
@@ -112,9 +121,9 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function createDashboard(name: string): Promise<DashboardMeta> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const d = await api.post<Dashboard>(
-      `/v1/admin/projects/${currentProjectId.value}/dashboards`,
+      `/v1/admin/projects/${pid}/dashboards`,
       { name, layout: { grid: { columns: 12 }, items: [] } }
     );
     const meta: DashboardMeta = {
@@ -132,9 +141,9 @@ export const useProjectStore = defineStore('project', () => {
     id: string,
     patch: { name?: string; description?: string | null }
   ): Promise<DashboardMeta> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const d = await api.put<Dashboard>(
-      `/v1/admin/projects/${currentProjectId.value}/dashboards/${id}`,
+      `/v1/admin/projects/${pid}/dashboards/${id}`,
       patch
     );
     dashboards.value = dashboards.value.map((x) =>
@@ -146,9 +155,9 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function fetchDashboard(id: string): Promise<Dashboard> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     return api.get<Dashboard>(
-      `/v1/admin/projects/${currentProjectId.value}/dashboards/${id}`
+      `/v1/admin/projects/${pid}/dashboards/${id}`
     );
   }
 
@@ -157,9 +166,9 @@ export const useProjectStore = defineStore('project', () => {
     layout: Layout,
     ifUpdatedAt: number
   ): Promise<Dashboard> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     return api.put<Dashboard>(
-      `/v1/admin/projects/${currentProjectId.value}/dashboards/${id}`,
+      `/v1/admin/projects/${pid}/dashboards/${id}`,
       { layout, if_updated_at: ifUpdatedAt }
     );
   }
@@ -218,9 +227,9 @@ export const useProjectStore = defineStore('project', () => {
     trigger_config?: unknown;
     actions?: unknown[];
   }): Promise<Automation> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const a = await api.post<Automation>(
-      `/v1/admin/projects/${currentProjectId.value}/automations`,
+      `/v1/admin/projects/${pid}/automations`,
       input
     );
     automations.value = [a, ...automations.value];
@@ -231,9 +240,9 @@ export const useProjectStore = defineStore('project', () => {
     id: string,
     patch: Partial<Pick<Automation, 'name' | 'description' | 'enabled' | 'trigger_config' | 'actions'>>
   ): Promise<Automation> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const a = await api.patch<Automation>(
-      `/v1/admin/projects/${currentProjectId.value}/automations/${id}`,
+      `/v1/admin/projects/${pid}/automations/${id}`,
       patch
     );
     automations.value = automations.value.map((x) => (x.id === id ? a : x));
@@ -249,11 +258,11 @@ export const useProjectStore = defineStore('project', () => {
   async function runAutomation(
     id: string
   ): Promise<{ status: 'ok' | 'error' | 'skipped'; error?: string; actionsRun: number }> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const res = await api.post<{
       result: { status: 'ok' | 'error' | 'skipped'; error?: string; actionsRun: number };
       automation: Automation;
-    }>(`/v1/admin/projects/${currentProjectId.value}/automations/${id}/run`);
+    }>(`/v1/admin/projects/${pid}/automations/${id}/run`);
     automations.value = automations.value.map((x) => (x.id === id ? res.automation : x));
     return res.result;
   }
@@ -274,9 +283,9 @@ export const useProjectStore = defineStore('project', () => {
     config?: unknown;
     enabled?: boolean;
   }): Promise<Integration> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const i = await api.post<Integration>(
-      `/v1/admin/projects/${currentProjectId.value}/integrations`,
+      `/v1/admin/projects/${pid}/integrations`,
       input
     );
     integrations.value = [i, ...integrations.value];
@@ -287,9 +296,9 @@ export const useProjectStore = defineStore('project', () => {
     id: string,
     patch: Partial<Pick<Integration, 'name' | 'config' | 'enabled'>>
   ): Promise<Integration> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const i = await api.patch<Integration>(
-      `/v1/admin/projects/${currentProjectId.value}/integrations/${id}`,
+      `/v1/admin/projects/${pid}/integrations/${id}`,
       patch
     );
     integrations.value = integrations.value.map((x) => (x.id === id ? i : x));
@@ -305,9 +314,9 @@ export const useProjectStore = defineStore('project', () => {
   // Fires a connection once with a synthetic context. Returns the delivery
   // result and refreshes the row's last-run status from the response.
   async function testIntegration(id: string): Promise<IntegrationTestResult> {
-    if (!currentProjectId.value) throw new Error('no project');
+    const pid = requireProjectId();
     const res = await api.post<IntegrationTestResult>(
-      `/v1/admin/projects/${currentProjectId.value}/integrations/${id}/test`
+      `/v1/admin/projects/${pid}/integrations/${id}/test`
     );
     const now = Math.floor(Date.now() / 1000);
     integrations.value = integrations.value.map((i) =>

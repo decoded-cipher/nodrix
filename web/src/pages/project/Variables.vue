@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useProjectStore } from '../../stores/project';
 import RevealOnce from '../../components/RevealOnce.vue';
 import { confirm } from '../../lib/confirm';
+import { toast } from '../../lib/toast';
 import type { ProjectTokenWithSecret } from '../../types';
 
 const project = useProjectStore();
@@ -23,17 +24,27 @@ async function createVariable() {
   try {
     await project.createVariable({ key });
     newKey.value = '';
+  } catch (e) {
+    toast.error((e as Error).message);
   } finally {
     creating.value = false;
   }
 }
 
 async function saveName(id: string, e: Event) {
-  await project.updateVariable(id, { name: (e.target as HTMLInputElement).value.trim() || null });
+  try {
+    await project.updateVariable(id, { name: (e.target as HTMLInputElement).value.trim() || null });
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function saveUnit(id: string, e: Event) {
-  await project.updateVariable(id, { unit: (e.target as HTMLInputElement).value.trim() || null });
+  try {
+    await project.updateVariable(id, { unit: (e.target as HTMLInputElement).value.trim() || null });
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function removeVariable(id: string) {
@@ -50,13 +61,19 @@ async function removeVariable(id: string) {
     confirmLabel: 'Delete variable',
   });
   if (!ok) return;
-  await project.deleteVariable(id);
+  try {
+    await project.deleteVariable(id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function createToken() {
   creatingToken.value = true;
   try {
     justCreatedToken.value = await project.createProjectToken(null);
+  } catch (e) {
+    toast.error((e as Error).message);
   } finally {
     creatingToken.value = false;
   }
@@ -69,7 +86,11 @@ async function revokeToken(id: string) {
     confirmLabel: 'Revoke token',
   });
   if (!ok) return;
-  await project.revokeProjectToken(id);
+  try {
+    await project.revokeProjectToken(id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 function fmt(ts: number | null | undefined): string {

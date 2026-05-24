@@ -85,7 +85,12 @@ async function removeDashboard(d: DashboardMeta) {
     confirmLabel: 'Delete dashboard',
   });
   if (!ok) return;
-  await project.deleteDashboard(d.id);
+  try {
+    await project.deleteDashboard(d.id);
+  } catch (e) {
+    toast.error((e as Error).message);
+    return;
+  }
   if (editing.value?.id === d.id) editing.value = null;
 }
 
