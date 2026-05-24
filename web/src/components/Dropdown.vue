@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends string | number">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
-type Option = { value: T; label: string; hint?: string };
+type Option = { value: T; label: string; hint?: string; meta?: string };
 
 const props = defineProps<{
   modelValue: T | '';
@@ -121,6 +121,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
     >
       <span :class="['flex-1 truncate', selected ? '' : 'text-neutral-400 dark:text-neutral-500']">
         {{ selected ? selected.label : (placeholder ?? 'Select…') }}
+        <span v-if="selected?.meta" class="ml-1.5 font-normal text-neutral-400 dark:text-neutral-500">{{ selected.meta }}</span>
       </span>
       <svg
         class="h-4 w-4 shrink-0 text-neutral-500 transition-transform dark:text-neutral-400"
@@ -177,7 +178,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
             @mouseenter="activeIdx = idx"
           >
             <span class="flex min-w-0 flex-col">
-              <span class="truncate">{{ o.label }}</span>
+              <span class="truncate">
+                {{ o.label }}
+                <span v-if="o.meta" class="ml-1.5 text-xs font-normal text-neutral-400 dark:text-neutral-500">{{ o.meta }}</span>
+              </span>
               <span v-if="o.hint" class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ o.hint }}</span>
             </span>
             <svg
