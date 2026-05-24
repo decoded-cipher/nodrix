@@ -23,6 +23,16 @@ const fullName = computed(
   () => [session.user?.first_name, session.user?.last_name].filter(Boolean).join(' ') || null
 );
 
+// Avatar initials: first+last, else first two of the local-part of the email.
+const initials = computed(() => {
+  const f = (session.user?.first_name ?? '').trim();
+  const l = (session.user?.last_name ?? '').trim();
+  if (f && l) return (f[0]! + l[0]!).toUpperCase();
+  if (f) return f.slice(0, 2).toUpperCase();
+  const local = (session.user?.email ?? '').split('@')[0] ?? '';
+  return local.slice(0, 2).toUpperCase() || '?';
+});
+
 // Open/close the form, seeding inputs from the stored user each time.
 function editProfile(on: boolean) {
   profileForm.value.first_name = session.user?.first_name ?? '';
@@ -286,34 +296,44 @@ const PROVIDER_META = {
     <!-- Account -->
     <section class="mb-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Account</div>
-      <div class="space-y-4 px-4 py-4 text-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-neutral-500 dark:text-neutral-400">Email</div>
-            <div class="font-medium">{{ session.user?.email ?? '...' }}</div>
+      <div class="px-4 py-4 text-sm">
+        <!-- Profile card -->
+        <div class="flex items-start gap-4">
+          <div class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-accent-100 text-base font-semibold text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+            {{ initials }}
           </div>
-          <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-            {{ session.user?.role ?? '' }}
-          </span>
-        </div>
 
-        <!-- Your name -->
-        <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
           <!-- Read-only view -->
-          <div v-if="!editingProfile" class="flex items-center justify-between gap-4">
-            <div>
-              <div class="text-neutral-500 dark:text-neutral-400">Name</div>
-              <div :class="fullName ? 'font-medium' : 'text-neutral-400 dark:text-neutral-500'">{{ fullName ?? 'Not set' }}</div>
+          <template v-if="!editingProfile">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  class="truncate text-base font-semibold"
+                  :class="{ 'text-neutral-400 dark:text-neutral-500': !fullName }"
+                >{{ fullName ?? 'Add your name' }}</span>
+                <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                  {{ session.user?.role ?? '' }}
+                </span>
+              </div>
+              <div class="mt-0.5 truncate text-neutral-500 dark:text-neutral-400">{{ session.user?.email ?? '...' }}</div>
             </div>
-            <button
-              type="button"
-              class="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              @click="editProfile(true)"
-            >Edit</button>
-          </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                @click="editProfile(true)"
+              >Edit</button>
+              <button
+                type="button"
+                class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                @click="signOut"
+              >Sign out</button>
+            </div>
+          </template>
 
           <!-- Edit form -->
-          <form v-else class="space-y-3" @submit.prevent="saveProfile">
+          <form v-else class="min-w-0 flex-1 space-y-3" @submit.prevent="saveProfile">
+            <div class="truncate text-neutral-500 dark:text-neutral-400">{{ session.user?.email ?? '...' }}</div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label class="block">
                 <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">First name</span>
@@ -338,14 +358,6 @@ const PROVIDER_META = {
               >{{ savingProfile ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
-        </div>
-
-        <div class="border-t border-neutral-100 pt-3 dark:border-neutral-800">
-          <button
-            type="button"
-            class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-            @click="signOut"
-          >Sign out</button>
         </div>
       </div>
     </section>
