@@ -1,7 +1,10 @@
 // Shared types used across stores, pages, and widgets.
 
 export type InstanceRole = 'owner' | 'admin' | 'member';
-export type ProjectRole = 'admin' | 'viewer';
+
+// A project the user has access to. owner/admin see all; members see only the
+// projects they're assigned to. Everyone with access has full control.
+export type ProjectRef = { id: string; name: string };
 
 export type User = {
   id: string;
@@ -22,11 +25,10 @@ export type Project = {
   description?: string | null;
   updated_at?: number;
   archived_at?: number | null;
-  // Caller's effective role on this project (from /me + /projects).
-  role?: ProjectRole;
 };
 
-// A user row in the instance Users management list.
+// A user row in the instance Users management list, with their assigned projects
+// (empty for owner/admin, who reach every project implicitly).
 export type InstanceUser = {
   id: string;
   email: string;
@@ -36,6 +38,7 @@ export type InstanceUser = {
   role: InstanceRole;
   last_login_at: number | null;
   created_at: number;
+  projects: ProjectRef[];
 };
 
 export type Invite = {
@@ -63,18 +66,7 @@ export type InvitePreview = {
   valid: boolean;
   email?: string | null;
   instance_role?: 'admin' | 'member';
-  projects?: Array<{ project_id: string; role: ProjectRole; name: string }>;
   inviter_email?: string | null;
-};
-
-export type ProjectMember = {
-  user_id: string;
-  email: string;
-  name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  role: ProjectRole;
-  added_at: number;
 };
 
 export type Variable = {

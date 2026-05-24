@@ -247,6 +247,8 @@ export async function buildAuth(env: Env, request?: Request) {
                 code: 'REGISTRATION_CLOSED',
               });
             }
+            // Invites only carry the instance role; project assignment happens
+            // later from the Users page.
             return { data: { ...user, role: invite.instance_role, emailVerified: true } };
           },
           after: async (user) => {
@@ -260,12 +262,12 @@ export async function buildAuth(env: Env, request?: Request) {
                 .bind(firstName, lastName, user.id)
                 .run();
             }
-            // Consume the matching invite (if any) and apply its pre-assigned
-            // project memberships. Bootstrap owner has no invite → no-op.
+            // Delete the matching invite (if any); the role was applied at
+            // INSERT by the before-hook. Bootstrap owner has no invite → no-op.
             const email = (user.email ?? '').toLowerCase();
             if (email) {
               const invite = await findOpenInviteByEmail(env, email);
-              if (invite) await consumeInvite(env, invite, user.id);
+              if (invite) await consumeInvite(env, invite);
             }
             await recordAudit(env, {
               projectId: null,

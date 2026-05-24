@@ -28,22 +28,20 @@ me.get('/', async (c) => {
       updated_at: number;
     }>();
 
-  // Instance owner/admin see every project (as admin); members see only theirs.
-  // Each project carries the caller's effective role so the UI can gate writes.
+  // Instance owner/admin see every project; members see only the projects
+  // they're assigned to. Anyone who sees a project has full control of it.
   const instanceAdmin = user.role === 'owner' || user.role === 'admin';
   const projects = instanceAdmin
     ? await c.env.DB
         .prepare(
-          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
-                  'admin' AS role
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at
              FROM projects p
             ORDER BY p.created_at ASC`
         )
         .all()
     : await c.env.DB
         .prepare(
-          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
-                  pm.role AS role
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
             WHERE pm.user_id = ?

@@ -5,8 +5,9 @@ import { buildAuth } from '../auth';
 
 // Public invite endpoints (no session) — used by the /invite/<token> accept page.
 // Account creation goes through Better Auth's signUpEmail; the create-gate finds
-// the invite by email and authorizes it, and the after-hook consumes it + applies
-// the pre-assigned project memberships.
+// the invite by email, authorizes it, and applies its instance role; the
+// after-hook then deletes the consumed invite. Projects are assigned later from
+// the Users page.
 
 const invite = new Hono<{ Bindings: Env }>();
 
@@ -16,16 +17,6 @@ invite.get('/:token', async (c) => {
   const row = await findOpenInviteByToken(c.env, token);
   if (!row) return c.json({ valid: false }, 404);
 
-  const projects = await c.env.DB
-    .prepare(
-      `SELECT ip.project_id, ip.role, p.name
-         FROM invite_projects ip
-         JOIN projects p ON p.id = ip.project_id
-        WHERE ip.invite_id = ?`
-    )
-    .bind(row.id)
-    .all<{ project_id: string; role: string; name: string }>();
-
   const inviter = row.created_by
     ? await c.env.DB.prepare(`SELECT email FROM users WHERE id = ?`).bind(row.created_by).first<{ email: string }>()
     : null;
@@ -34,7 +25,6 @@ invite.get('/:token', async (c) => {
     valid: true,
     email: row.email,
     instance_role: row.instance_role,
-    projects: projects.results,
     inviter_email: inviter?.email ?? null,
   });
 });

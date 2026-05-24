@@ -3,7 +3,7 @@ import type { Env } from '../env';
 import type { ProjectDO } from './project-do';
 import { validateLayout, variablesFromLayout, chartVariablesFromLayout, type Layout } from '../lib/layout';
 import { newId } from '../lib/ids';
-import { effectiveProjectRole } from '../lib/roles';
+import { userCanAccessProject } from '../lib/roles';
 
 // Dashboard Durable Object. One per dashboard id (ctx.id.name === dashboard_id).
 //
@@ -236,14 +236,13 @@ export class DashboardDO extends DurableObject<Env> {
     if (!row) return ack(false, 'dashboard_not_found');
     if (!row.variable_id) return ack(false, 'variable_not_in_project');
 
-    // Re-authorize the control write against the user's CURRENT role (viewers
-    // can't operate devices). Re-read per frame so a demotion mid-session takes
-    // effect on this already-open socket.
+    // Re-authorize the control write against the user's CURRENT access. Re-read
+    // per frame so a removal from the project mid-session takes effect on this
+    // already-open socket.
     const att = ws.deserializeAttachment() as { userId?: string } | null;
     const uid = att?.userId;
     if (!uid) return ack(false, 'forbidden');
-    const role = await effectiveProjectRole(this.env, uid, row.project_id);
-    if (role !== 'admin') return ack(false, 'forbidden');
+    if (!(await userCanAccessProject(this.env, uid, row.project_id))) return ack(false, 'forbidden');
 
     const cmdId = newId('control');
     const stub = this.env.PROJECT_DO.get(

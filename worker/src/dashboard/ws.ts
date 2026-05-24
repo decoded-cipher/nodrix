@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
-import { effectiveProjectRole } from '../lib/roles';
+import { userCanAccessProject } from '../lib/roles';
 
 const ws = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -21,14 +21,15 @@ ws.get('/:dashboard', async (c) => {
     .first<{ project_id: string }>();
   if (!dash) return c.json({ error: 'not_found' }, 404);
 
-  const role = await effectiveProjectRole(c.env, user.id, dash.project_id);
-  if (!role) return c.json({ error: 'forbidden' }, 403);
+  if (!(await userCanAccessProject(c.env, user.id, dash.project_id))) {
+    return c.json({ error: 'forbidden' }, 403);
+  }
 
   const upgrade = c.req.header('upgrade');
   if (upgrade !== 'websocket') return c.text('expected websocket', 426);
 
   // Forward to the DO with the authenticated user id stashed in a header so the
-  // DO can re-check the user's role per control frame (handles live demotion).
+  // DO can re-check project access per control frame (handles live removal).
   const headers = new Headers(c.req.raw.headers);
   headers.set('x-nodrix-uid', user.id);
   const fwd = new Request(c.req.raw.url, {

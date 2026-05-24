@@ -9,40 +9,35 @@ const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
 projects.use('*', requireSession);
 
-// Effective project role: instance owner/admin → 'admin' on every project;
-// otherwise the project_members.role, or null if the user has no access.
-async function effectiveRole(
-  env: Env,
-  user: { id: string; role: string },
-  projId: string
-): Promise<'admin' | 'viewer' | null> {
-  if (user.role === 'owner' || user.role === 'admin') return 'admin';
+// Project access: instance owner/admin reach every project; a member reaches a
+// project iff they have a project_members row. No per-project role — access is
+// full when granted.
+async function canAccess(env: Env, user: { id: string; role: string }, projId: string): Promise<boolean> {
+  if (user.role === 'owner' || user.role === 'admin') return true;
   const m = await env.DB
-    .prepare(`SELECT role FROM project_members WHERE user_id = ? AND project_id = ?`)
+    .prepare(`SELECT 1 AS ok FROM project_members WHERE user_id = ? AND project_id = ?`)
     .bind(user.id, projId)
-    .first<{ role: 'admin' | 'viewer' }>();
-  return m?.role ?? null;
+    .first<{ ok: number }>();
+  return !!m;
 }
 
 projects.get('/', async (c) => {
   const user = c.get('user');
   const instanceAdmin = user.role === 'owner' || user.role === 'admin';
 
-  // Instance owner/admin see every project (as admin); members see only the
-  // projects they belong to, tagged with their role so the UI can gate writes.
+  // Instance owner/admin see every project; members see only the projects
+  // they're assigned to.
   const rows = instanceAdmin
     ? await c.env.DB
         .prepare(
-          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
-                  'admin' AS role
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at
              FROM projects p
             ORDER BY p.created_at ASC`
         )
         .all()
     : await c.env.DB
         .prepare(
-          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at,
-                  pm.role AS role
+          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
             WHERE pm.user_id = ?
@@ -54,28 +49,24 @@ projects.get('/', async (c) => {
 });
 
 projects.post('/', async (c) => {
+  const user = c.get('user');
+  // Members can't create projects; they're assigned to existing ones.
+  if (user.role !== 'owner' && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+
   const body = await c.req.json<{ name?: string }>();
   const name = (body.name ?? '').trim();
   if (!name) return c.json({ error: 'bad_request', reason: 'missing_name' }, 400);
 
-  const user = c.get('user');
   const id = newId('project');
   const now = Math.floor(Date.now() / 1000);
 
-  await c.env.DB.batch([
-    c.env.DB
-      .prepare(
-        `INSERT INTO projects (id, name, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`
-      )
-      .bind(id, name, user.id, now, now),
-    c.env.DB
-      .prepare(
-        `INSERT INTO project_members (user_id, project_id, role, added_at, added_by)
-         VALUES (?, ?, 'admin', ?, ?)`
-      )
-      .bind(user.id, id, now, user.id),
-  ]);
+  await c.env.DB
+    .prepare(
+      `INSERT INTO projects (id, name, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .bind(id, name, user.id, now, now)
+    .run();
 
   c.executionCtx.waitUntil(
     recordAudit(c.env, {
@@ -96,7 +87,7 @@ projects.patch('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
 
-  if ((await effectiveRole(c.env, user, projId)) !== 'admin') return c.json({ error: 'forbidden' }, 403);
+  if (!(await canAccess(c.env, user, projId))) return c.json({ error: 'forbidden' }, 403);
 
   const body = await c.req.json<{
     name?: string;
@@ -147,7 +138,7 @@ projects.patch('/:proj', async (c) => {
 projects.post('/:proj/flush', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
-  if ((await effectiveRole(c.env, user, projId)) !== 'admin') return c.json({ error: 'forbidden' }, 403);
+  if (!(await canAccess(c.env, user, projId))) return c.json({ error: 'forbidden' }, 403);
 
   const stub = c.env.PROJECT_DO.get(c.env.PROJECT_DO.idFromName(projId)) as unknown as ProjectDO;
   const result = await stub.flushNow();
@@ -166,7 +157,7 @@ projects.delete('/:proj', async (c) => {
   const projId = c.req.param('proj');
   const user = c.get('user');
 
-  if ((await effectiveRole(c.env, user, projId)) !== 'admin') return c.json({ error: 'forbidden' }, 403);
+  if (!(await canAccess(c.env, user, projId))) return c.json({ error: 'forbidden' }, 403);
 
   // The project's own DO holds all variable state + R2 telemetry history.
   try {
