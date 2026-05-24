@@ -5,7 +5,6 @@ import { authClient } from '../lib/auth-client';
 import { toast } from '../lib/toast';
 import type {
   AuditLogEntry,
-  Invite,
   InviteCreated,
   InstanceUser,
   Project,
@@ -35,7 +34,6 @@ export const useSessionStore = defineStore('session', () => {
   const activeSessions = ref<ActiveSession[]>([]);
   const oauthProviders = ref<('google' | 'github')[]>([]);
   const instanceUsers = ref<InstanceUser[]>([]);
-  const invites = ref<Invite[]>([]);
 
   async function load(): Promise<void> {
     loading.value = true;
@@ -175,11 +173,8 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   // ─── Invites (owner/admin) ────────────────────────────────────────────────────
-
-  async function loadInvites(): Promise<void> {
-    const data = await api.get<{ invites: Invite[] }>('/v1/admin/invites');
-    invites.value = data.invites;
-  }
+  // Create-only: the invite returns a one-time link/temp-password shown in a
+  // modal. There's no pending-invites list (invites are throwaway).
 
   async function createInvite(input: {
     email: string;
@@ -188,24 +183,16 @@ export const useSessionStore = defineStore('session', () => {
     expires_in_days?: number | null;
     name?: string | null;
   }): Promise<InviteCreated> {
-    const created = await api.post<InviteCreated>('/v1/admin/invites', input);
-    await loadInvites();
-    return created;
-  }
-
-  async function revokeInvite(id: string): Promise<void> {
-    await api.del<void>(`/v1/admin/invites/${id}`);
-    invites.value = invites.value.filter((i) => i.id !== id);
-    toast.success('Invite revoked');
+    return api.post<InviteCreated>('/v1/admin/invites', input);
   }
 
   return {
     user, projects, loading, error,
     auditLog, auditLogPage, auditLogPageSize, auditLogPageCount, auditLogTotal,
-    activeSessions, oauthProviders, instanceUsers, invites,
+    activeSessions, oauthProviders, instanceUsers,
     load, createProject, deleteProject, updateProject, loadAuditLog, updateMe,
     signOut, loadSessions, revokeSession, loadProviders,
     loadUsers, setUserRole, setUserProjects, removeUser, transferOwnership,
-    loadInvites, createInvite, revokeInvite,
+    createInvite,
   };
 });

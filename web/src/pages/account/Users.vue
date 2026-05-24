@@ -29,7 +29,7 @@ onMounted(async () => {
   if (!session.user) await session.load();
   try { await session.loadSessions(); } catch { /* ignore */ }
   if (isAdmin.value) {
-    try { await Promise.all([session.loadUsers(), session.loadInvites()]); } catch { /* ignore */ }
+    try { await session.loadUsers(); } catch { /* ignore */ }
   }
 });
 
@@ -91,59 +91,74 @@ async function revokeDevice(s: ActiveSession) {
 
 // ─── People (owner/admin) ─────────────────────────────────────────────────────
 
-async function changeRole(id: string, role: 'admin' | 'member') {
-  try { await session.setUserRole(id, role); } catch (e) { toast.error((e as Error).message); }
+// You can manage a row when it isn't yourself or the owner, AND you're the owner
+// (any role) or you're an admin acting on a plain member.
+function canManage(u: InstanceUser): boolean {
+  return u.id !== session.user?.id && u.role !== 'owner' && (isOwner.value || u.role === 'member');
 }
 
-// ─── Project assignments (members only) ───────────────────────────────────────
-// Members reach only the projects assigned here; owner/admin reach everything.
+// ─── Edit user modal (role + project access) ──────────────────────────────────
+const editUser = ref<InstanceUser | null>(null);
+const editRole = ref<'admin' | 'member'>('member');
+const editProjects = ref<Set<string>>(new Set());
+const savingEdit = ref(false);
 
-const projectUser = ref<InstanceUser | null>(null);
-const projectSelection = ref<Set<string>>(new Set());
-const savingProjects = ref(false);
-
-function openProjects(u: InstanceUser) {
-  projectUser.value = u;
-  projectSelection.value = new Set(u.projects.map((p) => p.id));
+function openEdit(u: InstanceUser) {
+  editUser.value = u;
+  editRole.value = u.role === 'admin' ? 'admin' : 'member';
+  editProjects.value = new Set(u.projects.map((p) => p.id));
 }
 
-function toggleProject(id: string) {
-  const next = new Set(projectSelection.value);
+function toggleEditProject(id: string) {
+  const next = new Set(editProjects.value);
   next.has(id) ? next.delete(id) : next.add(id);
-  projectSelection.value = next;
+  editProjects.value = next;
 }
 
-async function saveProjects() {
-  if (!projectUser.value) return;
-  savingProjects.value = true;
+async function saveEdit() {
+  const u = editUser.value;
+  if (!u) return;
+  savingEdit.value = true;
   try {
-    await session.setUserProjects(projectUser.value.id, [...projectSelection.value]);
-    projectUser.value = null;
+    // Role change is owner-only; only call when it actually changed.
+    if (isOwner.value && editRole.value !== u.role) {
+      await session.setUserRole(u.id, editRole.value);
+    }
+    // Members carry explicit project access; admins reach everything.
+    if (editRole.value === 'member') {
+      await session.setUserProjects(u.id, [...editProjects.value]);
+    }
+    editUser.value = null;
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
-    savingProjects.value = false;
+    savingEdit.value = false;
   }
 }
 
-async function removeUser(id: string, email: string) {
+async function transferOwnership(u: InstanceUser) {
   const ok = await confirm({
-    title: `Remove ${email}?`,
-    message: 'They will be signed out everywhere and lose access immediately. This cannot be undone.',
-    confirmLabel: 'Remove user',
-  });
-  if (!ok) return;
-  try { await session.removeUser(id); } catch (e) { toast.error((e as Error).message); }
-}
-
-async function makeOwner(id: string, email: string) {
-  const ok = await confirm({
-    title: `Transfer ownership to ${email}?`,
-    message: 'They become the owner; you are demoted to admin. Only the owner can manage sign-in providers and updates.',
+    title: `Transfer ownership to ${u.email}?`,
+    message: 'They become the owner; you are demoted to admin. Only the owner can manage sign-in providers, updates, and the audit log.',
     confirmLabel: 'Transfer ownership',
   });
   if (!ok) return;
-  try { await session.transferOwnership(id); } catch (e) { toast.error((e as Error).message); }
+  try {
+    await session.transferOwnership(u.id);
+    editUser.value = null;
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
+}
+
+async function removeUser(u: InstanceUser) {
+  const ok = await confirm({
+    title: `Delete ${u.email}?`,
+    message: 'They will be signed out everywhere and lose access immediately. This cannot be undone.',
+    confirmLabel: 'Delete user',
+  });
+  if (!ok) return;
+  try { await session.removeUser(u.id); } catch (e) { toast.error((e as Error).message); }
 }
 
 // ─── Invites (owner/admin) ────────────────────────────────────────────────────
@@ -178,26 +193,9 @@ async function submitInvite() {
   }
 }
 
-async function revokeInvite(id: string, email: string | null) {
-  const ok = await confirm({
-    title: 'Revoke this invite?',
-    message: `The invite${email ? ` for ${email}` : ''} will stop working immediately.`,
-    confirmLabel: 'Revoke',
-  });
-  if (!ok) return;
-  try { await session.revokeInvite(id); } catch (e) { toast.error((e as Error).message); }
-}
-
 const copied = ref(false);
 async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* ignore */ }
-}
-
-// Invites are throwaway — a row only exists while pending, so this is just
-// pending vs (briefly) expired before the next prune.
-function inviteStatus(i: { expires_at: number | null }): string {
-  if (i.expires_at && i.expires_at * 1000 < Date.now()) return 'Expired';
-  return 'Pending';
 }
 </script>
 
@@ -242,58 +240,27 @@ function inviteStatus(i: { expires_at: number | null }): string {
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <span v-if="u.role === 'owner'" class="rounded-full bg-accent-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">Owner</span>
-            <Dropdown
-              v-else-if="isOwner && u.id !== session.user?.id"
-              :model-value="u.role"
-              :options="instanceRoleOptions"
-              size="sm"
-              class="w-28"
-              @update:model-value="(v) => changeRole(u.id, v as 'admin' | 'member')"
-            />
-            <span v-else class="text-[11px] uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{{ u.role }}</span>
+            <span
+              class="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+              :class="u.role === 'owner'
+                ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300'
+                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'"
+            >{{ u.role }}</span>
 
             <button
-              v-if="u.role === 'member'"
+              v-if="canManage(u)"
               type="button"
-              class="rounded-md border border-neutral-300 px-2 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              @click="openProjects(u)"
-            >Projects</button>
-            <button v-if="isOwner && u.role === 'admin' && u.id !== session.user?.id" type="button" class="rounded-md border border-neutral-300 px-2 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="makeOwner(u.id, u.email)">Make owner</button>
+              class="rounded-md border border-neutral-300 px-2.5 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="openEdit(u)"
+            >Edit</button>
             <button
-              v-if="u.role !== 'owner' && u.id !== session.user?.id && (isOwner || u.role === 'member')"
+              v-if="canManage(u)"
               type="button"
-              class="rounded-md border border-red-300 px-2 py-1 text-[11px] text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-              @click="removeUser(u.id, u.email)"
-            >Remove</button>
+              class="rounded-md border border-red-300 px-2.5 py-1 text-[11px] text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+              @click="removeUser(u)"
+            >Delete</button>
           </div>
         </li>
-      </ul>
-    </section>
-
-    <!-- Invites (owner/admin) -->
-    <section v-if="isAdmin" class="mt-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">Invites</div>
-
-      <ul class="divide-y divide-neutral-100 text-sm dark:divide-neutral-800">
-        <li v-for="i in session.invites" :key="i.id" class="flex items-center justify-between gap-3 px-4 py-3">
-          <div class="min-w-0">
-            <div class="truncate font-medium">{{ i.email ?? '(open link)' }}</div>
-            <div class="text-xs text-neutral-500 dark:text-neutral-400">
-              {{ i.instance_role }} · invited by {{ i.inviter_email ?? '—' }}
-            </div>
-          </div>
-          <div class="flex shrink-0 items-center gap-2">
-            <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide"
-              :class="inviteStatus(i) === 'Pending'
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'">
-              {{ inviteStatus(i) }}
-            </span>
-            <button v-if="inviteStatus(i) === 'Pending'" type="button" class="rounded-md border border-red-300 px-2 py-1 text-[11px] text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40" @click="revokeInvite(i.id, i.email)">Revoke</button>
-          </div>
-        </li>
-        <li v-if="session.invites.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">No invites yet.</li>
       </ul>
     </section>
 
@@ -409,29 +376,58 @@ function inviteStatus(i: { expires_at: number | null }): string {
       </div>
     </div>
 
-    <!-- Assign-projects modal (members only) -->
-    <div v-if="projectUser" class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" @click.self="projectUser = null">
+    <!-- Edit user modal (role + project access) -->
+    <div v-if="editUser" class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" @click.self="editUser = null">
       <div class="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
-        <h2 class="text-lg font-semibold">Project access</h2>
-        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          Choose which projects <span class="font-medium">{{ projectUser.email }}</span> can access. They have full control of each.
+        <div class="flex items-center gap-3">
+          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-neutral-100 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+            {{ initialsOf(editUser.email, editUser.first_name, editUser.last_name) }}
+          </div>
+          <div class="min-w-0">
+            <div class="truncate font-semibold">{{ [editUser.first_name, editUser.last_name].filter(Boolean).join(' ') || editUser.email }}</div>
+            <div class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ editUser.email }}</div>
+          </div>
+        </div>
+
+        <!-- Role (owner only) -->
+        <label v-if="isOwner" class="mt-4 block">
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Role</span>
+          <Dropdown v-model="editRole" :options="instanceRoleOptions" class="mt-1" />
+        </label>
+
+        <!-- Project access (members) -->
+        <div v-if="editRole === 'member'" class="mt-4">
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Project access</span>
+          <div v-if="session.projects.length > 0" class="mt-1 max-h-56 space-y-1 overflow-auto rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
+            <label
+              v-for="p in session.projects"
+              :key="p.id"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
+            >
+              <input type="checkbox" :checked="editProjects.has(p.id)" @change="toggleEditProject(p.id)" />
+              <span class="truncate">{{ p.name }}</span>
+            </label>
+          </div>
+          <p v-else class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">No projects exist yet.</p>
+        </div>
+        <p v-else class="mt-4 rounded-md bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+          Admins reach every project automatically.
         </p>
 
-        <div v-if="session.projects.length > 0" class="mt-4 max-h-64 space-y-1 overflow-auto rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
-          <label
-            v-for="p in session.projects"
-            :key="p.id"
-            class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
-          >
-            <input type="checkbox" :checked="projectSelection.has(p.id)" @change="toggleProject(p.id)" />
-            <span class="truncate">{{ p.name }}</span>
-          </label>
+        <!-- Transfer ownership (owner only, target admin) -->
+        <div v-if="isOwner && editUser.role === 'admin'" class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/20">
+          <div class="text-xs font-medium text-amber-900 dark:text-amber-300">Transfer ownership</div>
+          <p class="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300/80">Make this person the owner. You'll be demoted to admin.</p>
+          <button
+            type="button"
+            class="mt-2 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-[11px] text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-neutral-900 dark:text-amber-300 dark:hover:bg-amber-950/40"
+            @click="transferOwnership(editUser)"
+          >Make owner</button>
         </div>
-        <p v-else class="mt-4 text-sm text-neutral-500 dark:text-neutral-400">No projects exist yet.</p>
 
         <div class="mt-5 flex justify-end gap-2">
-          <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="projectUser = null">Cancel</button>
-          <button type="button" :disabled="savingProjects" class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50" @click="saveProjects">{{ savingProjects ? 'Saving…' : 'Save' }}</button>
+          <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="editUser = null">Cancel</button>
+          <button type="button" :disabled="savingEdit" class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50" @click="saveEdit">{{ savingEdit ? 'Saving…' : 'Save' }}</button>
         </div>
       </div>
     </div>
