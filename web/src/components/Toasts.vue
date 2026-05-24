@@ -3,11 +3,11 @@ import { toastState, type ToastKind } from '../lib/toast';
 
 const toasts = toastState();
 
-// Per-kind accent: filled icon chip + matching progress bar.
-const tone: Record<ToastKind, { chip: string; bar: string }> = {
-  success: { chip: 'bg-emerald-500', bar: 'bg-emerald-500' },
-  error: { chip: 'bg-red-500', bar: 'bg-red-500' },
-  info: { chip: 'bg-accent-500', bar: 'bg-accent-500' },
+// Muted by design: accent for success/info, red for errors. No green.
+const tone: Record<ToastKind, { icon: string; bar: string }> = {
+  success: { icon: 'text-accent-600 dark:text-accent-400', bar: 'bg-accent-500' },
+  info: { icon: 'text-accent-600 dark:text-accent-400', bar: 'bg-accent-500' },
+  error: { icon: 'text-red-600 dark:text-red-400', bar: 'bg-red-500' },
 };
 </script>
 
@@ -17,27 +17,25 @@ const tone: Record<ToastKind, { chip: string; bar: string }> = {
       <div
         v-for="t in toasts"
         :key="t.id"
-        class="pointer-events-auto overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
+        class="pointer-events-auto overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
         role="status"
       >
-        <div class="flex items-center gap-3 px-3.5 py-3">
-          <!-- Filled icon chip -->
-          <span
-            class="grid h-6 w-6 shrink-0 place-items-center rounded-full text-white"
-            :class="tone[t.kind].chip"
+        <div class="flex items-center gap-2.5 px-3 py-2.5">
+          <svg
+            class="h-4 w-4 shrink-0"
+            :class="tone[t.kind].icon"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            aria-hidden="true"
           >
-            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <template v-if="t.kind === 'success'"><path d="M20 6 9 17l-5-5" /></template>
-              <template v-else-if="t.kind === 'error'"><path d="M18 6 6 18M6 6l12 12" /></template>
-              <template v-else><path d="M12 8h.01M12 11v5" /></template>
-            </svg>
-          </span>
-
-          <p class="min-w-0 flex-1 text-sm font-medium text-neutral-800 dark:text-neutral-100">{{ t.message }}</p>
+            <template v-if="t.kind === 'success'"><path d="M20 6 9 17l-5-5" /></template>
+            <template v-else-if="t.kind === 'error'"><path d="M18 6 6 18M6 6l12 12" /></template>
+            <template v-else><path d="M12 8h.01M12 11v5" /></template>
+          </svg>
+          <p class="min-w-0 flex-1 text-sm text-neutral-700 dark:text-neutral-200">{{ t.message }}</p>
         </div>
 
-        <!-- Duration progress bar: full-width, flush with the bottom edge. -->
-        <div v-if="t.ttl > 0" class="h-1 w-full bg-neutral-100 dark:bg-neutral-800">
+        <!-- Duration progress bar: flush with the bottom edge. -->
+        <div v-if="t.ttl > 0" class="h-0.5 w-full bg-neutral-100 dark:bg-neutral-800">
           <div
             class="toast-bar h-full origin-left"
             :class="tone[t.kind].bar"
@@ -58,24 +56,18 @@ const tone: Record<ToastKind, { chip: string; bar: string }> = {
   animation: toast-shrink linear forwards;
 }
 
-/* Enter/leave: slide in from the right, fade + collapse out. */
 .toast-enter-active,
 .toast-leave-active {
-  transition: all 0.25s cubic-bezier(0.21, 1.02, 0.73, 1);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.toast-enter-from {
-  opacity: 0;
-  transform: translateX(1rem) scale(0.96);
-}
+.toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(1rem);
+  transform: translateX(0.5rem);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .toast-bar { animation: none; }
-  .toast-enter-active,
-  .toast-leave-active { transition: opacity 0.2s ease; }
   .toast-enter-from,
   .toast-leave-to { transform: none; }
 }
