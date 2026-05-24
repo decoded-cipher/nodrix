@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api, ApiError } from '../api';
 import { authClient } from '../lib/auth-client';
+import { toast } from '../lib/toast';
 import type {
   AuditLogEntry,
   Invite,
@@ -60,12 +61,15 @@ export const useSessionStore = defineStore('session', () => {
   async function createProject(name: string): Promise<Project> {
     const p = await api.post<Project>('/v1/admin/projects', { name });
     projects.value = [...projects.value, p];
+    toast.success(`Project “${p.name}” created`);
     return p;
   }
 
   async function deleteProject(id: string): Promise<void> {
+    const name = projects.value.find((p) => p.id === id)?.name;
     await api.del<void>(`/v1/admin/projects/${id}`);
     projects.value = projects.value.filter((p) => p.id !== id);
+    toast.success(name ? `Project “${name}” deleted` : 'Project deleted');
   }
 
   async function updateProject(
@@ -74,6 +78,7 @@ export const useSessionStore = defineStore('session', () => {
   ): Promise<void> {
     const updated = await api.patch<Project>(`/v1/admin/projects/${id}`, patch);
     projects.value = projects.value.map((p) => (p.id === id ? { ...p, ...updated } : p));
+    toast.success('Project updated');
   }
 
   async function updateMe(patch: {
@@ -82,6 +87,7 @@ export const useSessionStore = defineStore('session', () => {
   }): Promise<void> {
     const updated = await api.patch<User>('/v1/admin/me', patch);
     user.value = updated;
+    toast.success('Profile updated');
   }
 
   async function signOut(): Promise<void> {
@@ -99,6 +105,7 @@ export const useSessionStore = defineStore('session', () => {
   async function revokeSession(id: string): Promise<void> {
     await api.del<void>(`/v1/admin/sessions/${id}`);
     activeSessions.value = activeSessions.value.filter((s) => s.id !== id);
+    toast.success('Device signed out');
   }
 
   async function loadProviders(): Promise<void> {
@@ -137,6 +144,7 @@ export const useSessionStore = defineStore('session', () => {
     instanceUsers.value = instanceUsers.value.map((u) =>
       u.id === id ? { ...u, role, projects: role === 'admin' ? [] : u.projects } : u
     );
+    toast.success(`Role changed to ${role}`);
   }
 
   // Replace a member's project assignments. Returns the stored set.
@@ -149,17 +157,21 @@ export const useSessionStore = defineStore('session', () => {
     instanceUsers.value = instanceUsers.value.map((u) =>
       u.id === id ? { ...u, projects: projects.value.filter((p) => stored.has(p.id)) } : u
     );
+    toast.success('Project access updated');
   }
 
   async function removeUser(id: string): Promise<void> {
+    const email = instanceUsers.value.find((u) => u.id === id)?.email;
     await api.del<void>(`/v1/admin/users/${id}`);
     instanceUsers.value = instanceUsers.value.filter((u) => u.id !== id);
+    toast.success(email ? `${email} removed` : 'User removed');
   }
 
   async function transferOwnership(id: string): Promise<void> {
     await api.post<{ id: string; role: string }>(`/v1/admin/users/${id}/transfer-ownership`);
     await loadUsers();
     await load();
+    toast.success('Ownership transferred');
   }
 
   // ─── Invites (owner/admin) ────────────────────────────────────────────────────
@@ -184,6 +196,7 @@ export const useSessionStore = defineStore('session', () => {
   async function revokeInvite(id: string): Promise<void> {
     await api.del<void>(`/v1/admin/invites/${id}`);
     invites.value = invites.value.filter((i) => i.id !== id);
+    toast.success('Invite revoked');
   }
 
   return {
