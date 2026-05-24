@@ -231,17 +231,15 @@ function onCommand(e: Event) {
 
 <template>
   <main class="flex h-full flex-col">
-    <header class="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-3 dark:border-neutral-800 dark:bg-neutral-900">
-      <div>
-        <h2 class="text-lg font-semibold tracking-tight">{{ dashboard?.name ?? 'Loading...' }}</h2>
-        <p class="font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ dashboard?.id }}</p>
-      </div>
+    <!-- Edit lives in the topbar (replacing theme + GitHub), like the editor's
+         Done/Save — so the view has no sub-navbar of its own. -->
+    <Teleport to="#topbar-actions" defer>
       <RouterLink
         v-if="dashboard && canEdit"
         :to="`/p/${project.currentProjectId}/d/${dashboard.id}/edit`"
         class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
       >Edit</RouterLink>
-    </header>
+    </Teleport>
     <div v-if="error" class="p-6 text-sm text-red-600 dark:text-red-400">{{ error }}</div>
     <div ref="gridContainer" class="flex-1 overflow-auto p-6"></div>
   </main>
