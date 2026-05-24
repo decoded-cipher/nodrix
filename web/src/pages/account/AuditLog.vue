@@ -117,13 +117,15 @@ const rangeEnd = computed(() =>
               <span v-if="e.target_id" class="ml-1 font-mono text-neutral-700 dark:text-neutral-300">{{ e.target_id }}</span>
               <span v-if="!e.target_type && !e.target_id" class="text-neutral-400 dark:text-neutral-600">—</span>
             </td>
-            <td class="px-4 py-2 text-xs text-neutral-600 dark:text-neutral-400">
-              {{ e.user_email ?? '—' }}
+            <td class="px-4 py-2 text-xs">
+              <span v-if="e.user_email" class="text-neutral-600 dark:text-neutral-400">{{ e.user_email }}</span>
+              <span v-else class="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">System</span>
             </td>
           </tr>
           <tr v-if="!loading && filtered.length === 0">
             <td colspan="5" class="px-4 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
-              No entries.
+              No entries. Audit logging is off by default — an owner can enable it in
+              <RouterLink to="/settings" class="text-accent-700 hover:underline dark:text-accent-400">Settings → More</RouterLink>.
             </td>
           </tr>
           <tr v-if="loading && session.auditLog.length === 0">

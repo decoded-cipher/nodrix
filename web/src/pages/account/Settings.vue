@@ -6,6 +6,7 @@ import { useThemeStore, type ThemeMode } from '../../stores/theme';
 import { useAccentStore, type Accent } from '../../stores/accent';
 import { api } from '../../api';
 import { confirm } from '../../lib/confirm';
+import Toggle from '../../components/Toggle.vue';
 
 const session = useSessionStore();
 const theme = useThemeStore();
@@ -91,6 +92,32 @@ const submitting = ref(false);
 const error = ref<string | null>(null);
 
 const isOwner = ref(false);
+
+// ─── Audit log (owner-only, opt-in) ───────────────────────────────────────────
+const auditLogEnabled = ref(false);
+const auditLogSaving = ref(false);
+
+async function toggleAuditLog(next: boolean) {
+  // Disabling wipes every existing entry — make that explicit first.
+  if (!next) {
+    const ok = await confirm({
+      title: 'Disable audit log?',
+      message: 'Logging stops and all existing entries are permanently deleted.',
+      details: ['This cannot be undone'],
+      confirmLabel: 'Disable & wipe',
+    });
+    if (!ok) return;
+  }
+  auditLogSaving.value = true;
+  try {
+    const res = await api.put<{ audit_log_enabled: boolean }>('/v1/admin/settings/audit-log', { enabled: next });
+    auditLogEnabled.value = res.audit_log_enabled;
+  } catch (e) {
+    alert((e as Error).message);
+  } finally {
+    auditLogSaving.value = false;
+  }
+}
 
 // Version & updates state. Polled once on mount — the worker side
 // KV-caches the upstream lookup (1h) so this is cheap to re-fetch.
@@ -192,6 +219,10 @@ onMounted(async () => {
     } catch {
       providers.value = [];
     }
+    try {
+      const s = await api.get<{ audit_log_enabled: boolean }>('/v1/admin/settings');
+      auditLogEnabled.value = s.audit_log_enabled;
+    } catch { /* ignore */ }
     await refreshVersion();
   }
 });
@@ -663,6 +694,22 @@ const PROVIDER_META = {
     <section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div class="border-b border-neutral-100 px-4 py-3 text-sm font-semibold dark:border-neutral-800">More</div>
       <ul class="divide-y divide-neutral-100 text-sm dark:divide-neutral-800">
+        <li v-if="isOwner" class="flex items-center justify-between gap-4 px-4 py-3">
+          <div class="min-w-0">
+            <div class="font-medium">Audit log</div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+              Record every action — by users and the system — to the Audit log page. Off by
+              default. Disabling permanently deletes all recorded entries.
+            </div>
+          </div>
+          <Toggle
+            :model-value="auditLogEnabled"
+            :disabled="auditLogSaving"
+            label="Audit log"
+            class="shrink-0"
+            @update:model-value="toggleAuditLog"
+          />
+        </li>
         <li class="flex items-center justify-between px-4 py-3">
           <div>
             <div class="font-medium">Custom domain</div>
