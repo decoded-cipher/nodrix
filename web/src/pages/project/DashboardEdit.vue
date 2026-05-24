@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import { useRoute, useRouter } from 'vue-router';
 import { GridLayout, GridItem } from 'grid-layout-plus';
 import { useProjectStore } from '../../stores/project';
+import { toast } from '../../lib/toast';
 import { specFor } from '../../builder/widget-catalog';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
@@ -288,7 +289,6 @@ function removeItem(id: string) {
 async function save() {
   if (!dashboard.value) return;
   saving.value = true;
-  err.value = null;
   try {
     const updated = await project.saveDashboard(
       dashboard.value.id,
@@ -299,7 +299,7 @@ async function save() {
     layout.value = updated.layout;
     dirty.value = false;
   } catch (e) {
-    err.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     saving.value = false;
   }

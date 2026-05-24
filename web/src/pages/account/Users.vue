@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useSessionStore, type ActiveSession } from '../../stores/session';
 import { confirm } from '../../lib/confirm';
+import { toast } from '../../lib/toast';
 import { relativeTime } from '../../lib/time';
 import Dropdown from '../../components/Dropdown.vue';
 import type { InstanceUser, InviteCreated } from '../../types';
@@ -85,13 +86,13 @@ async function revokeDevice(s: ActiveSession) {
     confirmLabel: 'Sign out device',
   });
   if (!ok) return;
-  try { await session.revokeSession(s.id); } catch (e) { alert((e as Error).message); }
+  try { await session.revokeSession(s.id); } catch (e) { toast.error((e as Error).message); }
 }
 
 // ─── People (owner/admin) ─────────────────────────────────────────────────────
 
 async function changeRole(id: string, role: 'admin' | 'member') {
-  try { await session.setUserRole(id, role); } catch (e) { alert((e as Error).message); }
+  try { await session.setUserRole(id, role); } catch (e) { toast.error((e as Error).message); }
 }
 
 // ─── Project assignments (members only) ───────────────────────────────────────
@@ -119,7 +120,7 @@ async function saveProjects() {
     await session.setUserProjects(projectUser.value.id, [...projectSelection.value]);
     projectUser.value = null;
   } catch (e) {
-    alert((e as Error).message);
+    toast.error((e as Error).message);
   } finally {
     savingProjects.value = false;
   }
@@ -132,7 +133,7 @@ async function removeUser(id: string, email: string) {
     confirmLabel: 'Remove user',
   });
   if (!ok) return;
-  try { await session.removeUser(id); } catch (e) { alert((e as Error).message); }
+  try { await session.removeUser(id); } catch (e) { toast.error((e as Error).message); }
 }
 
 async function makeOwner(id: string, email: string) {
@@ -142,7 +143,7 @@ async function makeOwner(id: string, email: string) {
     confirmLabel: 'Transfer ownership',
   });
   if (!ok) return;
-  try { await session.transferOwnership(id); } catch (e) { alert((e as Error).message); }
+  try { await session.transferOwnership(id); } catch (e) { toast.error((e as Error).message); }
 }
 
 // ─── Invites (owner/admin) ────────────────────────────────────────────────────
@@ -154,18 +155,15 @@ const invite = ref<{
   mode: 'link' | 'direct';
 }>({ email: '', instance_role: 'member', mode: 'link' });
 const inviteSubmitting = ref(false);
-const inviteError = ref<string | null>(null);
 const inviteResult = ref<InviteCreated | null>(null);
 
 function openInvite() {
   invite.value = { email: '', instance_role: 'member', mode: 'link' };
-  inviteError.value = null;
   inviteResult.value = null;
   inviteOpen.value = true;
 }
 
 async function submitInvite() {
-  inviteError.value = null;
   inviteSubmitting.value = true;
   try {
     inviteResult.value = await session.createInvite({
@@ -174,7 +172,7 @@ async function submitInvite() {
       mode: invite.value.mode,
     });
   } catch (e) {
-    inviteError.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     inviteSubmitting.value = false;
   }
@@ -187,7 +185,7 @@ async function revokeInvite(id: string, email: string | null) {
     confirmLabel: 'Revoke',
   });
   if (!ok) return;
-  try { await session.revokeInvite(id); } catch (e) { alert((e as Error).message); }
+  try { await session.revokeInvite(id); } catch (e) { toast.error((e as Error).message); }
 }
 
 const copied = ref(false);
@@ -376,7 +374,6 @@ function inviteStatus(i: { expires_at: number | null }): string {
               <span v-else>After they join, assign projects from the People list.</span>
             </p>
 
-            <p v-if="inviteError" class="text-xs text-red-600 dark:text-red-400">{{ inviteError }}</p>
             <div class="flex justify-end gap-2 pt-1">
               <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="inviteOpen = false">Cancel</button>
               <button type="submit" :disabled="inviteSubmitting" class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50">{{ inviteSubmitting ? '...' : 'Create invite' }}</button>

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { authClient } from '../lib/auth-client';
+import { toast } from '../lib/toast';
 import Spinner from '../components/Spinner.vue';
 
 const session = useSessionStore();
@@ -18,7 +19,6 @@ const mode = computed<'login' | 'register'>(() => (bootstrap.value ? 'register' 
 
 const form = ref({ email: '', password: '', first_name: '', last_name: '' });
 const submitting = ref(false);
-const error = ref<string | null>(null);
 
 onMounted(async () => {
   // Public endpoint: returns 200 in both cases. We piggy-back the providers
@@ -44,7 +44,6 @@ onMounted(async () => {
 });
 
 async function submit() {
-  error.value = null;
   submitting.value = true;
   try {
     if (mode.value === 'register') {
@@ -67,21 +66,20 @@ async function submit() {
     await session.load();
     router.replace('/');
   } catch (e) {
-    error.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     submitting.value = false;
   }
 }
 
 async function signInWith(provider: 'google' | 'github') {
-  error.value = null;
   try {
     await authClient.signIn.social({
       provider,
       callbackURL: `${location.origin}/`,
     });
   } catch (e) {
-    error.value = (e as Error).message;
+    toast.error((e as Error).message);
   }
 }
 </script>
@@ -140,8 +138,6 @@ async function signInWith(provider: 'google' | 'github') {
             class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
           />
         </label>
-
-        <p v-if="error" class="text-xs text-red-600 dark:text-red-400">{{ error }}</p>
 
         <button
           type="submit"

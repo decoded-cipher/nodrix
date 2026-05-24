@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '../../stores/project';
 import { confirm } from '../../lib/confirm';
+import { toast } from '../../lib/toast';
 import type { DashboardMeta } from '../../types';
 
 const project = useProjectStore();
@@ -10,7 +11,6 @@ const router = useRouter();
 
 const newName = ref('');
 const creating = ref(false);
-const err = ref<string | null>(null);
 
 // Per-card menu state.
 const openMenuFor = ref<string | null>(null);
@@ -19,19 +19,17 @@ const openMenuFor = ref<string | null>(null);
 const editing = ref<DashboardMeta | null>(null);
 const form = ref({ name: '', description: '' });
 const saving = ref(false);
-const saveError = ref<string | null>(null);
 
 async function create() {
   const n = newName.value.trim();
   if (!n) return;
   creating.value = true;
-  err.value = null;
   try {
     const d = await project.createDashboard(n);
     newName.value = '';
     router.push(`/p/${project.currentProjectId}/d/${d.id}/edit`);
   } catch (e) {
-    err.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     creating.value = false;
   }
@@ -54,7 +52,6 @@ function startEdit(d: DashboardMeta, event: Event) {
     name: d.name ?? '',
     description: d.description ?? '',
   };
-  saveError.value = null;
 }
 
 function closeModal() {
@@ -64,7 +61,6 @@ function closeModal() {
 async function save() {
   if (!editing.value) return;
   saving.value = true;
-  saveError.value = null;
   try {
     await project.updateDashboard(editing.value.id, {
       name: form.value.name.trim(),
@@ -72,7 +68,7 @@ async function save() {
     });
     editing.value = null;
   } catch (e) {
-    saveError.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     saving.value = false;
   }
@@ -161,7 +157,6 @@ watch(
         Create dashboard
       </button>
     </form>
-    <p v-if="err" class="mb-4 text-sm text-red-600 dark:text-red-400">{{ err }}</p>
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div
@@ -275,8 +270,6 @@ watch(
               placeholder="What this dashboard shows"
             />
           </label>
-
-          <p v-if="saveError" class="text-xs text-red-600 dark:text-red-400">{{ saveError }}</p>
 
           <div class="-mx-5 mt-2 border-t border-neutral-100 dark:border-neutral-800"></div>
 

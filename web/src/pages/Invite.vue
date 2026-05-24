@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
+import { toast } from '../lib/toast';
 import type { InvitePreview } from '../types';
 import Spinner from '../components/Spinner.vue';
 
@@ -14,7 +15,6 @@ const loading = ref(true);
 const preview = ref<InvitePreview | null>(null);
 const form = ref({ first_name: '', last_name: '', password: '' });
 const submitting = ref(false);
-const error = ref<string | null>(null);
 
 const roleLabel = computed(() =>
   preview.value?.instance_role === 'admin' ? 'Administrator' : 'Member'
@@ -33,7 +33,6 @@ onMounted(async () => {
 
 async function submit() {
   if (!preview.value?.valid) return;
-  error.value = null;
   submitting.value = true;
   try {
     const name = [form.value.first_name.trim(), form.value.last_name.trim()].filter(Boolean).join(' ');
@@ -50,7 +49,7 @@ async function submit() {
     await session.load();
     router.replace('/');
   } catch (e) {
-    error.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     submitting.value = false;
   }
@@ -125,8 +124,6 @@ async function submit() {
               class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
             />
           </label>
-
-          <p v-if="error" class="text-xs text-red-600 dark:text-red-400">{{ error }}</p>
 
           <button
             type="submit"

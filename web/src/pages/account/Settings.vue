@@ -6,6 +6,7 @@ import { useThemeStore, type ThemeMode } from '../../stores/theme';
 import { useAccentStore, type Accent } from '../../stores/accent';
 import { api } from '../../api';
 import { confirm } from '../../lib/confirm';
+import { toast } from '../../lib/toast';
 import Toggle from '../../components/Toggle.vue';
 
 const session = useSessionStore();
@@ -18,7 +19,6 @@ const router = useRouter();
 const profileForm = ref({ first_name: '', last_name: '' });
 const editingProfile = ref(false);
 const savingProfile = ref(false);
-const profileError = ref<string | null>(null);
 
 const fullName = computed(
   () => [session.user?.first_name, session.user?.last_name].filter(Boolean).join(' ') || null
@@ -38,13 +38,11 @@ const initials = computed(() => {
 function editProfile(on: boolean) {
   profileForm.value.first_name = session.user?.first_name ?? '';
   profileForm.value.last_name = session.user?.last_name ?? '';
-  profileError.value = null;
   editingProfile.value = on;
 }
 
 async function saveProfile() {
   savingProfile.value = true;
-  profileError.value = null;
   try {
     await session.updateMe({
       first_name: profileForm.value.first_name.trim() || null,
@@ -52,7 +50,7 @@ async function saveProfile() {
     });
     editingProfile.value = false;
   } catch (e) {
-    profileError.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     savingProfile.value = false;
   }
@@ -89,7 +87,6 @@ const providers = ref<ProviderRow[]>([]);
 const editing = ref<'google' | 'github' | null>(null);
 const form = ref({ client_id: '', client_secret: '', enabled: true });
 const submitting = ref(false);
-const error = ref<string | null>(null);
 
 const isOwner = ref(false);
 
@@ -112,8 +109,9 @@ async function toggleAuditLog(next: boolean) {
   try {
     const res = await api.put<{ audit_log_enabled: boolean }>('/v1/admin/settings/audit-log', { enabled: next });
     auditLogEnabled.value = res.audit_log_enabled;
+    toast.success(res.audit_log_enabled ? 'Audit log enabled' : 'Audit log disabled — entries wiped');
   } catch (e) {
-    alert((e as Error).message);
+    toast.error((e as Error).message);
   } finally {
     auditLogSaving.value = false;
   }
@@ -234,23 +232,20 @@ function openEdit(kind: 'google' | 'github') {
     client_secret: '',
     enabled: existing ? existing.enabled : true,
   };
-  error.value = null;
   editing.value = kind;
 }
 
 function cancel() {
   editing.value = null;
-  error.value = null;
 }
 
 async function save() {
   if (!editing.value) return;
   if (!form.value.client_id.trim() || !form.value.client_secret.trim()) {
-    error.value = 'Both Client ID and Client Secret are required.';
+    toast.error('Both Client ID and Client Secret are required.');
     return;
   }
   submitting.value = true;
-  error.value = null;
   try {
     const updated = await api.put<ProviderRow>(`/v1/admin/auth-providers/${editing.value}`, {
       client_id: form.value.client_id.trim(),
@@ -260,9 +255,10 @@ async function save() {
     const i = providers.value.findIndex((p) => p.kind === editing.value);
     if (i >= 0) providers.value[i] = { ...providers.value[i]!, ...updated };
     else providers.value.push({ ...updated, created_at: Math.floor(Date.now() / 1000), updated_at: Math.floor(Date.now() / 1000) });
+    toast.success(`${PROVIDER_META[editing.value].name} sign-in saved`);
     editing.value = null;
   } catch (e) {
-    error.value = (e as Error).message;
+    toast.error((e as Error).message);
   } finally {
     submitting.value = false;
   }
@@ -280,8 +276,13 @@ async function remove(kind: 'google' | 'github') {
     confirmLabel: `Remove ${label}`,
   });
   if (!ok) return;
-  await api.del<void>(`/v1/admin/auth-providers/${kind}`);
-  providers.value = providers.value.filter((p) => p.kind !== kind);
+  try {
+    await api.del<void>(`/v1/admin/auth-providers/${kind}`);
+    providers.value = providers.value.filter((p) => p.kind !== kind);
+    toast.success(`${label} sign-in removed`);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function signOut() {
@@ -375,7 +376,6 @@ const PROVIDER_META = {
                 <input v-model="profileForm.last_name" type="text" maxlength="80" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
               </label>
             </div>
-            <p v-if="profileError" class="text-xs text-red-600 dark:text-red-400">{{ profileError }}</p>
             <div class="flex justify-end gap-2">
               <button
                 type="button"
@@ -506,8 +506,6 @@ const PROVIDER_META = {
               <input v-model="form.enabled" type="checkbox" />
               <span>Show this provider on the login page</span>
             </label>
-
-            <p v-if="error" class="text-xs text-red-600 dark:text-red-400">{{ error }}</p>
 
             <div class="flex justify-end gap-2">
               <button

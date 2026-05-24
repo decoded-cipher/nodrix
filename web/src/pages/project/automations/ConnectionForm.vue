@@ -2,6 +2,7 @@
 import { reactive, ref, computed, onMounted } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import Dropdown from '../../../components/Dropdown.vue';
+import { toast } from '../../../lib/toast';
 import { connSpec } from './connection-catalog';
 import type { Integration, IntegrationKind } from '../../../types';
 
@@ -16,7 +17,6 @@ const spec = computed(() => connSpec(props.kind));
 
 const name = ref('');
 const values = reactive<Record<string, string>>({});
-const error = ref<string | null>(null);
 const submitting = ref(false);
 
 onMounted(() => {
@@ -43,12 +43,12 @@ function buildConfig(): Record<string, unknown> | null {
   for (const f of spec.value.fields) {
     const v = (values[f.key] ?? '').trim();
     if (!v) {
-      if (f.required) { error.value = `${f.label} is required.`; return null; }
+      if (f.required) { toast.error(`${f.label} is required.`); return null; }
       continue;
     }
     if (f.type === 'json') {
       try { config[f.key] = JSON.parse(v); }
-      catch { error.value = `${f.label} must be valid JSON.`; return null; }
+      catch { toast.error(`${f.label} must be valid JSON.`); return null; }
     } else {
       config[f.key] = values[f.key];
     }
@@ -57,9 +57,8 @@ function buildConfig(): Record<string, unknown> | null {
 }
 
 async function submit() {
-  error.value = null;
   const n = name.value.trim();
-  if (!n) { error.value = 'Name is required.'; return; }
+  if (!n) { toast.error('Name is required.'); return; }
   const config = buildConfig();
   if (config === null) return;
 
@@ -71,6 +70,8 @@ async function submit() {
       await project.createIntegration({ name: n, kind: props.kind, config });
     }
     emit('saved');
+  } catch (e) {
+    toast.error((e as Error).message);
   } finally {
     submitting.value = false;
   }
@@ -129,8 +130,6 @@ async function submit() {
       </label>
       <p v-if="f.hint" class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">{{ f.hint }}</p>
     </div>
-
-    <p v-if="error" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ error }}</p>
 
     <div class="mt-4 flex justify-end gap-2">
       <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="emit('cancel')">Cancel</button>
