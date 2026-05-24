@@ -69,7 +69,7 @@ dashboards.post('/', async (c) => {
   const name = (body.name ?? '').trim();
   if (!name) return c.json({ error: 'bad_request', reason: 'missing_name' }, 400);
 
-  const layout = body.layout ?? { grid: { columns: 12 }, items: [] };
+  const layout = body.layout ?? { grid: { columns: 24 }, items: [] };
   const v = validateLayout(layout);
   if (!v.ok) return c.json({ error: 'bad_request', reason: v.reason }, 400);
 

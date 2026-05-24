@@ -11,6 +11,7 @@ import {
   subscriptionVariable,
   type DataIndex,
 } from '../../builder/render-widget';
+import { ROW_HEIGHT_VIEW, GRID_MARGIN, normalizeLayout } from '../../builder/grid';
 import type {
   Dashboard,
   Layout,
@@ -63,13 +64,16 @@ onBeforeUnmount(() => {
   document.removeEventListener('iot-command', onCommand as EventListener);
 });
 
-function mountGrid(layout: Layout) {
+function mountGrid(raw: Layout) {
+  // Upscale legacy 12-col layouts to the current resolution (idempotent), so the
+  // viewer matches the editor regardless of when the dashboard was last saved.
+  const layout = normalizeLayout(raw);
   const root = gridContainer.value!;
   root.innerHTML = '';
   root.style.display = 'grid';
   root.style.gridTemplateColumns = `repeat(${layout.grid.columns}, 1fr)`;
-  root.style.gridAutoRows = '90px';
-  root.style.gap = '12px';
+  root.style.gridAutoRows = `${ROW_HEIGHT_VIEW}px`;
+  root.style.gap = `${GRID_MARGIN}px`;
 
   // Compact y positions: legacy dashboards may have y=999 (placeholder from
   // the editor) which would render off-screen. Sort by (y, x), then drop each

@@ -5,6 +5,7 @@ import { GridLayout, GridItem } from 'grid-layout-plus';
 import { useProjectStore } from '../../stores/project';
 import { toast } from '../../lib/toast';
 import { specFor } from '../../builder/widget-catalog';
+import { GRID_COLUMNS, ROW_HEIGHT_EDIT, GRID_MARGIN, MIN_UNITS, normalizeLayout } from '../../builder/grid';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
 import { applyProps, createWidgetElement, buildDataIndex, subscriptionVariable, type DataIndex } from '../../builder/render-widget';
@@ -16,7 +17,7 @@ const router = useRouter();
 const project = useProjectStore();
 
 const dashboard = ref<Dashboard | null>(null);
-const layout = ref<Layout>({ grid: { columns: 12 }, items: [] });
+const layout = ref<Layout>({ grid: { columns: GRID_COLUMNS }, items: [] });
 const selectedId = ref<string | null>(null);
 const saving = ref(false);
 const dirty = ref(false);
@@ -72,7 +73,8 @@ onMounted(async () => {
     // project context exists before any project-scoped fetch.
     await project.switchTo(projId);
     dashboard.value = await project.fetchDashboard(dashId);
-    layout.value = dashboard.value.layout;
+    // Upscale legacy 12-col layouts to the current resolution (idempotent).
+    layout.value = normalizeLayout(dashboard.value.layout);
     dirty.value = false;
   } catch {
     err.value = 'This dashboard could not be loaded. It may have been removed, or you may not have access to it.';
@@ -296,7 +298,7 @@ async function save() {
       dashboard.value.updated_at
     );
     dashboard.value = updated;
-    layout.value = updated.layout;
+    layout.value = normalizeLayout(updated.layout);
     dirty.value = false;
   } catch (e) {
     toast.error((e as Error).message);
@@ -335,10 +337,10 @@ function exitToView() {
         <GridLayout
           :layout="gridItems"
           :col-num="layout.grid.columns"
-          :row-height="80"
+          :row-height="ROW_HEIGHT_EDIT"
           :is-draggable="true"
           :is-resizable="true"
-          :margin="[12, 12]"
+          :margin="[GRID_MARGIN, GRID_MARGIN]"
           :use-css-transforms="true"
           @layout-updated="onGridLayoutUpdated"
         >
@@ -350,6 +352,8 @@ function exitToView() {
             :y="g.y"
             :w="g.w"
             :h="g.h"
+            :min-w="MIN_UNITS"
+            :min-h="MIN_UNITS"
             drag-allow-from=".drag-handle"
           >
             <div

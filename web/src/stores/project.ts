@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api } from '../api';
+import { GRID_COLUMNS } from '../builder/grid';
 import type {
   Automation,
   AutomationTriggerType,
@@ -124,7 +125,7 @@ export const useProjectStore = defineStore('project', () => {
     const pid = requireProjectId();
     const d = await api.post<Dashboard>(
       `/v1/admin/projects/${pid}/dashboards`,
-      { name, layout: { grid: { columns: 12 }, items: [] } }
+      { name, layout: { grid: { columns: GRID_COLUMNS }, items: [] } }
     );
     const meta: DashboardMeta = {
       id: d.id,

@@ -51,7 +51,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     dataTypes: ['Numeric', 'String', 'Boolean'],
     whenToUse: 'Display the most recent reading of a single metric — temperature, pressure, status text.',
     icon: ICON_VALUE,
-    defaultSize: { w: 3, h: 2 },
+    defaultSize: { w: 6, h: 4 },
     defaultProps: { title: '', variable: '', unit: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
@@ -67,7 +67,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     dataTypes: ['Numeric (bounded)'],
     whenToUse: 'Visualize a single bounded value such as battery percentage, fill level, or signal strength.',
     icon: ICON_GAUGE,
-    defaultSize: { w: 3, h: 3 },
+    defaultSize: { w: 6, h: 6 },
     defaultProps: { title: '', variable: '', min: 0, max: 100 },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
@@ -84,7 +84,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     dataTypes: ['Numeric time series'],
     whenToUse: 'Plot trends for one or more metrics over a time window (15m to 24h). Good for spotting drift, spikes, or correlations.',
     icon: ICON_CHART,
-    defaultSize: { w: 6, h: 3 },
+    defaultSize: { w: 12, h: 6 },
     defaultProps: { title: '', window: '1h', chartType: 'line', zoom: false, series: [] },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
@@ -104,7 +104,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     whenToUse:
       'Plot device or asset locations on a map — fleet tracking, or fixed sensors across a site. Each marker can sit at fixed coordinates or follow a lat/lng variable pair, with an optional value shown on click.',
     icon: ICON_MAP,
-    defaultSize: { w: 6, h: 4 },
+    defaultSize: { w: 12, h: 8 },
     defaultProps: { title: '', basemap: 'auto', zoom: 13, centerLat: 0, centerLng: 0, markers: [] },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
@@ -124,7 +124,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     dataTypes: ['Boolean command'],
     whenToUse: 'Send an on/off command to a device — relays, switches, actuators. Reflects the latest reported state.',
     icon: ICON_TOGGLE,
-    defaultSize: { w: 3, h: 2 },
+    defaultSize: { w: 6, h: 4 },
     defaultProps: { title: '', variable: '', onValue: 'on', offValue: 'off' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
@@ -141,7 +141,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     dataTypes: ['Momentary command'],
     whenToUse: 'Trigger a one-shot action — restart a device, run a scene, reset a counter. No persistent state; each press sends the command once.',
     icon: ICON_PUSH,
-    defaultSize: { w: 3, h: 2 },
+    defaultSize: { w: 6, h: 4 },
     defaultProps: { title: '', variable: '', value: '', label: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
@@ -158,7 +158,7 @@ export const CATALOG: ReadonlyArray<WidgetSpec> = [
     dataTypes: ['Numeric command'],
     whenToUse: 'Set a continuous numeric value — brightness, fan speed, setpoint, volume. Sends the command on release; reflects reported state via the chosen metric.',
     icon: ICON_SLIDER,
-    defaultSize: { w: 4, h: 2 },
+    defaultSize: { w: 8, h: 4 },
     defaultProps: { title: '', variable: '', orientation: 'horizontal', min: 0, max: 100, step: 1, unit: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'string' },
