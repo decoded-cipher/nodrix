@@ -18,8 +18,9 @@ const emit = defineEmits<{ close: [] }>();
 const session = useSessionStore();
 const isOwner = computed(() => session.user?.role === 'owner');
 
-// Role is only editable when the owner edits an existing user. Invites always
-// create members; promote to admin afterward from the People list.
+// Role is owner-only: the owner sets it when inviting a new user or editing an
+// existing one. Admins inviting can onboard members only (the selector is hidden
+// for them, so role stays 'member').
 const roleOptions: { value: 'admin' | 'member'; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'member', label: 'Member' },
@@ -56,10 +57,11 @@ async function submit() {
   submitting.value = true;
   try {
     if (props.mode === 'invite') {
-      // Invites onboard a member with optionally pre-assigned projects.
+      // Members get pre-assigned projects; admins reach everything, so none apply.
       inviteResult.value = await session.createInvite({
         email: email.value.trim(),
-        project_ids: [...projectIds.value],
+        instance_role: role.value,
+        project_ids: role.value === 'member' ? [...projectIds.value] : [],
       });
       // Stay open to reveal the one-time link.
     } else if (props.user) {
@@ -134,8 +136,8 @@ async function copyLink(text: string) {
           </label>
         </template>
 
-        <!-- Role: only the owner can change an existing user's role. -->
-        <label v-if="mode === 'edit' && isOwner" class="block">
+        <!-- Role: owner-only, when inviting a new user or editing an existing one. -->
+        <label v-if="isOwner" class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Role</span>
           <Dropdown v-model="role" :options="roleOptions" class="mt-1" />
         </label>
