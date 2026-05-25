@@ -92,26 +92,6 @@ async function disable() {
   }
 }
 
-async function rotate() {
-  const ok = await confirm({
-    title: 'Generate a new link?',
-    message: 'The current link will stop working immediately. You will need to re-share the new one.',
-    confirmLabel: 'Generate new link',
-  });
-  if (!ok) return;
-  busy.value = true;
-  try {
-    const s = await project.rotateDashboardShare(props.dashboard.id);
-    token.value = s.share_token;
-    emit('change', { visibility: s.visibility, share_token: s.share_token });
-    toast.success('New link generated');
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    busy.value = false;
-  }
-}
-
 async function copy(text: string, what: string) {
   if (!text) return;
   try {
@@ -237,20 +217,9 @@ function onKey(e: KeyboardEvent) {
             </div>
           </label>
 
-          <div class="flex items-center justify-between border-t border-neutral-100 pt-3 dark:border-neutral-800">
-            <button
-              type="button"
-              class="text-xs text-neutral-500 underline-offset-2 hover:text-neutral-700 hover:underline dark:text-neutral-400 dark:hover:text-neutral-200"
-              :disabled="busy"
-              @click="rotate"
-            >Generate new link</button>
-            <button
-              type="button"
-              class="text-xs text-red-600 underline-offset-2 hover:underline dark:text-red-400"
-              :disabled="busy"
-              @click="disable"
-            >Stop sharing</button>
-          </div>
+          <p class="border-t border-neutral-100 pt-3 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+            Turning off public access disables the link. Re-enabling it generates a new one.
+          </p>
         </template>
 
         <p v-else class="text-xs text-neutral-500 dark:text-neutral-400">

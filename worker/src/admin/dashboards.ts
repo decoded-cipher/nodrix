@@ -225,8 +225,9 @@ dashboards.delete('/:id', async (c) => {
 
 // POST /v1/admin/projects/:proj/dashboards/:id/share
 // Idempotent "make public": creates a share token if none exists, leaves an
-// existing one untouched — toggling sharing on shouldn't invalidate a link
-// already in the wild. Use /share/rotate to mint a fresh token.
+// existing one untouched so a re-publish doesn't gratuitously break a live link.
+// To rotate a leaked link, unshare (DELETE clears the token) then share again —
+// the next publish mints a fresh one.
 dashboards.post('/:id/share', async (c) => {
   const project = c.get('project');
   const user = c.get('user');
@@ -253,42 +254,6 @@ dashboards.post('/:id/share', async (c) => {
       projectId: project.id,
       userId: user.id,
       action: 'dashboard.share',
-      targetType: 'dashboard',
-      targetId: id,
-    })
-  );
-
-  return c.json({ id, visibility: 'public', share_token: token, updated_at: now });
-});
-
-// POST /v1/admin/projects/:proj/dashboards/:id/share/rotate
-// Invalidate the current link and issue a fresh one (the old URL 404s at once).
-dashboards.post('/:id/share/rotate', async (c) => {
-  const project = c.get('project');
-  const user = c.get('user');
-  const id = c.req.param('id');
-
-  const row = await c.env.DB
-    .prepare(`SELECT id FROM dashboards WHERE id = ? AND project_id = ?`)
-    .bind(id, project.id)
-    .first<{ id: string }>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
-
-  const token = newToken();
-  const now = Math.floor(Date.now() / 1000);
-  await c.env.DB
-    .prepare(
-      `UPDATE dashboards SET visibility = 'public', share_token = ?, updated_at = ?
-        WHERE id = ? AND project_id = ?`
-    )
-    .bind(token, now, id, project.id)
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: 'dashboard.share_rotate',
       targetType: 'dashboard',
       targetId: id,
     })

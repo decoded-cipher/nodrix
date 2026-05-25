@@ -3,5 +3,5 @@
 // defaults exist so fresh checkouts typecheck without running the script.
 
 export const VERSION: string = "0.0.0";
-export const COMMIT: string = "03caf6e9f1fc3479ef09aa850532300996123e69";
-export const BUILT_AT: number = 1779684849;
+export const COMMIT: string = "4f2b0eca052653baa947a1da53c92517b14aa99c";
+export const BUILT_AT: number = 1779685821;
