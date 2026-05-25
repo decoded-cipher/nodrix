@@ -1,12 +1,8 @@
-// Version & updates endpoint.
-//
-// Returns the deployment's identity (baked at build time) alongside the
-// upstream repo's latest main-branch commit, so the Settings UI can render a
-// "you're behind, sync your fork" prompt.
-//
-// We cache the upstream lookup in KV with a 1h TTL. GitHub's unauthenticated
-// API limit is 60 req/hour per IP, and Workers share edge IPs; aggressive
-// caching is the simplest way to stay comfortably under it.
+// Version & updates endpoint. Reports the deployment's build-time identity and
+// the upstream repo's latest commit so Settings can show a "sync your fork"
+// prompt. The upstream lookup is cached in KV with a short freshness window and
+// revalidated via conditional requests (If-None-Match) to stay under GitHub's
+// 60 req/hour unauthenticated limit.
 
 import { Hono } from 'hono';
 import type { Env } from '../env';
@@ -18,7 +14,10 @@ const version = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 version.use('*', requireSession);
 
 const DEFAULT_UPSTREAM = 'decoded-cipher/nodrix';
-const UPSTREAM_TTL_SECONDS = 3600;
+// Cache is served as-is for FRESH seconds; the entry (with its ETag) is kept in
+// KV for KV_TTL so revalidation can stay conditional across freshness windows.
+const UPSTREAM_FRESH_SECONDS = 300;
+const UPSTREAM_KV_TTL_SECONDS = 86400;
 
 // Cloudflare's dashboard URL takes a `?to=/:account/...` path; CF substitutes
 // the account selector at sign-in time, so we don't need to know the owner's
@@ -47,18 +46,24 @@ type UpstreamCommit = {
 type CachedPayload = {
   fetched_at: number;
   commit: UpstreamCommit;
+  etag: string | null; // for conditional revalidation (If-None-Match)
 };
 
-async function fetchUpstreamCommit(repo: string): Promise<UpstreamCommit> {
-  // GitHub API requires a User-Agent header. Worker fetch sets a default but
-  // it's friendlier to identify ourselves so anyone tracing the request can
-  // tell what's making it.
-  const res = await fetch(`https://api.github.com/repos/${repo}/commits/master`, {
-    headers: {
-      'User-Agent': 'nodrix-update-check',
-      Accept: 'application/vnd.github+json',
-    },
-  });
+type FetchResult =
+  | { kind: 'not_modified' }
+  | { kind: 'ok'; commit: UpstreamCommit; etag: string | null };
+
+async function fetchUpstreamCommit(repo: string, etag?: string | null): Promise<FetchResult> {
+  // GitHub requires a User-Agent. If-None-Match makes GitHub answer 304 when
+  // nothing changed since our last fetch.
+  const headers: Record<string, string> = {
+    'User-Agent': 'nodrix-update-check',
+    Accept: 'application/vnd.github+json',
+  };
+  if (etag) headers['If-None-Match'] = etag;
+
+  const res = await fetch(`https://api.github.com/repos/${repo}/commits/master`, { headers });
+  if (res.status === 304) return { kind: 'not_modified' };
   if (!res.ok) {
     throw new Error(`upstream commit fetch failed: ${res.status}`);
   }
@@ -69,31 +74,55 @@ async function fetchUpstreamCommit(repo: string): Promise<UpstreamCommit> {
   };
   const authorDate = body.commit.author?.date ? Math.floor(new Date(body.commit.author.date).getTime() / 1000) : null;
   return {
-    sha: body.sha,
-    short_sha: body.sha.slice(0, 7),
-    // First line of the commit message — keep payload small.
-    message: (body.commit.message ?? '').split('\n')[0]?.slice(0, 200) ?? '',
-    author_date: authorDate,
-    html_url: body.html_url,
+    kind: 'ok',
+    etag: res.headers.get('etag'),
+    commit: {
+      sha: body.sha,
+      short_sha: body.sha.slice(0, 7),
+      // First line of the commit message — keep payload small.
+      message: (body.commit.message ?? '').split('\n')[0]?.slice(0, 200) ?? '',
+      author_date: authorDate,
+      html_url: body.html_url,
+    },
   };
 }
 
 async function getCachedUpstream(env: Env, repo: string): Promise<CachedPayload | null> {
   const key = `version:upstream:${repo}`;
-  try {
-    const cached = await env.KV.get<CachedPayload>(key, 'json');
-    if (cached) return cached;
-  } catch { /* KV miss/error falls through to network */ }
+  const now = Math.floor(Date.now() / 1000);
 
-  let commit: UpstreamCommit;
+  let cached: CachedPayload | null = null;
   try {
-    commit = await fetchUpstreamCommit(repo);
-  } catch {
-    return null;
+    cached = await env.KV.get<CachedPayload>(key, 'json');
+  } catch { /* KV miss/error → treat as no cache */ }
+
+  // Inside the freshness window: serve cache, no network.
+  if (cached && now - cached.fetched_at < UPSTREAM_FRESH_SECONDS) {
+    return cached;
   }
-  const payload: CachedPayload = { fetched_at: Math.floor(Date.now() / 1000), commit };
+
+  // Stale or missing → revalidate, conditionally if we have an ETag.
+  let result: FetchResult;
   try {
-    await env.KV.put(key, JSON.stringify(payload), { expirationTtl: UPSTREAM_TTL_SECONDS });
+    result = await fetchUpstreamCommit(repo, cached?.etag);
+  } catch {
+    // Network/API error: a stale commit beats dropping to "unknown".
+    return cached;
+  }
+
+  if (result.kind === 'not_modified') {
+    // Unchanged: re-stamp the cached commit as freshly checked.
+    if (!cached) return null;
+    const refreshed: CachedPayload = { ...cached, fetched_at: now };
+    try {
+      await env.KV.put(key, JSON.stringify(refreshed), { expirationTtl: UPSTREAM_KV_TTL_SECONDS });
+    } catch { /* best-effort */ }
+    return refreshed;
+  }
+
+  const payload: CachedPayload = { fetched_at: now, commit: result.commit, etag: result.etag };
+  try {
+    await env.KV.put(key, JSON.stringify(payload), { expirationTtl: UPSTREAM_KV_TTL_SECONDS });
   } catch { /* best-effort */ }
   return payload;
 }
