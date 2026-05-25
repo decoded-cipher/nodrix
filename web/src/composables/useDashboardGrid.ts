@@ -114,9 +114,15 @@ export function useDashboardGrid() {
     for (const item of layout.items) {
       const el = els.value.get(item.id);
       if (!el) continue;
-      applyProps(el, item); // keep attributes current
-      if (item.type === 'iot-chart') applyChartFull(el, item, series);
-      else applyLatest(el, item, variables);
+      // Charts are driven entirely by applyChartFull — do NOT call applyProps on
+      // them here: its iot-chart branch resets the series to empty points, which
+      // would blow away the history we're about to (or already) render.
+      if (item.type === 'iot-chart') {
+        applyChartFull(el, item, series);
+      } else {
+        applyProps(el, item); // keep attributes current
+        applyLatest(el, item, variables);
+      }
     }
   }
 
@@ -132,9 +138,14 @@ export function useDashboardGrid() {
     for (const item of layout.items) {
       const el = els.value.get(item.id);
       if (!el) continue;
-      applyProps(el, item);
-      if (item.type === 'iot-chart') applyChartDelta(el, item, series);
-      else applyLatest(el, item, variables);
+      // Same as applySnapshot: never applyProps a chart (it would wipe history);
+      // a delta only appends the new points.
+      if (item.type === 'iot-chart') {
+        applyChartDelta(el, item, series);
+      } else {
+        applyProps(el, item);
+        applyLatest(el, item, variables);
+      }
     }
   }
 
