@@ -88,7 +88,7 @@ function removeMarker(idx: number) {
 <template>
   <aside
     v-if="item"
-    class="pointer-events-auto absolute inset-x-4 top-4 bottom-4 z-30 flex flex-col rounded-lg border border-neutral-200 bg-white shadow-xl sm:inset-x-auto sm:right-4 sm:w-80 dark:border-neutral-800 dark:bg-neutral-900"
+    class="pointer-events-auto absolute right-4 top-4 bottom-4 z-30 flex w-[calc(100%-2rem)] max-w-[20rem] flex-col rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
   >
     <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
       <div class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
