@@ -5,6 +5,7 @@ import { newId } from '../lib/ids';
 import { runAutomation } from '../engine/run';
 import { matchVariableCondition } from '../engine/triggers';
 import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '../engine/types';
+import { toCompactSeries, type CompactSeries } from '../lib/series';
 
 // Project Durable Object. One per project id. SQLite-backed.
 // Holds latest variable state + recent ring buffer + pending control writes +
@@ -263,11 +264,17 @@ export class ProjectDO extends DurableObject<Env> {
     }));
   }
 
-  // Series for a specific set of variables in one query. Used by the dashboard
-  // snapshot so a connecting client only receives history for the variables its
-  // chart widgets render — not the whole ring buffer.
-  async getSeriesForVariables(variables: string[], sinceTs: number | null): Promise<SeriesRow[]> {
-    if (variables.length === 0) return [];
+  // Series for a specific set of variables in one query, returned in the compact
+  // columnar shape the dashboards consume. Used by the dashboard snapshot so a
+  // connecting client only receives history for the variables its chart widgets
+  // render — not the whole ring buffer. `cap` stride-samples dense series; pass it
+  // for full snapshots and omit it for incremental (since-based) delta reads.
+  async getSeriesForVariables(
+    variables: string[],
+    sinceTs: number | null,
+    cap?: number
+  ): Promise<CompactSeries> {
+    if (variables.length === 0) return {};
     const cutoff = sinceTs ?? 0;
     const placeholders = variables.map(() => '?').join(',');
     const rows = this.sql
@@ -279,7 +286,10 @@ export class ProjectDO extends DurableObject<Env> {
         cutoff
       )
       .toArray();
-    return rows.map((r) => ({ ts: r.ts, variable: r.variable, value: safeParse(r.value) }));
+    return toCompactSeries(
+      rows.map((r) => ({ ts: r.ts, variable: r.variable, value: safeParse(r.value) })),
+      cap
+    );
   }
 
   async getSeries(variable: string | null, sinceTs: number | null): Promise<SeriesRow[]> {
@@ -577,6 +587,11 @@ export class ProjectDO extends DurableObject<Env> {
       );
     `);
     this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_ts ON ring_buffer(ts);`);
+    // Serves the per-variable series reads (chart snapshots + delta polls); the
+    // ts-only index above stays for age-based eviction.
+    this.sql.exec(
+      `CREATE INDEX IF NOT EXISTS idx_ring_buffer_var_ts ON ring_buffer(variable, ts);`
+    );
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS pending_control (
         id           TEXT PRIMARY KEY,

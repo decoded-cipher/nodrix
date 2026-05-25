@@ -8,6 +8,7 @@ import {
   type Layout,
 } from '../lib/layout';
 import type { ProjectDO } from '../do/project-do';
+import type { CompactSeries } from '../lib/series';
 
 // Public, unauthenticated read of a SHARED dashboard. No session, no token —
 // the share_token in the URL is the capability. Every handler resolves the
@@ -23,6 +24,9 @@ const pub = new Hono<{ Bindings: Env }>();
 
 // Series window shipped to charts, matching the DO snapshot (1h).
 const SERIES_WINDOW_SECONDS = 60 * 60;
+// Cap on points per chart series in a full snapshot. Dense ingest is stride-
+// sampled down to this; deltas are never capped (they carry only new points).
+const SERIES_MAX_POINTS = 300;
 
 type DashRow = {
   id: string;
@@ -74,11 +78,16 @@ pub.get('/:token', async (c) => {
   );
 });
 
-// GET /v1/public/dashboards/:token/state
+// GET /v1/public/dashboards/:token/state[?since=<ts>]
 // The polling endpoint: latest value for every variable the layout references,
-// plus 1h of series for chart variables only — the exact shape of the DO's
-// snapshot { variables, series }, FILTERED to the dashboard's own variables so
-// no unrelated project state leaks.
+// plus chart-variable series — the compact { variables, series } shape of the
+// DO's snapshot, FILTERED to the dashboard's own variables so no unrelated
+// project state leaks.
+//
+// Without `since` it returns the full 1h window (stride-capped). With `since` it
+// returns only points newer than that ts (uncapped, tiny) — the steady-state
+// delta poll. Clients send a `since` quantized to the refresh cadence so all
+// viewers share one edge-cache entry per bucket.
 pub.get('/:token/state', async (c) => {
   return withEdgeCache(
     c.req.raw,
@@ -90,7 +99,12 @@ pub.get('/:token/state', async (c) => {
 
       const shownVars = new Set(variablesFromLayout(layout));
       const chartVars = chartVariablesFromLayout(layout);
-      const since = Math.floor(Date.now() / 1000) - SERIES_WINDOW_SECONDS;
+
+      const sinceParam = c.req.query('since');
+      const sinceTs = sinceParam !== undefined ? Number(sinceParam) : NaN;
+      const isDelta = Number.isFinite(sinceTs);
+      const seriesSince = isDelta ? sinceTs : Math.floor(Date.now() / 1000) - SERIES_WINDOW_SECONDS;
+      const seriesCap = isDelta ? undefined : SERIES_MAX_POINTS;
 
       const stub = c.env.PROJECT_DO.get(
         c.env.PROJECT_DO.idFromName(row.project_id)
@@ -99,8 +113,8 @@ pub.get('/:token/state', async (c) => {
       const [latest, series] = await Promise.all([
         stub.getLatestState().catch(() => []),
         chartVars.length > 0
-          ? stub.getSeriesForVariables(chartVars, since).catch(() => [])
-          : Promise.resolve([] as Array<{ ts: number; variable: string; value: unknown }>),
+          ? stub.getSeriesForVariables(chartVars, seriesSince, seriesCap).catch(() => ({}) as CompactSeries)
+          : Promise.resolve({} as CompactSeries),
       ]);
 
       const variables: Record<string, { value: unknown; received_at: number }> = {};

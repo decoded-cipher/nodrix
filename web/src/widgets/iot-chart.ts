@@ -186,6 +186,10 @@ export class IotChartElement extends HTMLElement {
     const idx = this.#series.findIndex((s) => s.key === key);
     if (idx < 0) return;
     const s = this.#series[idx]!;
+    // Drop points we already have: delta polls send a `since` quantized to the
+    // refresh cadence, so they re-send the trailing points of the prior poll.
+    const last = s.points[s.points.length - 1];
+    if (last && point.ts <= last.ts) return;
     s.points.push(point);
     if (s.points.length > this.#maxPoints) s.points = s.points.slice(-this.#maxPoints);
 

@@ -189,10 +189,14 @@ function applySnapshot(snap: SnapshotMsg) {
       const series = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
       (el as HTMLElement & { series?: unknown }).series = series.map((s) => {
         const variable = String(s['variable'] ?? '');
-        const pts = snap.series
-          .filter((p) => p.variable === variable)
-          .map((p) => ({ ts: p.ts, value: Number(p.value) }))
-          .filter((p) => Number.isFinite(p.value));
+        const col = snap.series[variable];
+        const pts: Array<{ ts: number; value: number }> = [];
+        if (col) {
+          for (let i = 0; i < col.t.length; i++) {
+            const value = Number(col.v[i]);
+            if (Number.isFinite(value)) pts.push({ ts: col.t[i]!, value });
+          }
+        }
         return {
           key: variable,
           label: typeof s['label'] === 'string' ? s['label'] : variable,

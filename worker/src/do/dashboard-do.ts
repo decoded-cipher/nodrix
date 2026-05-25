@@ -4,6 +4,11 @@ import type { ProjectDO } from './project-do';
 import { validateLayout, variablesFromLayout, chartVariablesFromLayout, type Layout } from '../lib/layout';
 import { newId } from '../lib/ids';
 import { userCanAccessProject } from '../lib/roles';
+import type { CompactSeries } from '../lib/series';
+
+// Cap on points per chart series in the bootstrap snapshot (mirrors the public
+// /state full snapshot). Dense ingest is stride-sampled to this.
+const SNAPSHOT_SERIES_CAP = 300;
 
 // Dashboard Durable Object. One per dashboard id (ctx.id.name === dashboard_id).
 //
@@ -20,7 +25,7 @@ type Snapshot = {
   dashboard: string;
   layout: Layout;
   variables: Record<string, { value: unknown; received_at: number }>;
-  series: Array<{ ts: number; variable: string; value: unknown }>;
+  series: CompactSeries;
 };
 
 type UpdateMsg = {
@@ -185,8 +190,10 @@ export class DashboardDO extends DurableObject<Env> {
     const [latest, series] = await Promise.all([
       stub.getLatestState().catch(() => []),
       chartVars.length > 0
-        ? stub.getSeriesForVariables(chartVars, Math.floor(Date.now() / 1000) - 60 * 60).catch(() => [])
-        : Promise.resolve([] as Array<{ ts: number; variable: string; value: unknown }>),
+        ? stub
+            .getSeriesForVariables(chartVars, Math.floor(Date.now() / 1000) - 60 * 60, SNAPSHOT_SERIES_CAP)
+            .catch(() => ({}) as CompactSeries)
+        : Promise.resolve({} as CompactSeries),
     ]);
 
     const variables: Record<string, { value: unknown; received_at: number }> = {};

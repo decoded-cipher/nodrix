@@ -13,7 +13,7 @@ import {
   type DataIndex,
 } from '../builder/render-widget';
 import { ROW_HEIGHT_VIEW, GRID_MARGIN, normalizeLayout } from '../builder/grid';
-import type { Layout, SnapshotMsg, UpdateMsg } from '../types';
+import type { CompactSeries, Layout, SnapshotMsg, UpdateMsg } from '../types';
 
 // Widgets that write back to hardware. In read-only contexts (public shares,
 // embeds) they still reflect reported state but must not be operable.
@@ -102,50 +102,100 @@ export function useDashboardGrid() {
     idx.value = buildDataIndex(layout, m);
   }
 
-  // Apply a full snapshot (initial load, or every poll for the public viewer).
+  // Apply a full snapshot (initial load, or the first public poll / a remount).
+  // Charts are replaced wholesale; other widgets take their latest value.
   // `variables`/`series` mirror the WS SnapshotMsg shape.
   function applySnapshot(
     layout: Layout,
     variables: SnapshotMsg['variables'],
-    series: SnapshotMsg['series']
+    series: CompactSeries
   ): void {
     if (!idx.value) return;
-
     for (const item of layout.items) {
       const el = els.value.get(item.id);
       if (!el) continue;
       applyProps(el, item); // keep attributes current
+      if (item.type === 'iot-chart') applyChartFull(el, item, series);
+      else applyLatest(el, item, variables);
+    }
+  }
 
-      if (item.type === 'iot-chart') {
-        const seriesArr = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
-        const built = seriesArr.map((s) => {
-          const variable = String(s['variable'] ?? '');
-          const pts = series
-            .filter((p) => p.variable === variable)
-            .map((p) => ({ ts: p.ts, value: numericOrNaN(p.value) }))
-            .filter((p) => Number.isFinite(p.value));
-          return {
-            key: variable,
-            label: typeof s['label'] === 'string' ? s['label'] : variable,
-            color: typeof s['color'] === 'string' ? s['color'] : undefined,
-            points: pts,
-          };
-        });
-        (el as HTMLElement & { series?: unknown }).series = built;
-      } else if (item.type === 'iot-map') {
-        const m = el as HTMLElement & { updateVar?: (k: string, v: unknown, ts: number) => void };
-        for (const key of mapVariableKeys(item)) {
-          const latest = variables[key];
-          if (latest !== undefined) m.updateVar?.(key, latest.value, latest.received_at);
+  // Apply an incremental delta (steady-state public poll): append only the new
+  // chart points, refresh other widgets from the latest values. Charts dedupe by
+  // ts, so a delta that overlaps points the client already has is harmless.
+  function applyDelta(
+    layout: Layout,
+    variables: SnapshotMsg['variables'],
+    series: CompactSeries
+  ): void {
+    if (!idx.value) return;
+    for (const item of layout.items) {
+      const el = els.value.get(item.id);
+      if (!el) continue;
+      applyProps(el, item);
+      if (item.type === 'iot-chart') applyChartDelta(el, item, series);
+      else applyLatest(el, item, variables);
+    }
+  }
+
+  // Replace a chart's series from the compact columnar payload.
+  function applyChartFull(el: HTMLElement, item: Layout['items'][number], series: CompactSeries): void {
+    const seriesArr = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
+    const built = seriesArr.map((s) => {
+      const variable = String(s['variable'] ?? '');
+      const col = series[variable];
+      const pts: Array<{ ts: number; value: number }> = [];
+      if (col) {
+        for (let i = 0; i < col.t.length; i++) {
+          const value = numericOrNaN(col.v[i]);
+          if (Number.isFinite(value)) pts.push({ ts: col.t[i]!, value });
         }
-      } else {
-        const variable = subscriptionVariable(item);
-        if (!variable) continue;
-        const latest = variables[variable];
-        if (latest !== undefined) {
-          (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;
-          (el as HTMLElement & { value?: unknown; ts?: number }).ts = latest.received_at;
-        }
+      }
+      return {
+        key: variable,
+        label: typeof s['label'] === 'string' ? s['label'] : variable,
+        color: typeof s['color'] === 'string' ? s['color'] : undefined,
+        points: pts,
+      };
+    });
+    (el as HTMLElement & { series?: unknown }).series = built;
+  }
+
+  // Append new points to an existing chart, using the same series-key dispatch as
+  // the WS update path so keys line up with what the chart was mounted with.
+  function applyChartDelta(el: HTMLElement, item: Layout['items'][number], series: CompactSeries): void {
+    const keyMap = idx.value?.chartKeys.get(item.id);
+    const chartEl = el as HTMLElement & {
+      appendPoint?: (k: string, p: { ts: number; value: number }) => void;
+    };
+    const seriesArr = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
+    for (const s of seriesArr) {
+      const variable = String(s['variable'] ?? '');
+      const col = series[variable];
+      if (!col) continue;
+      const sk = keyMap?.get(variable) ?? variable;
+      for (let i = 0; i < col.t.length; i++) {
+        const value = numericOrNaN(col.v[i]);
+        if (Number.isFinite(value)) chartEl.appendPoint?.(sk, { ts: col.t[i]!, value });
+      }
+    }
+  }
+
+  // Push the latest value into a non-chart widget (map markers, gauges, toggles).
+  function applyLatest(el: HTMLElement, item: Layout['items'][number], variables: SnapshotMsg['variables']): void {
+    if (item.type === 'iot-map') {
+      const m = el as HTMLElement & { updateVar?: (k: string, v: unknown, ts: number) => void };
+      for (const key of mapVariableKeys(item)) {
+        const latest = variables[key];
+        if (latest !== undefined) m.updateVar?.(key, latest.value, latest.received_at);
+      }
+    } else {
+      const variable = subscriptionVariable(item);
+      if (!variable) return;
+      const latest = variables[variable];
+      if (latest !== undefined) {
+        (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;
+        (el as HTMLElement & { value?: unknown; ts?: number }).ts = latest.received_at;
       }
     }
   }
@@ -210,7 +260,7 @@ export function useDashboardGrid() {
     return null;
   }
 
-  return { els, idx, mount, applySnapshot, applyUpdate };
+  return { els, idx, mount, applySnapshot, applyDelta, applyUpdate };
 }
 
 function numericOrNaN(v: unknown): number {
