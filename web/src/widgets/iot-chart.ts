@@ -196,7 +196,14 @@ export class IotChartElement extends HTMLElement {
     this.updateTs();
     if (this.#chart) {
       // Live push — keeps existing axes/animations rather than rebuilding.
-      this.#chart.appendData([{ data: [{ x: point.ts * 1000, y: point.value }] }]);
+      // appendData is POSITIONAL (entry i appends to series i), so build a
+      // full-length payload and put the point on `idx` only — otherwise a
+      // second series' points would be appended to the first line.
+      this.#chart.appendData(
+        this.#series.map((_, i) => ({
+          data: i === idx ? [{ x: point.ts * 1000, y: point.value }] : [],
+        }))
+      );
     } else {
       this.scheduleRebuild();
     }
