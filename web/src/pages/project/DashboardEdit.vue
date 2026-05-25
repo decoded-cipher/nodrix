@@ -380,39 +380,60 @@ function exitToView() {
     />
 
     <div class="relative flex flex-1 flex-col">
+      <!-- Topbar actions. Labels collapse to icon-only below sm to keep the
+           header uncluttered on phones; sm+ shows icon + text. -->
       <Teleport to="#topbar-actions" defer>
         <div class="mr-1 inline-flex items-center rounded-md border border-neutral-300 p-0.5 dark:border-neutral-700">
           <button
             type="button"
-            class="rounded px-2.5 py-1 text-sm"
+            class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-sm"
             :class="viewMode === 'desktop' ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            title="Desktop layout"
             @click="setViewMode('desktop')"
-          >Desktop</button>
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+            <span class="hidden sm:inline">Desktop</span>
+          </button>
           <button
             type="button"
-            class="rounded px-2.5 py-1 text-sm"
+            class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-sm"
             :class="viewMode === 'mobile' ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            title="Phone layout"
             @click="setViewMode('mobile')"
-          >Mobile</button>
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>
+            <span class="hidden sm:inline">Mobile</span>
+          </button>
         </div>
         <button
           v-if="viewMode === 'mobile'"
           type="button"
-          class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          class="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           :disabled="!layout.mobile"
           :class="layout.mobile ? '' : 'cursor-not-allowed opacity-50'"
-          title="Revert the phone layout to the auto-generated arrangement"
+          title="Reset layout — revert the phone layout to the auto-generated arrangement"
           @click="resetMobileLayout"
-        >Reset layout</button>
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8" /><path d="M3 3v5h5" /></svg>
+          <span class="hidden sm:inline">Reset layout</span>
+        </button>
         <button
-          class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          class="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          title="Done"
           @click="exitToView"
-        >Done</button>
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M20 6 9 17l-5-5" /></svg>
+          <span class="hidden sm:inline">Done</span>
+        </button>
         <button
-          class="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent-600 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
           :disabled="!dirty || saving"
+          :title="saving ? 'Saving…' : 'Save'"
           @click="save"
-        >{{ saving ? 'Saving...' : 'Save' }}</button>
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
+          <span class="hidden sm:inline">{{ saving ? 'Saving…' : 'Save' }}</span>
+        </button>
       </Teleport>
 
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ err }}</div>
