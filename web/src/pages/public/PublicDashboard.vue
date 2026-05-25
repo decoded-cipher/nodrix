@@ -17,7 +17,7 @@ import { useDashboardGrid } from '../../composables/useDashboardGrid';
 import { useIsPhone } from '../../composables/useViewport';
 import { effectiveMobileLayout } from '../../builder/mobile-layout';
 import { publicApi, PublicApiError } from '../../lib/public-api';
-import type { Layout, PublicDashboard, PublicState } from '../../types';
+import type { CompactSeries, Layout, PublicDashboard, PublicState } from '../../types';
 
 const route = useRoute();
 const grid = useDashboardGrid();
@@ -34,7 +34,8 @@ const onlyItem = computed(() => {
 });
 
 let layout: Layout | null = null;          // desktop layout (with nested .mobile)
-let lastState: PublicState | null = null;  // re-applied after a breakpoint remount
+let lastState: PublicState | null = null;  // accumulated full state, re-applied on remount
+let lastTs: number | null = null;          // newest series ts held; drives delta `since`
 let ticker: ReturnType<typeof setInterval> | undefined;
 
 // Auto-refresh cadence (seconds). Owner-set and server-clamped, delivered in the
@@ -80,6 +81,8 @@ onBeforeUnmount(() => {
 
 async function load() {
   status.value = 'loading';
+  lastState = null;
+  lastTs = null; // force the next poll to fetch a full snapshot
   try {
     const d = await publicApi.get<PublicDashboard>(`/v1/public/dashboards/${token}`);
     name.value = d.name;
@@ -116,13 +119,27 @@ function stopPolling() {
   ticker = undefined;
 }
 
+// Client-side history cap, mirrors the chart's own #maxPoints.
+const SERIES_CLIENT_CAP = 600;
+
 async function poll() {
   if (!layout || document.hidden) return;
   try {
-    const s = await publicApi.get<PublicState>(`/v1/public/dashboards/${token}/state`);
-    lastState = s;
+    // First poll fetches the full snapshot; afterwards send a `since` quantized to
+    // the refresh cadence so only new points come back AND concurrent viewers
+    // (who all hold the same newest ts) share one edge-cache entry per bucket.
+    const bucket = Math.max(1, refreshSecs.value);
+    const qs = lastTs != null ? `?since=${Math.floor(lastTs / bucket) * bucket}` : '';
+    const s = await publicApi.get<PublicState>(`/v1/public/dashboards/${token}/state${qs}`);
     const lay = currentLayout();
-    if (lay) grid.applySnapshot(lay, s.variables, s.series);
+    if (lastTs == null) {
+      lastState = s;
+      if (lay) grid.applySnapshot(lay, s.variables, s.series);
+    } else {
+      lastState = mergeDelta(lastState, s);
+      if (lay) grid.applyDelta(lay, s.variables, s.series);
+    }
+    lastTs = maxSeriesTs(lastState.series) ?? lastTs;
   } catch (e) {
     // Sharing revoked mid-view → switch to the unavailable state and stop.
     // Other (transient) errors keep the last good render and retry next tick.
@@ -131,6 +148,38 @@ async function poll() {
       stopPolling();
     }
   }
+}
+
+// Fold a delta response into the accumulated full state so a breakpoint remount
+// (which re-applies lastState) keeps the full chart history.
+function mergeDelta(prev: PublicState | null, next: PublicState): PublicState {
+  const series: CompactSeries = { ...(prev?.series ?? {}) };
+  for (const [variable, col] of Object.entries(next.series)) {
+    const cur = series[variable] ?? { t: [], v: [] };
+    const t = cur.t.slice();
+    const v = cur.v.slice();
+    const last = t.length ? t[t.length - 1]! : -Infinity;
+    for (let i = 0; i < col.t.length; i++) {
+      if (col.t[i]! > last) {
+        t.push(col.t[i]!);
+        v.push(col.v[i]!);
+      }
+    }
+    series[variable] =
+      t.length > SERIES_CLIENT_CAP
+        ? { t: t.slice(-SERIES_CLIENT_CAP), v: v.slice(-SERIES_CLIENT_CAP) }
+        : { t, v };
+  }
+  return { variables: next.variables, series };
+}
+
+function maxSeriesTs(series: CompactSeries): number | null {
+  let max: number | null = null;
+  for (const col of Object.values(series)) {
+    const t = col.t[col.t.length - 1];
+    if (t !== undefined && (max === null || t > max)) max = t;
+  }
+  return max;
 }
 
 // Resume immediately when a hidden tab/embed becomes visible again, instead of

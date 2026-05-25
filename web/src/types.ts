@@ -140,9 +140,14 @@ export type PublicDashboard = {
   layout: Layout;
 };
 
+// Chart series in the compact columnar shape: grouped by variable, parallel
+// timestamp/value arrays. Replaces the old flat `{ ts, variable, value }[]` so
+// the variable name isn't repeated per point.
+export type CompactSeries = Record<string, { t: number[]; v: number[] }>;
+
 export type PublicState = {
   variables: Record<string, { value: unknown; received_at: number }>;
-  series: Array<{ ts: number; variable: string; value: unknown }>;
+  series: CompactSeries;
 };
 
 // Response from the share / unshare admin endpoints.
@@ -261,7 +266,7 @@ export type SnapshotMsg = {
   dashboard: string;
   layout: Layout;
   variables: Record<string, { value: unknown; received_at: number }>;
-  series: Array<{ ts: number; variable: string; value: unknown }>;
+  series: CompactSeries;
 };
 
 export type UpdateMsg = {
