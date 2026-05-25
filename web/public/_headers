@@ -1,0 +1,26 @@
+# Cloudflare Workers Assets headers — caching for the SPA build.
+# Honored by ASSETS.fetch(); see wrangler.toml [assets].
+
+# Hashed build output (Vite emits content-hashed filenames) — safe forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Self-hosted fonts — stable filenames, content never changes.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+# Stable-named images/icons — cache a month (the service worker busts these
+# by content revision on deploy, so users still get updates promptly).
+/*.png
+  Cache-Control: public, max-age=2592000
+/*.webp
+  Cache-Control: public, max-age=2592000
+/*.svg
+  Cache-Control: public, max-age=2592000
+/*.ico
+  Cache-Control: public, max-age=2592000
+
+# Note: index.html, sw.js, and registerSW.js intentionally fall through to the
+# default (max-age=0, must-revalidate) so app and SW updates ship immediately.
