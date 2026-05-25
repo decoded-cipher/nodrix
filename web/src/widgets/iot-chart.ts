@@ -72,9 +72,7 @@ const WIDGET_CSS = `
     min-width: 0;
   }
   .title {
-    /* Fixed size — apex's CSS bundle can interact unpredictably with
-       container-query units inside the shadow root, so don't gamble. */
-    font-size: 13px;
+    font-size: clamp(10px, min(8cqh, 4cqw), 14px);
     line-height: 1.2;
     min-height: 16px;
     color: var(--color-text-muted, #525252);
