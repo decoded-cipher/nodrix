@@ -9,6 +9,11 @@ const routes: RouteRecordRaw[] = [
   // Back-compat redirect for any bookmarks that still point at /setup.
   { path: '/setup', redirect: '/login' },
 
+  // Public dashboard viewer — no auth, outside the app shell. /share is a
+  // standalone page; /embed is the chrome-stripped, iframe-able variant.
+  { path: '/share/:token', name: 'public-share', component: () => import('./pages/public/PublicDashboard.vue'), meta: { title: 'Dashboard' } },
+  { path: '/embed/:token', name: 'public-embed', component: () => import('./pages/public/PublicDashboard.vue'), meta: { title: 'Dashboard' } },
+
   // Everything else is wrapped in the authenticated app shell.
   {
     path: '/',

@@ -18,6 +18,7 @@ import invitesRouter from './admin/invites';
 import usersRouter from './admin/users';
 import settingsRouter from './admin/settings';
 import publicInvite from './public/invite';
+import publicDashboards from './public/dashboards';
 import telemetry from './device/telemetry';
 import control from './device/control';
 import events from './device/events';
@@ -133,6 +134,10 @@ app.get('/v1/public/bootstrap-status', async (c) => {
 // Public invite preview + accept (no session).
 app.route('/v1/public/invite', publicInvite);
 
+// Public read of SHARED dashboards (no session; share_token in the URL is the
+// capability). Layout + a polled state endpoint, both edge-cached.
+app.route('/v1/public/dashboards', publicDashboards);
+
 // Admin (session-gated):
 app.route('/v1/admin/me', me);
 app.route('/v1/admin/sessions', sessionsRouter);
@@ -201,6 +206,21 @@ app.route('/v1/projects/:proj/variables/:key/series', readSeries);
 
 // WebSocket: dashboard live feed (session auth).
 app.route('/ws', ws);
+
+// Embed pages (/embed/:token) are the public dashboard view with chrome
+// stripped, meant to be iframed from any site. They're served by the SPA like
+// every other client route, but the HTML document must be frame-able: drop any
+// X-Frame-Options and set a permissive frame-ancestors CSP. Static assets
+// (/assets/*) fall through to the generic handler below — only the document
+// needs the header. The dashboard data still loads via same-origin fetch, so
+// no CORS is involved.
+app.get('/embed/*', async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const headers = new Headers(res.headers);
+  headers.delete('x-frame-options');
+  headers.set('content-security-policy', 'frame-ancestors *');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+});
 
 // SPA fallback.
 app.all('*', async (c) => c.env.ASSETS.fetch(c.req.raw));

@@ -14,6 +14,7 @@ import type {
   IntegrationKind,
   IntegrationTestResult,
   Layout,
+  ShareState,
   UserToken,
 } from '../types';
 
@@ -178,6 +179,39 @@ export const useProjectStore = defineStore('project', () => {
     if (!currentProjectId.value) return;
     await api.del<void>(`/v1/admin/projects/${currentProjectId.value}/dashboards/${id}`);
     dashboards.value = dashboards.value.filter((d) => d.id !== id);
+  }
+
+  // ── Public sharing ────────────────────────────────────────────────────────
+  function patchShare(s: ShareState): void {
+    dashboards.value = dashboards.value.map((d) =>
+      d.id === s.id
+        ? { ...d, visibility: s.visibility, share_token: s.share_token, updated_at: s.updated_at }
+        : d
+    );
+  }
+
+  // Make public (idempotent — keeps an existing link).
+  async function shareDashboard(id: string): Promise<ShareState> {
+    const pid = requireProjectId();
+    const s = await api.post<ShareState>(`/v1/admin/projects/${pid}/dashboards/${id}/share`);
+    patchShare(s);
+    return s;
+  }
+
+  // Mint a fresh link, invalidating the old one.
+  async function rotateDashboardShare(id: string): Promise<ShareState> {
+    const pid = requireProjectId();
+    const s = await api.post<ShareState>(`/v1/admin/projects/${pid}/dashboards/${id}/share/rotate`);
+    patchShare(s);
+    return s;
+  }
+
+  // Make private and kill the link.
+  async function unshareDashboard(id: string): Promise<ShareState> {
+    const pid = requireProjectId();
+    const s = await api.del<ShareState>(`/v1/admin/projects/${pid}/dashboards/${id}/share`);
+    patchShare(s);
+    return s;
   }
 
   async function loadTokens(): Promise<void> {
@@ -350,6 +384,9 @@ export const useProjectStore = defineStore('project', () => {
     fetchDashboard,
     saveDashboard,
     deleteDashboard,
+    shareDashboard,
+    rotateDashboardShare,
+    unshareDashboard,
     loadTokens,
     createToken,
     revokeToken,

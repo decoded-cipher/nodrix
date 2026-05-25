@@ -196,7 +196,64 @@ async function main() {
 
   ws.close();
 
+  // 12. Public sharing: publish, read with NO auth, prove leak-safety, rotate
+  //     + unshare invalidate the link.
+  // Ingest a variable that is NOT on the dashboard layout — it must never appear
+  // on the public state endpoint.
+  await fetch(`${BASE}/v1/telemetry`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${pt.token}` },
+    body: JSON.stringify({ metrics: { hidden_var: 999 } }),
+  });
+
+  const share = await req<{ visibility: string; share_token: string }>(
+    'POST',
+    `/v1/admin/projects/${proj.id}/dashboards/${dash.id}/share`
+  );
+  assert(
+    share.visibility === 'public' && typeof share.share_token === 'string' && share.share_token.length > 20,
+    `dashboard published with a share token`
+  );
+
+  const layoutRes = await pubGet(`/v1/public/dashboards/${share.share_token}`);
+  assert(layoutRes.ok, `public layout fetch returns 200 with no auth`);
+  const pubLayout = (await layoutRes.json()) as { id: string; layout: { items: unknown[] } };
+  assert(pubLayout.id === dash.id, `public layout is the shared dashboard`);
+
+  const stateRes = await pubGet(`/v1/public/dashboards/${share.share_token}/state`);
+  assert(stateRes.ok, `public state fetch returns 200 with no auth`);
+  const pubState = (await stateRes.json()) as {
+    variables: Record<string, { value: unknown }>;
+  };
+  assert(
+    pubState.variables['temperature'] !== undefined,
+    `public state includes the layout variable (temperature)`
+  );
+  assert(
+    pubState.variables['hidden_var'] === undefined,
+    `public state EXCLUDES non-layout variables (no leak)`
+  );
+
+  const rotated = await req<{ share_token: string }>(
+    'POST',
+    `/v1/admin/projects/${proj.id}/dashboards/${dash.id}/share/rotate`
+  );
+  assert(rotated.share_token !== share.share_token, `rotate issues a new token`);
+  const oldRes = await pubGet(`/v1/public/dashboards/${share.share_token}`);
+  assert(oldRes.status === 404, `old link 404s after rotate`);
+
+  await req('DELETE', `/v1/admin/projects/${proj.id}/dashboards/${dash.id}/share`);
+  const goneRes = await pubGet(`/v1/public/dashboards/${rotated.share_token}`);
+  assert(goneRes.status === 404, `link 404s after unshare`);
+
   console.log('\nALL CHECKS PASSED.');
+}
+
+// Public GET with a unique cache-buster so edge caching never makes an
+// assertion flaky (the server ignores the query; the cache key is the full URL).
+function pubGet(path: string): Promise<Response> {
+  const sep = path.includes('?') ? '&' : '?';
+  return fetch(`${BASE}${path}${sep}cb=${Date.now()}_${Math.random().toString(36).slice(2)}`);
 }
 
 function waitForMessage<T = { type: string } & Record<string, unknown>>(

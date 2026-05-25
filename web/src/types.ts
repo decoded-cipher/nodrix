@@ -120,6 +120,29 @@ export type Dashboard = DashboardMeta & {
   layout: Layout;
 };
 
+// Public (unauthenticated) share endpoints. The layout response mirrors the
+// fields a viewer needs; the state response mirrors the WS snapshot's data.
+export type PublicDashboard = {
+  id: string;
+  name: string;
+  description: string | null;
+  project_id: string;
+  layout: Layout;
+};
+
+export type PublicState = {
+  variables: Record<string, { value: unknown; received_at: number }>;
+  series: Array<{ ts: number; variable: string; value: unknown }>;
+};
+
+// Response from the share/unshare/rotate admin endpoints.
+export type ShareState = {
+  id: string;
+  visibility: 'private' | 'public';
+  share_token: string | null;
+  updated_at: number;
+};
+
 // ─── New entities (backed by 0002_schema_v2.sql) ─────────────────────────────
 
 export type AutomationTriggerType =
