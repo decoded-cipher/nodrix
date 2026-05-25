@@ -100,9 +100,16 @@ export type WidgetInstance = {
   props: Record<string, unknown>;
 };
 
+// Phone (<768px) position override for one widget — positions ONLY (by id),
+// never type/props, which stay single-source-of-truth on the desktop items.
+export type MobilePlacement = { id: string; x: number; y: number; w: number; h: number };
+
 export type Layout = {
   grid: { columns: number };
   items: WidgetInstance[];
+  // Phone layout override, nested in the same layout JSON (no separate column).
+  // Absent/null => auto-derive the phone layout from the desktop items.
+  mobile?: { items: MobilePlacement[] } | null;
 };
 
 export type DashboardMeta = {

@@ -11,9 +11,11 @@
 // wrong token or sharing turned off — including revocation mid-view, caught on
 // the next poll. "failed" is a transient error and offers a retry.
 
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useDashboardGrid } from '../../composables/useDashboardGrid';
+import { useIsPhone } from '../../composables/useViewport';
+import { effectiveMobileLayout } from '../../builder/mobile-layout';
 import { publicApi, PublicApiError } from '../../lib/public-api';
 import type { Layout, PublicDashboard, PublicState } from '../../types';
 
@@ -34,12 +36,32 @@ const onlyItem = computed(() => {
 // Poll cadence. Aligned to the /state edge-cache TTL (5s) so most polls collapse
 // to a cached edge response.
 const POLL_MS = 5000;
-let layout: Layout | null = null;
+let layout: Layout | null = null;          // desktop layout (with nested .mobile)
+let lastState: PublicState | null = null;  // re-applied after a breakpoint remount
 let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+// Below 768px render the phone layout (override if set, else auto-derived).
+const isPhone = useIsPhone();
+function currentLayout(): Layout | null {
+  if (!layout) return null;
+  return isPhone.value ? effectiveMobileLayout(layout) : layout;
+}
+
+function mountGrid(): void {
+  const lay = currentLayout();
+  if (!container.value || !lay) return;
+  grid.mount(container.value, lay, { onlyItem: onlyItem.value, controlsDisabled: true });
+  if (lastState) grid.applySnapshot(lay, lastState.variables, lastState.series);
+}
 
 onMounted(() => {
   void load();
   document.addEventListener('visibilitychange', onVisibility);
+});
+
+// Remount when the desktop<->phone breakpoint flips, preserving the last state.
+watch(isPhone, () => {
+  if (status.value === 'ready') mountGrid();
 });
 
 onBeforeUnmount(() => {
@@ -56,12 +78,7 @@ async function load() {
     status.value = 'ready';
     // Wait a tick so the container is rendered before mounting the grid.
     await Promise.resolve();
-    if (container.value && layout) {
-      grid.mount(container.value, layout, {
-        onlyItem: onlyItem.value,
-        controlsDisabled: true,
-      });
-    }
+    mountGrid();
     await poll();
     startPolling();
   } catch (e) {
@@ -83,7 +100,9 @@ async function poll() {
   if (!layout || document.hidden) return;
   try {
     const s = await publicApi.get<PublicState>(`/v1/public/dashboards/${token}/state`);
-    grid.applySnapshot(layout, s.variables, s.series);
+    lastState = s;
+    const lay = currentLayout();
+    if (lay) grid.applySnapshot(lay, s.variables, s.series);
   } catch (e) {
     // Sharing revoked mid-view → switch to the unavailable state and stop.
     // Other (transient) errors keep the last good render and retry next tick.

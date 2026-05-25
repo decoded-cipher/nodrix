@@ -145,7 +145,7 @@ const initials = computed(() => {
     @click="ui.closeMobileSidebar()"
   />
   <aside
-    class="fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:w-60 lg:translate-x-0 lg:transition-[width] dark:border-neutral-800 dark:bg-neutral-900"
+    class="fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 lg:transition-[width] dark:border-neutral-800 dark:bg-neutral-900"
     :class="[
       ui.sidebarRailed ? 'lg:w-16' : 'lg:w-60',
       ui.mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',

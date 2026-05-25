@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useProjectStore } from '../../stores/project';
 import { useSessionStore } from '../../stores/session';
 import { DashboardWs } from '../../ws';
 import { useDashboardGrid } from '../../composables/useDashboardGrid';
+import { useIsPhone } from '../../composables/useViewport';
+import { effectiveMobileLayout } from '../../builder/mobile-layout';
 import ShareDialog from '../../components/ShareDialog.vue';
-import type { Dashboard, WsServerMsg } from '../../types';
+import type { Dashboard, Layout, SnapshotMsg, WsServerMsg } from '../../types';
 
 const route = useRoute();
 const project = useProjectStore();
@@ -27,17 +29,34 @@ const grid = useDashboardGrid();
 const sharing = ref(false);
 let ws: DashboardWs | null = null;
 
+// Below 768px render the phone layout (override if set, else auto-derived).
+const isPhone = useIsPhone();
+const renderLayout = computed<Layout>(() => {
+  const d = dashboard.value;
+  if (!d) return { grid: { columns: 24 }, items: [] };
+  return isPhone.value ? effectiveMobileLayout(d.layout) : d.layout;
+});
+// Re-applied after a breakpoint remount so the new grid shows live data at once.
+let lastSnapshot: SnapshotMsg | null = null;
+
 onMounted(async () => {
   const projId = route.params['proj'] as string;
   const dashId = route.params['dash'] as string;
   try {
     await project.switchTo(projId);
     dashboard.value = await project.fetchDashboard(dashId);
-    grid.mount(gridContainer.value!, dashboard.value.layout);
+    grid.mount(gridContainer.value!, renderLayout.value);
   } catch {
     error.value = 'This dashboard could not be loaded. It may have been removed, or you may not have access to it.';
     return;
   }
+
+  // Remount when the desktop<->phone breakpoint flips (or the layout changes).
+  watch(renderLayout, (lay) => {
+    if (!gridContainer.value) return;
+    grid.mount(gridContainer.value, lay);
+    if (lastSnapshot) grid.applySnapshot(lay, lastSnapshot.variables, lastSnapshot.series);
+  });
 
   ws = new DashboardWs(dashId, handleMessage);
   ws.start();
@@ -55,7 +74,8 @@ onBeforeUnmount(() => {
 function handleMessage(msg: WsServerMsg) {
   if (!dashboard.value) return;
   if (msg.type === 'snapshot') {
-    grid.applySnapshot(dashboard.value.layout, msg.variables, msg.series);
+    lastSnapshot = msg;
+    grid.applySnapshot(renderLayout.value, msg.variables, msg.series);
   } else if (msg.type === 'update') {
     grid.applyUpdate(msg);
   }

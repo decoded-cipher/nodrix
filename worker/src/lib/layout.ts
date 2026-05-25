@@ -25,9 +25,15 @@ export type WidgetInstance = {
   props: Record<string, unknown>;
 };
 
+// Phone (<768px) position override for one widget — positions only, by id.
+export type MobilePlacement = { id: string; x: number; y: number; w: number; h: number };
+
 export type Layout = {
   grid: { columns: number };
   items: WidgetInstance[];
+  // Optional phone override, nested in the same layout JSON. Absent/null means
+  // the phone layout is auto-derived from the desktop items.
+  mobile?: { items: MobilePlacement[] } | null;
 };
 
 export function validateLayout(input: unknown): { ok: true; value: Layout } | { ok: false; reason: string } {
@@ -53,11 +59,31 @@ export function validateLayout(input: unknown): { ok: true; value: Layout } | { 
     if (!isObject(item['props'])) return { ok: false, reason: 'item.props must be an object' };
   }
 
+  // Optional phone override (positions only); absent/null => auto-derive.
+  let mobile: { items: MobilePlacement[] } | null | undefined;
+  const m = input['mobile'];
+  if (m === null) {
+    mobile = null;
+  } else if (m !== undefined) {
+    if (!isObject(m) || !Array.isArray(m['items'])) {
+      return { ok: false, reason: 'layout.mobile.items must be an array' };
+    }
+    for (const it of m['items']) {
+      if (!isObject(it)) return { ok: false, reason: 'each mobile item must be an object' };
+      if (typeof it['id'] !== 'string') return { ok: false, reason: 'mobile item.id must be a string' };
+      for (const f of ['x', 'y', 'w', 'h'] as const) {
+        if (typeof it[f] !== 'number') return { ok: false, reason: `mobile item.${f} must be a number` };
+      }
+    }
+    mobile = { items: m['items'] as MobilePlacement[] };
+  }
+
   return {
     ok: true,
     value: {
       grid: { columns: grid['columns'] },
       items: items as WidgetInstance[],
+      ...(mobile !== undefined ? { mobile } : {}),
     },
   };
 }

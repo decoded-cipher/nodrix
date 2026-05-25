@@ -30,5 +30,7 @@ export function normalizeLayout(layout: Layout): Layout {
       w: it.w * factor,
       h: it.h * factor,
     })),
+    // Preserve the phone override (always authored at the current resolution).
+    ...(layout.mobile !== undefined ? { mobile: layout.mobile } : {}),
   };
 }
