@@ -162,20 +162,20 @@ function onKey(e: KeyboardEvent) {
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/50 px-4 backdrop-blur-sm dark:bg-black/70"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 px-4 dark:bg-black/70"
     @click.self="emit('close')"
     @keydown="onKey"
   >
-    <div class="flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10">
+    <div class="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
       <!-- Header -->
-      <header class="flex items-start justify-between gap-3 border-b border-neutral-100 px-7 py-5 dark:border-neutral-800">
+      <header class="flex items-start justify-between gap-3 border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
         <div class="min-w-0">
-          <h2 class="text-[15px] font-semibold leading-tight text-neutral-900 dark:text-neutral-100">Share dashboard</h2>
-          <p class="mt-1 truncate text-xs text-neutral-500 dark:text-neutral-400">{{ dashboard.name }}</p>
+          <h2 class="text-sm font-semibold leading-tight text-neutral-900 dark:text-neutral-100">Share dashboard</h2>
+          <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-neutral-400">{{ dashboard.name }}</p>
         </div>
         <button
           type="button"
-          class="-mr-2 -mt-1 shrink-0 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          class="-mr-1 -mt-0.5 shrink-0 rounded-md p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           aria-label="Close"
           @click="emit('close')"
         >
@@ -185,9 +185,9 @@ function onKey(e: KeyboardEvent) {
         </button>
       </header>
 
-      <div class="flex-1 space-y-7 overflow-y-auto px-7 py-6">
+      <div class="flex-1 space-y-4 overflow-y-auto px-5 py-4">
         <!-- Public access -->
-        <div class="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-4 py-4 ring-1 ring-neutral-200/70 dark:bg-neutral-800/40 dark:ring-white/5">
+        <div class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3.5 py-2.5 dark:border-neutral-800">
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-neutral-900 dark:text-neutral-100">Public access</span>
@@ -202,7 +202,7 @@ function onKey(e: KeyboardEvent) {
                 Live
               </span>
             </div>
-            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
               {{ isPublic ? 'Anyone with the link can view — read-only.' : 'Only project members can open this dashboard.' }}
             </p>
           </div>
@@ -224,18 +224,18 @@ function onKey(e: KeyboardEvent) {
 
         <template v-if="isPublic && token">
           <!-- 1. Share link (primary) -->
-          <section class="space-y-2">
+          <div class="space-y-1.5">
             <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Share link</label>
             <div class="flex gap-2">
               <input
                 :value="shareUrl"
                 readonly
-                class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2.5 font-mono text-xs text-neutral-700 focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200"
+                class="min-w-0 flex-1 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 font-mono text-xs text-neutral-700 focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200"
                 @focus="($event.target as HTMLInputElement).select()"
               />
               <button
                 type="button"
-                class="inline-flex w-24 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-accent-600 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-accent-700"
+                class="inline-flex w-[68px] shrink-0 items-center justify-center gap-1.5 rounded-md bg-accent-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-accent-700"
                 @click="copy(shareUrl, 'link')"
               >
                 <svg v-if="copied === 'link'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5"><path d="M20 6 9 17l-5-5" /></svg>
@@ -243,23 +243,23 @@ function onKey(e: KeyboardEvent) {
                 {{ copied === 'link' ? 'Copied' : 'Copy' }}
               </button>
             </div>
-          </section>
+          </div>
 
           <!-- 2. Embed -->
-          <section class="space-y-3">
+          <div class="space-y-2">
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Embed</label>
-              <div class="inline-flex items-center rounded-lg bg-neutral-100 p-0.5 dark:bg-neutral-800">
+              <div class="inline-flex items-center rounded-md bg-neutral-100 p-0.5 dark:bg-neutral-800">
                 <button
                   type="button"
-                  class="rounded-md px-3 py-1 text-xs transition"
+                  class="rounded px-2 py-0.5 text-xs transition"
                   :class="embedMode === 'dashboard' ? 'bg-white font-medium text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
                   @click="embedMode = 'dashboard'"
                 >Whole dashboard</button>
                 <button
                   v-if="widgets.length"
                   type="button"
-                  class="rounded-md px-3 py-1 text-xs transition"
+                  class="rounded px-2 py-0.5 text-xs transition"
                   :class="embedMode === 'widget' ? 'bg-white font-medium text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
                   @click="embedMode = 'widget'"
                 >Single widget</button>
@@ -270,43 +270,44 @@ function onKey(e: KeyboardEvent) {
               v-if="embedMode === 'widget' && widgets.length"
               v-model="selectedItem"
               :options="widgetOptions"
+              size="sm"
               placeholder="Choose a widget"
             />
 
             <textarea
               :value="activeEmbedCode"
               readonly
-              rows="3"
-              class="w-full resize-none rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-neutral-600 focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
+              rows="2"
+              class="w-full resize-none rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 font-mono text-[11px] leading-relaxed text-neutral-600 focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300"
               @focus="($event.target as HTMLTextAreaElement).select()"
             ></textarea>
             <button
               type="button"
-              class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-2.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              class="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
               @click="copy(activeEmbedCode, 'embed')"
             >
               <svg v-if="copied === 'embed'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5"><path d="M20 6 9 17l-5-5" /></svg>
               <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V4a2 2 0 0 1 2-2h10" /></svg>
               {{ copied === 'embed' ? 'Copied embed code' : 'Copy embed code' }}
             </button>
-          </section>
+          </div>
 
           <!-- 3. Auto-refresh (a setting — lives below the actions) -->
-          <section class="flex items-center justify-between gap-3 border-t border-neutral-100 pt-6 dark:border-neutral-800">
+          <div class="flex items-center justify-between gap-3 border-t border-neutral-100 pt-4 dark:border-neutral-800">
             <div class="min-w-0">
               <div class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Auto-refresh</div>
-              <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+              <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
                 {{ savingRefresh ? 'Saving…' : 'How often the public dashboard refreshes.' }}
               </p>
             </div>
             <Dropdown
-              class="w-44 shrink-0"
+              class="w-40 shrink-0"
               :model-value="refreshSecs"
               :options="refreshOptions"
               size="sm"
               @update:model-value="(v) => { if (typeof v === 'number') void setRefresh(v); }"
             />
-          </section>
+          </div>
 
           <p class="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
             Turning off public access disables the link. Re-enabling generates a new one.
@@ -314,13 +315,13 @@ function onKey(e: KeyboardEvent) {
         </template>
 
         <!-- Private: empty state -->
-        <div v-else class="rounded-xl border border-dashed border-neutral-200 px-4 py-8 text-center dark:border-neutral-800">
-          <span class="mx-auto grid h-11 w-11 place-items-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+        <div v-else class="rounded-lg border border-dashed border-neutral-200 px-4 py-6 text-center dark:border-neutral-800">
+          <span class="mx-auto grid h-10 w-10 place-items-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
               <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />
             </svg>
           </span>
-          <p class="mx-auto mt-3 max-w-[18rem] text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+          <p class="mx-auto mt-2.5 max-w-[16rem] text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
             Turn on public access to get a shareable link and embed code.
           </p>
         </div>
