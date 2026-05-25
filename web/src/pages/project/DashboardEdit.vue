@@ -511,12 +511,12 @@ function exitToView() {
         @close="selectedId = null"
       />
 
-      <!-- Opens the palette drawer when it's off-canvas (below lg). Hidden while
-           a widget is selected, so it doesn't sit under the config panel. -->
+      <!-- Opens the palette drawer (below lg). Pinned bottom-right and always on
+           top so it stays reachable while panning or configuring a widget. -->
       <button
-        v-if="viewMode === 'desktop' && !selectedId"
+        v-if="viewMode === 'desktop'"
         type="button"
-        class="absolute bottom-4 right-4 z-20 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-accent-700 lg:hidden"
+        class="absolute bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-accent-700 lg:hidden"
         @click="paletteOpen = true"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
