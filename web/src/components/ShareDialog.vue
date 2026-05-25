@@ -30,6 +30,44 @@ const busy = ref(false);
 const widgets = ref<WidgetInstance[]>([]);
 const selectedItem = ref<string>('');
 
+// Full layout + version, kept so we can persist the refresh setting back.
+const dashLayout = ref<Layout | null>(null);
+const dashUpdatedAt = ref<number>(0);
+
+// Auto-refresh cadence for the shared view. Persisted server-side in the layout
+// (clamped there) and delivered to viewers via the API — never a URL param — so
+// it can't be tampered with to make viewers poll faster.
+const refreshSecs = ref<number>(5);
+const savingRefresh = ref(false);
+const refreshOptions = [
+  { value: 5, label: 'Every 5 seconds' },
+  { value: 10, label: 'Every 10 seconds' },
+  { value: 30, label: 'Every 30 seconds' },
+  { value: 60, label: 'Every minute' },
+  { value: 300, label: 'Every 5 minutes' },
+];
+async function setRefresh(v: number) {
+  if (!dashLayout.value || v === refreshSecs.value) return;
+  const prev = refreshSecs.value;
+  refreshSecs.value = v;
+  savingRefresh.value = true;
+  try {
+    const updated = await project.saveDashboard(
+      props.dashboard.id,
+      { ...dashLayout.value, refresh: v },
+      dashUpdatedAt.value
+    );
+    dashLayout.value = updated.layout;
+    dashUpdatedAt.value = updated.updated_at;
+    refreshSecs.value = updated.layout.refresh ?? v;
+  } catch (e) {
+    refreshSecs.value = prev; // roll back the dropdown on failure
+    toast.error((e as Error).message);
+  } finally {
+    savingRefresh.value = false;
+  }
+}
+
 const origin = typeof window !== 'undefined' ? window.location.origin : '';
 const shareUrl = computed(() => (token.value ? `${origin}/share/${token.value}` : ''));
 const embedUrl = computed(() => (token.value ? `${origin}/embed/${token.value}` : ''));
@@ -54,7 +92,10 @@ const widgetOptions = computed(() => widgets.value.map((w) => ({ value: w.id, la
 onMounted(async () => {
   try {
     const d = await project.fetchDashboard(props.dashboard.id);
-    widgets.value = (d.layout as Layout).items;
+    dashLayout.value = d.layout;
+    dashUpdatedAt.value = d.updated_at;
+    refreshSecs.value = d.layout.refresh ?? 5;
+    widgets.value = d.layout.items;
     if (widgets.value[0]) selectedItem.value = widgets.value[0].id;
   } catch {
     // Non-fatal: the per-widget picker just stays empty.
@@ -160,6 +201,22 @@ function onKey(e: KeyboardEvent) {
         </div>
 
         <template v-if="isPublic && token">
+          <!-- Auto-refresh: how often the shared/embedded view fetches new data.
+               Saved on the dashboard so viewers can't change it. -->
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Auto-refresh</span>
+            <Dropdown
+              class="mt-1"
+              :model-value="refreshSecs"
+              :options="refreshOptions"
+              size="sm"
+              @update:model-value="(v) => { if (typeof v === 'number') void setRefresh(v); }"
+            />
+            <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+              {{ savingRefresh ? 'Saving…' : 'How often viewers fetch new data.' }}
+            </p>
+          </label>
+
           <!-- Share link -->
           <label class="block">
             <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Share link</span>

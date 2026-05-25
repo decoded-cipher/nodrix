@@ -110,6 +110,9 @@ export type Layout = {
   // Phone layout override, nested in the same layout JSON (no separate column).
   // Absent/null => auto-derive the phone layout from the desktop items.
   mobile?: { items: MobilePlacement[] } | null;
+  // Public-view auto-refresh cadence in seconds. Owner-set, server-clamped, and
+  // delivered via the API (never a URL param) so viewers can't override it.
+  refresh?: number;
 };
 
 export type DashboardMeta = {
