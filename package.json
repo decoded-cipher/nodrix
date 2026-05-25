@@ -1,7 +1,7 @@
 {
   "name": "nodrix",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "workspaces": [
     "worker",
@@ -19,7 +19,8 @@
     "deploy:platform": "bun run build && bun run --filter @nodrix/worker deploy",
     "deploy:promo": "bun run --filter @nodrix/promo deploy",
     "typecheck": "bun run --filter '*' typecheck",
-    "smoke": "bun run worker/test/smoke.ts"
+    "smoke": "bun run worker/test/smoke.ts",
+    "postinstall": "bun run build:version"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

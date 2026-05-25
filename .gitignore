@@ -10,6 +10,7 @@ dist/
 .DS_Store
 .astro/
 worker/worker-configuration.d.ts
+worker/src/version.gen.ts
 web/dist/
 marketing/dist/
 bun.lockb
