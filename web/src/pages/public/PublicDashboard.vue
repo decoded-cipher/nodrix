@@ -33,12 +33,21 @@ const onlyItem = computed(() => {
   return typeof q === 'string' && q ? q : undefined;
 });
 
-// Poll cadence. Aligned to the /state edge-cache TTL (5s) so most polls collapse
-// to a cached edge response.
-const POLL_MS = 5000;
 let layout: Layout | null = null;          // desktop layout (with nested .mobile)
 let lastState: PublicState | null = null;  // re-applied after a breakpoint remount
-let pollTimer: ReturnType<typeof setInterval> | undefined;
+let ticker: ReturnType<typeof setInterval> | undefined;
+
+// Auto-refresh cadence (seconds). Owner-set and server-clamped, delivered in the
+// layout payload — NOT a URL param — so viewers can't override it to poll faster.
+const refreshSecs = ref(5);
+const secondsToRefresh = ref(refreshSecs.value);
+const countdownLabel = computed(() => {
+  const s = secondsToRefresh.value;
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m}m ${r}s` : `${m}m`;
+});
 
 // Below 768px render the phone layout (override if set, else auto-derived).
 const isPhone = useIsPhone();
@@ -75,6 +84,7 @@ async function load() {
     const d = await publicApi.get<PublicDashboard>(`/v1/public/dashboards/${token}`);
     name.value = d.name;
     layout = d.layout;
+    refreshSecs.value = d.layout.refresh ?? 5; // server-clamped
     status.value = 'ready';
     // Wait a tick so the container is rendered before mounting the grid.
     await Promise.resolve();
@@ -88,12 +98,22 @@ async function load() {
 
 function startPolling() {
   stopPolling();
-  pollTimer = setInterval(poll, POLL_MS);
+  secondsToRefresh.value = refreshSecs.value;
+  // One 1s ticker drives both the countdown and the poll, so "next refresh in"
+  // is exact and polling matches the chosen cadence.
+  ticker = setInterval(() => {
+    if (secondsToRefresh.value <= 1) {
+      secondsToRefresh.value = refreshSecs.value;
+      void poll();
+    } else {
+      secondsToRefresh.value -= 1;
+    }
+  }, 1000);
 }
 
 function stopPolling() {
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = undefined;
+  if (ticker) clearInterval(ticker);
+  ticker = undefined;
 }
 
 async function poll() {
@@ -116,7 +136,10 @@ async function poll() {
 // Resume immediately when a hidden tab/embed becomes visible again, instead of
 // waiting up to a full interval.
 function onVisibility() {
-  if (!document.hidden && status.value === 'ready') void poll();
+  if (!document.hidden && status.value === 'ready') {
+    secondsToRefresh.value = refreshSecs.value;
+    void poll();
+  }
 }
 </script>
 
@@ -127,10 +150,17 @@ function onVisibility() {
       class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 sm:px-6 dark:border-neutral-800"
     >
       <h1 class="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ name }}</h1>
-      <span class="ml-3 inline-flex shrink-0 items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-        Live · read-only
-      </span>
+      <div class="ml-3 flex shrink-0 items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
+        <span class="inline-flex items-center gap-1.5">
+          <!-- Live pulse: a solid dot with a radiating wave. -->
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+          </span>
+          <span class="hidden sm:inline">Live · read-only</span>
+        </span>
+        <span class="tabular-nums">Next refresh in {{ countdownLabel }}</span>
+      </div>
     </header>
 
     <!-- Loading -->

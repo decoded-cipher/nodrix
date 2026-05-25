@@ -34,7 +34,14 @@ export type Layout = {
   // Optional phone override, nested in the same layout JSON. Absent/null means
   // the phone layout is auto-derived from the desktop items.
   mobile?: { items: MobilePlacement[] } | null;
+  // Public-view auto-refresh cadence in seconds (server-clamped).
+  refresh?: number;
 };
+
+// Public-view refresh bounds: floor matches the /state edge-cache TTL (polling
+// faster just returns the cached response); ceiling is 1h.
+const REFRESH_MIN = 5;
+const REFRESH_MAX = 3600;
 
 export function validateLayout(input: unknown): { ok: true; value: Layout } | { ok: false; reason: string } {
   if (!isObject(input)) return { ok: false, reason: 'layout must be an object' };
@@ -78,12 +85,24 @@ export function validateLayout(input: unknown): { ok: true; value: Layout } | { 
     mobile = { items: m['items'] as MobilePlacement[] };
   }
 
+  // Optional public-view refresh cadence (seconds), clamped to safe bounds so a
+  // crafted payload can't drive viewers to poll aggressively.
+  let refresh: number | undefined;
+  const r = input['refresh'];
+  if (r !== undefined) {
+    if (typeof r !== 'number' || !Number.isFinite(r)) {
+      return { ok: false, reason: 'layout.refresh must be a number' };
+    }
+    refresh = Math.min(Math.max(Math.round(r), REFRESH_MIN), REFRESH_MAX);
+  }
+
   return {
     ok: true,
     value: {
       grid: { columns: grid['columns'] },
       items: items as WidgetInstance[],
       ...(mobile !== undefined ? { mobile } : {}),
+      ...(refresh !== undefined ? { refresh } : {}),
     },
   };
 }
