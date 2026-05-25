@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string | number">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue';
 
 type Option = { value: T; label: string; hint?: string; meta?: string };
 
@@ -16,6 +16,33 @@ const buttonEl = ref<HTMLButtonElement | null>(null);
 const listEl = ref<HTMLUListElement | null>(null);
 const activeIdx = ref(-1);
 
+// The menu is teleported to <body> and positioned with fixed coordinates so it
+// can never be clipped by a scrolling/overflow ancestor (e.g. a modal). We
+// anchor it to the button's viewport rect and flip above when there's no room
+// below. Re-measured on open and on scroll/resize while open.
+const menuStyle = ref<CSSProperties>({});
+const MENU_MAX_H = 240; // px — matches the old max-h-60
+
+function positionMenu() {
+  const btn = buttonEl.value;
+  if (!btn) return;
+  const r = btn.getBoundingClientRect();
+  const gap = 4;
+  const spaceBelow = window.innerHeight - r.bottom;
+  const spaceAbove = r.top;
+  const openUp = spaceBelow < Math.min(MENU_MAX_H, 220) && spaceAbove > spaceBelow;
+  const avail = (openUp ? spaceAbove : spaceBelow) - gap - 8;
+  menuStyle.value = {
+    position: 'fixed',
+    left: `${r.left}px`,
+    width: `${r.width}px`,
+    maxHeight: `${Math.max(120, Math.min(MENU_MAX_H, avail))}px`,
+    ...(openUp
+      ? { bottom: `${window.innerHeight - r.top + gap}px` }
+      : { top: `${r.bottom + gap}px` }),
+  };
+}
+
 const selected = computed(() => props.options.find((o) => o.value === props.modelValue) ?? null);
 const sizeCls = computed(() =>
   props.size === 'sm' ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'
@@ -29,7 +56,10 @@ function openMenu() {
   open.value = true;
   activeIdx.value = Math.max(0, props.options.findIndex((o) => o.value === props.modelValue));
   nextTick(() => {
+    positionMenu();
     document.addEventListener('mousedown', onDocMouseDown, true);
+    window.addEventListener('scroll', positionMenu, true);
+    window.addEventListener('resize', positionMenu);
     scrollActiveIntoView();
   });
 }
@@ -37,6 +67,8 @@ function openMenu() {
 function close() {
   open.value = false;
   document.removeEventListener('mousedown', onDocMouseDown, true);
+  window.removeEventListener('scroll', positionMenu, true);
+  window.removeEventListener('resize', positionMenu);
 }
 
 function onDocMouseDown(e: MouseEvent) {
@@ -101,7 +133,11 @@ function scrollActiveIntoView() {
 }
 
 watch(() => props.options.length, () => { if (open.value) close(); });
-onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, true));
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocMouseDown, true);
+  window.removeEventListener('scroll', positionMenu, true);
+  window.removeEventListener('resize', positionMenu);
+});
 </script>
 
 <template>
@@ -135,19 +171,21 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
       ><path d="M6 9l6 6 6-6"/></svg>
     </button>
 
-    <Transition
-      enter-active-class="transition duration-100 ease-out"
-      enter-from-class="opacity-0 -translate-y-1"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition duration-75 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-100 ease-out"
+        enter-from-class="opacity-0 -translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-75 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
       <ul
         v-if="open"
         ref="listEl"
         role="listbox"
-        class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+        :style="menuStyle"
+        class="z-[60] overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
         @keydown="onKeydown"
       >
         <li v-if="placeholder">
@@ -200,6 +238,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
           No options
         </li>
       </ul>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
