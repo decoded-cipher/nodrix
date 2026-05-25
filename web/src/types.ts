@@ -135,7 +135,7 @@ export type PublicState = {
   series: Array<{ ts: number; variable: string; value: unknown }>;
 };
 
-// Response from the share/unshare/rotate admin endpoints.
+// Response from the share / unshare admin endpoints.
 export type ShareState = {
   id: string;
   visibility: 'private' | 'public';

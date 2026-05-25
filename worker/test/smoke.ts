@@ -196,8 +196,8 @@ async function main() {
 
   ws.close();
 
-  // 12. Public sharing: publish, read with NO auth, prove leak-safety, rotate
-  //     + unshare invalidate the link.
+  // 12. Public sharing: publish, read with NO auth, prove leak-safety, and that
+  //     unshare kills the link while re-sharing mints a fresh one.
   // Ingest a variable that is NOT on the dashboard layout — it must never appear
   // on the public state endpoint.
   await fetch(`${BASE}/v1/telemetry`, {
@@ -234,17 +234,19 @@ async function main() {
     `public state EXCLUDES non-layout variables (no leak)`
   );
 
-  const rotated = await req<{ share_token: string }>(
-    'POST',
-    `/v1/admin/projects/${proj.id}/dashboards/${dash.id}/share/rotate`
-  );
-  assert(rotated.share_token !== share.share_token, `rotate issues a new token`);
-  const oldRes = await pubGet(`/v1/public/dashboards/${share.share_token}`);
-  assert(oldRes.status === 404, `old link 404s after rotate`);
-
+  // Unshare → the link 404s immediately.
   await req('DELETE', `/v1/admin/projects/${proj.id}/dashboards/${dash.id}/share`);
-  const goneRes = await pubGet(`/v1/public/dashboards/${rotated.share_token}`);
+  const goneRes = await pubGet(`/v1/public/dashboards/${share.share_token}`);
   assert(goneRes.status === 404, `link 404s after unshare`);
+
+  // Re-share → a brand-new token (off → on is how you rotate a leaked link).
+  const reshared = await req<{ share_token: string }>(
+    'POST',
+    `/v1/admin/projects/${proj.id}/dashboards/${dash.id}/share`
+  );
+  assert(reshared.share_token !== share.share_token, `re-sharing mints a new token`);
+  const newRes = await pubGet(`/v1/public/dashboards/${reshared.share_token}`);
+  assert(newRes.ok, `the new link works`);
 
   console.log('\nALL CHECKS PASSED.');
 }

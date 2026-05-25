@@ -198,14 +198,6 @@ export const useProjectStore = defineStore('project', () => {
     return s;
   }
 
-  // Mint a fresh link, invalidating the old one.
-  async function rotateDashboardShare(id: string): Promise<ShareState> {
-    const pid = requireProjectId();
-    const s = await api.post<ShareState>(`/v1/admin/projects/${pid}/dashboards/${id}/share/rotate`);
-    patchShare(s);
-    return s;
-  }
-
   // Make private and kill the link.
   async function unshareDashboard(id: string): Promise<ShareState> {
     const pid = requireProjectId();
@@ -385,7 +377,6 @@ export const useProjectStore = defineStore('project', () => {
     saveDashboard,
     deleteDashboard,
     shareDashboard,
-    rotateDashboardShare,
     unshareDashboard,
     loadTokens,
     createToken,
