@@ -34,7 +34,20 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    // Don't ship full source maps to production (smaller deploy, no source
+    // exposure). Flip to true locally when you need to debug a prod build.
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Split the stable framework deps into their own long-cached chunks so
+        // an app-code change doesn't bust them. apexcharts/leaflet are NOT listed
+        // here on purpose — they're dynamically imported and must stay lazy.
+        manualChunks: {
+          vendor: ['vue', 'vue-router', 'pinia'],
+          ui: ['reka-ui'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,
