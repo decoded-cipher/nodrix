@@ -115,7 +115,7 @@ const WIDGET_CSS = `
     min-width: 0;
   }
   .title {
-    font-size: 13px;
+    font-size: clamp(10px, min(8cqh, 4cqw), 14px);
     line-height: 1.2;
     color: var(--color-text-muted, #525252);
     text-transform: uppercase;
