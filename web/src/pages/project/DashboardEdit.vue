@@ -26,6 +26,8 @@ const err = ref<string | null>(null);
 
 // The phone override lives in layout.value.mobile (null until customized).
 const viewMode = ref<'desktop' | 'mobile'>('desktop');
+// Below lg the widget palette is an off-canvas drawer; this is its open state.
+const paletteOpen = ref(false);
 
 // What's rendered/edited now. The phone layout shares widget ids + props with
 // desktop, so everything below works unchanged on whichever is active.
@@ -296,6 +298,7 @@ function addWidget(type: WidgetType) {
   };
   selectedId.value = id;
   dirty.value = true;
+  paletteOpen.value = false; // close the drawer so the new widget is visible
 }
 
 function duplicateItem(id: string) {
@@ -369,7 +372,12 @@ function exitToView() {
 
 <template>
   <main class="flex h-full">
-    <WidgetPalette v-if="viewMode === 'desktop'" @add="addWidget" />
+    <WidgetPalette
+      v-if="viewMode === 'desktop'"
+      :open="paletteOpen"
+      @add="addWidget"
+      @close="paletteOpen = false"
+    />
 
     <div class="relative flex flex-1 flex-col">
       <Teleport to="#topbar-actions" defer>
@@ -414,10 +422,16 @@ function exitToView() {
           v-if="viewMode === 'mobile'"
           class="mx-auto mb-3 max-w-[412px] text-center text-xs text-neutral-500 dark:text-neutral-400"
         >Phone layout (&lt;768px). Drag to customize; widget settings are edited in Desktop.</p>
+        <p
+          v-else
+          class="mb-3 text-xs text-neutral-500 lg:hidden dark:text-neutral-400"
+        >Desktop layout — scroll to pan. Switch to Mobile to arrange the phone view.</p>
+        <!-- Desktop keeps a usable min-width and scrolls horizontally on narrow
+             screens; mobile uses a centered phone frame. -->
         <div
           :class="viewMode === 'mobile'
             ? 'mx-auto w-full max-w-[412px] rounded-2xl border border-neutral-300 bg-white p-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-900'
-            : ''"
+            : 'min-w-[760px]'"
         >
         <!-- :key remounts the grid on toggle so it re-measures the phone frame width. -->
         <GridLayout
@@ -474,6 +488,17 @@ function exitToView() {
         @duplicate="duplicateItem"
         @close="selectedId = null"
       />
+
+      <!-- Opens the palette drawer when it's off-canvas (below lg). -->
+      <button
+        v-if="viewMode === 'desktop'"
+        type="button"
+        class="absolute bottom-4 left-4 z-20 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-accent-700 lg:hidden"
+        @click="paletteOpen = true"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
+        Widgets
+      </button>
     </div>
   </main>
 </template>
