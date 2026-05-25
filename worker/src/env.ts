@@ -22,4 +22,9 @@ export interface Env {
   // Upstream repo (owner/repo) the Settings → Version & updates page polls
   // to detect new commits. Plaintext var defaulted in wrangler.toml.
   NODRIX_UPSTREAM_REPO?: string;
+
+  // When set (any non-empty value), emit the per-request `[auth] …` success/
+  // redirect logs. Errors are always logged regardless. Off in production keeps
+  // the auth hot path quiet (observability log volume).
+  NODRIX_DEBUG_AUTH?: string;
 }

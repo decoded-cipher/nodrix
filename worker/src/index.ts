@@ -64,7 +64,8 @@ authApp.all('*', async (c) => {
 
   const url = new URL(c.req.url);
   const path = url.pathname;
-  console.log(`[auth] ${c.req.method} ${path}${url.search}`);
+  const debug = Boolean(c.env.NODRIX_DEBUG_AUTH);
+  if (debug) console.log(`[auth] ${c.req.method} ${path}${url.search}`);
 
   // Capture the user BEFORE sign-out invalidates the session, so we can
   // emit a user.logout audit entry with the right user_id.
@@ -94,15 +95,17 @@ authApp.all('*', async (c) => {
     }, 500);
   }
 
-  console.log(`[auth] ${c.req.method} ${path} -> ${res.status}`);
+  if (debug) console.log(`[auth] ${c.req.method} ${path} -> ${res.status}`);
   if (res.status >= 400 && res.status < 600) {
     try {
       const body = await res.clone().text();
       console.error(`[auth] error body: ${body.slice(0, 500)}`);
     } catch { /* ignore */ }
   }
-  const loc = res.headers.get('location');
-  if (loc) console.log(`[auth] redirect -> ${loc}`);
+  if (debug) {
+    const loc = res.headers.get('location');
+    if (loc) console.log(`[auth] redirect -> ${loc}`);
+  }
 
   if (logoutUserId && res.status < 400) {
     c.executionCtx.waitUntil(

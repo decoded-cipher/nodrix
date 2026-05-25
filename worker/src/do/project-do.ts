@@ -97,24 +97,35 @@ export class ProjectDO extends DurableObject<Env> {
       for (const r of rows) prev.set(r.variable, safeParse(r.value));
     }
 
-    for (const p of points) {
+    // latest_state: one multi-row UPSERT instead of one statement per point.
+    // Dedupe by variable (last value wins) — payload keys are already unique, but
+    // a multi-row UPSERT can't have two VALUES rows hit the same conflict target,
+    // so guard against a caller passing duplicates.
+    const latestByVar = new Map<string, unknown>();
+    for (const p of points) latestByVar.set(p.variable, p.value);
+    const latestEntries = [...latestByVar];
+    if (latestEntries.length > 0) {
+      const rows = latestEntries.map(() => '(?, ?, ?)').join(', ');
+      const binds: unknown[] = [];
+      for (const [variable, value] of latestEntries) {
+        binds.push(variable, JSON.stringify(value), receivedAt);
+      }
       this.sql.exec(
         `INSERT INTO latest_state (variable, value, received_at)
-         VALUES (?, ?, ?)
+         VALUES ${rows}
          ON CONFLICT(variable) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
-        p.variable,
-        JSON.stringify(p.value),
-        receivedAt
+        ...binds
       );
     }
 
-    for (const p of points) {
-      this.sql.exec(
-        `INSERT INTO ring_buffer (ts, variable, value) VALUES (?, ?, ?)`,
-        receivedAt,
-        p.variable,
-        JSON.stringify(p.value)
-      );
+    // ring_buffer: append every point in a single multi-row INSERT.
+    if (points.length > 0) {
+      const rows = points.map(() => '(?, ?, ?)').join(', ');
+      const binds: unknown[] = [];
+      for (const p of points) {
+        binds.push(receivedAt, p.variable, JSON.stringify(p.value));
+      }
+      this.sql.exec(`INSERT INTO ring_buffer (ts, variable, value) VALUES ${rows}`, ...binds);
     }
 
     // Eviction is independent of the flush cursor (copy-not-move).
@@ -250,6 +261,19 @@ export class ProjectDO extends DurableObject<Env> {
   }
 
   // ---- RPC: read paths -------------------------------------------------------
+
+  // Combined dashboard read: latest state + compact chart series in ONE DO round
+  // trip. The poll endpoint and the WS bootstrap both need both, so folding them
+  // into a single RPC halves the hops to this (single-threaded) DO.
+  async getDashboardSnapshot(
+    variables: string[],
+    sinceTs: number | null,
+    cap?: number
+  ): Promise<{ latest: LatestStateRow[]; series: CompactSeries }> {
+    const latest = this.getLatestState();
+    const series = this.getSeriesForVariables(variables, sinceTs, cap);
+    return { latest: await latest, series: await series };
+  }
 
   async getLatestState(): Promise<LatestStateRow[]> {
     const rows = this.sql

@@ -110,12 +110,11 @@ pub.get('/:token/state', async (c) => {
         c.env.PROJECT_DO.idFromName(row.project_id)
       ) as unknown as ProjectDO;
 
-      const [latest, series] = await Promise.all([
-        stub.getLatestState().catch(() => []),
-        chartVars.length > 0
-          ? stub.getSeriesForVariables(chartVars, seriesSince, seriesCap).catch(() => ({}) as CompactSeries)
-          : Promise.resolve({} as CompactSeries),
-      ]);
+      // One DO round trip for both latest state and chart series. Passing [] when
+      // there are no charts skips the series query inside the DO.
+      const { latest, series } = await stub
+        .getDashboardSnapshot(chartVars, seriesSince, seriesCap)
+        .catch(() => ({ latest: [], series: {} as CompactSeries }));
 
       const variables: Record<string, { value: unknown; received_at: number }> = {};
       for (const r of latest) {

@@ -187,14 +187,11 @@ export class DashboardDO extends DurableObject<Env> {
     // from latest state alone). Avoids streaming the whole project's history.
     const shownVars = new Set(variablesFromLayout(layout));
     const chartVars = chartVariablesFromLayout(layout);
-    const [latest, series] = await Promise.all([
-      stub.getLatestState().catch(() => []),
-      chartVars.length > 0
-        ? stub
-            .getSeriesForVariables(chartVars, Math.floor(Date.now() / 1000) - 60 * 60, SNAPSHOT_SERIES_CAP)
-            .catch(() => ({}) as CompactSeries)
-        : Promise.resolve({} as CompactSeries),
-    ]);
+    // One DO round trip for latest state + chart series (chartVars=[] skips the
+    // series query inside the DO).
+    const { latest, series } = await stub
+      .getDashboardSnapshot(chartVars, Math.floor(Date.now() / 1000) - 60 * 60, SNAPSHOT_SERIES_CAP)
+      .catch(() => ({ latest: [], series: {} as CompactSeries }));
 
     const variables: Record<string, { value: unknown; received_at: number }> = {};
     for (const r of latest) {

@@ -179,6 +179,13 @@ export async function buildAuth(env: Env, request?: Request) {
       // Long-lived browser sessions; the cookie auto-renews.
       expiresIn: 60 * 60 * 24 * 30,        // 30d
       updateAge: 60 * 60 * 24,             // bump expiry once a day
+      // Serve the session from a short-lived signed cookie so getSession()
+      // doesn't read D1 on every authenticated request — the DB is hit only when
+      // the cache is older than maxAge. Bounds staleness of the cached instance
+      // role: an admin↔member change takes effect within ~60s. Per-request
+      // project access is still checked against D1 (resolveProject /
+      // userCanAccessProject), so this never widens project reach.
+      cookieCache: { enabled: true, maxAge: 60 },
     },
 
     account: {
