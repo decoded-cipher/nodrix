@@ -9,6 +9,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useProjectStore } from '../stores/project';
 import { toast } from '../lib/toast';
 import { confirm } from '../lib/confirm';
+import Dropdown from './Dropdown.vue';
 import type { Layout, WidgetInstance } from '../types';
 
 const props = defineProps<{
@@ -47,6 +48,8 @@ function widgetLabel(w: WidgetInstance): string {
   const type = w.type.replace(/^iot-/, '');
   return title ? `${title} (${type})` : `${type} · ${w.id}`;
 }
+
+const widgetOptions = computed(() => widgets.value.map((w) => ({ value: w.id, label: widgetLabel(w) })));
 
 onMounted(async () => {
   try {
@@ -197,12 +200,12 @@ function onKey(e: KeyboardEvent) {
           <label v-if="widgets.length" class="block">
             <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Embed a single widget</span>
             <div class="mt-1 flex flex-col gap-2 sm:flex-row">
-              <select
+              <Dropdown
                 v-model="selectedItem"
-                class="w-full shrink-0 rounded-md border border-neutral-300 bg-white px-2 py-2 text-xs sm:w-40 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-              >
-                <option v-for="w in widgets" :key="w.id" :value="w.id">{{ widgetLabel(w) }}</option>
-              </select>
+                :options="widgetOptions"
+                size="sm"
+                class="w-full shrink-0 sm:w-40"
+              />
               <input
                 :value="widgetEmbedCode"
                 readonly
