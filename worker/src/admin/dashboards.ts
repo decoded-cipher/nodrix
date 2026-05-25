@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
-import { newId } from '../lib/ids';
+import { newId, newToken } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { validateLayout } from '../lib/layout';
 
@@ -214,6 +214,123 @@ dashboards.delete('/:id', async (c) => {
   );
 
   return c.body(null, 204);
+});
+
+// ---- Public sharing --------------------------------------------------------
+// A shared dashboard is world-readable (read-only) at an unguessable URL. The
+// token lives in the URL, so it's a capability, not a password: we store it in
+// plaintext (the column was designed for exactly this — see 0001_init.sql) so
+// the share dialog can re-display the link and the public read path can look it
+// up by a direct match. The data is, by definition, already meant to be public.
+
+// POST /v1/admin/projects/:proj/dashboards/:id/share
+// Idempotent "make public": creates a share token if none exists, leaves an
+// existing one untouched — toggling sharing on shouldn't invalidate a link
+// already in the wild. Use /share/rotate to mint a fresh token.
+dashboards.post('/:id/share', async (c) => {
+  const project = c.get('project');
+  const user = c.get('user');
+  const id = c.req.param('id');
+
+  const row = await c.env.DB
+    .prepare(`SELECT share_token FROM dashboards WHERE id = ? AND project_id = ?`)
+    .bind(id, project.id)
+    .first<{ share_token: string | null }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  const token = row.share_token ?? newToken();
+  const now = Math.floor(Date.now() / 1000);
+  await c.env.DB
+    .prepare(
+      `UPDATE dashboards SET visibility = 'public', share_token = ?, updated_at = ?
+        WHERE id = ? AND project_id = ?`
+    )
+    .bind(token, now, id, project.id)
+    .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'dashboard.share',
+      targetType: 'dashboard',
+      targetId: id,
+    })
+  );
+
+  return c.json({ id, visibility: 'public', share_token: token, updated_at: now });
+});
+
+// POST /v1/admin/projects/:proj/dashboards/:id/share/rotate
+// Invalidate the current link and issue a fresh one (the old URL 404s at once).
+dashboards.post('/:id/share/rotate', async (c) => {
+  const project = c.get('project');
+  const user = c.get('user');
+  const id = c.req.param('id');
+
+  const row = await c.env.DB
+    .prepare(`SELECT id FROM dashboards WHERE id = ? AND project_id = ?`)
+    .bind(id, project.id)
+    .first<{ id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  const token = newToken();
+  const now = Math.floor(Date.now() / 1000);
+  await c.env.DB
+    .prepare(
+      `UPDATE dashboards SET visibility = 'public', share_token = ?, updated_at = ?
+        WHERE id = ? AND project_id = ?`
+    )
+    .bind(token, now, id, project.id)
+    .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'dashboard.share_rotate',
+      targetType: 'dashboard',
+      targetId: id,
+    })
+  );
+
+  return c.json({ id, visibility: 'public', share_token: token, updated_at: now });
+});
+
+// DELETE /v1/admin/projects/:proj/dashboards/:id/share
+// Make private again and kill the link. Distinct path from DELETE /:id, so the
+// dashboard itself is untouched.
+dashboards.delete('/:id/share', async (c) => {
+  const project = c.get('project');
+  const user = c.get('user');
+  const id = c.req.param('id');
+
+  const row = await c.env.DB
+    .prepare(`SELECT id FROM dashboards WHERE id = ? AND project_id = ?`)
+    .bind(id, project.id)
+    .first<{ id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  const now = Math.floor(Date.now() / 1000);
+  await c.env.DB
+    .prepare(
+      `UPDATE dashboards SET visibility = 'private', share_token = NULL, updated_at = ?
+        WHERE id = ? AND project_id = ?`
+    )
+    .bind(now, id, project.id)
+    .run();
+
+  c.executionCtx.waitUntil(
+    recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'dashboard.unshare',
+      targetType: 'dashboard',
+      targetId: id,
+    })
+  );
+
+  return c.json({ id, visibility: 'private', share_token: null, updated_at: now });
 });
 
 export default dashboards;

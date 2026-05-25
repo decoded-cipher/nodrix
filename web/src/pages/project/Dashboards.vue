@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useProjectStore } from '../../stores/project';
 import { confirm } from '../../lib/confirm';
 import { toast } from '../../lib/toast';
+import ShareDialog from '../../components/ShareDialog.vue';
 import type { DashboardMeta } from '../../types';
 
 const project = useProjectStore();
@@ -14,6 +15,15 @@ const creating = ref(false);
 
 // Per-card menu state.
 const openMenuFor = ref<string | null>(null);
+
+// Share dialog state.
+const sharing = ref<DashboardMeta | null>(null);
+
+function shareFromMenu(d: DashboardMeta, event: Event) {
+  event.stopPropagation();
+  openMenuFor.value = null;
+  sharing.value = d;
+}
 
 // Edit modal state.
 const editing = ref<DashboardMeta | null>(null);
@@ -211,6 +221,17 @@ watch(
           >
             <button
               type="button"
+              class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              @click="shareFromMenu(d, $event)"
+            >
+              <span>Share</span>
+              <span
+                v-if="d.visibility === 'public'"
+                class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+              >Public</span>
+            </button>
+            <button
+              type="button"
               class="block w-full px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
               @click="startEdit(d, $event)"
             >Edit dashboard</button>
@@ -305,5 +326,11 @@ watch(
         </form>
       </div>
     </div>
+
+    <ShareDialog
+      v-if="sharing"
+      :dashboard="sharing"
+      @close="sharing = null"
+    />
   </div>
 </template>
