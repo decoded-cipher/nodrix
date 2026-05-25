@@ -9,6 +9,7 @@ import { GRID_COLUMNS, ROW_HEIGHT_EDIT, GRID_MARGIN, MIN_UNITS, normalizeLayout 
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
 import { applyProps, createWidgetElement, buildDataIndex, subscriptionVariable, type DataIndex } from '../../builder/render-widget';
+import { effectiveMobileLayout } from '../../builder/mobile-layout';
 import { DashboardWs } from '../../ws';
 import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../../types';
 
@@ -23,6 +24,15 @@ const saving = ref(false);
 const dirty = ref(false);
 const err = ref<string | null>(null);
 
+// The phone override lives in layout.value.mobile (null until customized).
+const viewMode = ref<'desktop' | 'mobile'>('desktop');
+
+// What's rendered/edited now. The phone layout shares widget ids + props with
+// desktop, so everything below works unchanged on whichever is active.
+const activeLayout = computed<Layout>(() =>
+  viewMode.value === 'mobile' ? effectiveMobileLayout(layout.value) : layout.value
+);
+
 const widgetEls = shallowRef<Map<string, HTMLElement>>(new Map());
 // Cached subscription index — rebuilt only when the layout/elements change
 // (in syncWidgetElements), not on every incoming WS update.
@@ -34,7 +44,7 @@ let ws: DashboardWs | null = null;
 // `update:layout` — so v-model:layout silently doesn't work. We listen to
 // layout-updated explicitly via onGridLayoutUpdated() below.
 const gridItems = computed(() =>
-  layout.value.items.map((it) => ({
+  activeLayout.value.items.map((it) => ({
     i: it.id,
     x: it.x,
     y: it.y,
@@ -44,6 +54,30 @@ const gridItems = computed(() =>
 );
 
 type GridShape = { i: string; x: number; y: number; w: number; h: number };
+
+function onLayoutUpdated(newLayout: GridShape[]) {
+  if (viewMode.value === 'mobile') onMobileLayoutUpdated(newLayout);
+  else onGridLayoutUpdated(newLayout);
+}
+
+// First phone edit turns the auto-derived layout into a saved override.
+function onMobileLayoutUpdated(newLayout: GridShape[]) {
+  const cur = activeLayout.value;
+  const map = new Map(newLayout.map((g) => [g.i, g] as const));
+  const same = cur.items.every((it) => {
+    const g = map.get(it.id);
+    return g && g.x === it.x && g.y === it.y && g.w === it.w && g.h === it.h;
+  });
+  if (same) return;
+  const items = cur.items.map((it) => {
+    const g = map.get(it.id);
+    return g
+      ? { id: it.id, x: g.x, y: g.y, w: g.w, h: g.h }
+      : { id: it.id, x: it.x, y: it.y, w: it.w, h: it.h };
+  });
+  layout.value = { ...layout.value, mobile: { items } };
+  dirty.value = true;
+}
 
 function onGridLayoutUpdated(newLayout: GridShape[]) {
   const map = new Map(newLayout.map((g) => [g.i, g] as const));
@@ -64,6 +98,20 @@ function onGridLayoutUpdated(newLayout: GridShape[]) {
 }
 
 const selected = computed(() => layout.value.items.find((it) => it.id === selectedId.value) ?? null);
+
+function setViewMode(mode: 'desktop' | 'mobile') {
+  if (viewMode.value === mode) return;
+  selectedId.value = null;
+  viewMode.value = mode;
+}
+
+// Revert the phone layout to the auto-derived arrangement.
+function resetMobileLayout() {
+  if (!layout.value.mobile) return;
+  layout.value = { ...layout.value, mobile: null };
+  selectedId.value = null;
+  dirty.value = true;
+}
 
 onMounted(async () => {
   const projId = route.params['proj'] as string;
@@ -91,15 +139,15 @@ onBeforeUnmount(() => {
   ws?.stop();
 });
 
-// Every layout mutation reassigns layout.value to a fresh object (add/remove/
-// move/resize/config-edit/save all do `layout.value = {...}`), so a shallow
-// watch fires on each change — no need for a deep tree walk every reactive tick.
-watch(layout, () => syncWidgetElements(), { flush: 'post' });
+// Every layout mutation reassigns a fresh object (add/remove/move/resize/
+// config-edit/save), and switching modes / editing the override recomputes
+// activeLayout — so a shallow watch fires on each change, no deep tree walk.
+watch(activeLayout, () => syncWidgetElements(), { flush: 'post' });
 
 function syncWidgetElements() {
   // After each render of grid items, ensure each .widget-host has the right
   // custom element instance and updated attributes.
-  for (const it of layout.value.items) {
+  for (const it of activeLayout.value.items) {
     const host = document.querySelector(`[data-host="${it.id}"]`) as HTMLElement | null;
     if (!host) continue;
     let el = widgetEls.value.get(it.id);
@@ -109,16 +157,21 @@ function syncWidgetElements() {
       host.appendChild(el);
       widgetEls.value.set(it.id, el);
     } else {
+      // Re-attach if the host was recreated (the grid re-mounts on Desktop<->Mobile).
+      if (el.parentElement !== host) {
+        host.innerHTML = '';
+        host.appendChild(el);
+      }
       applyProps(el, it);
     }
   }
   // Clean up stale
-  const ids = new Set(layout.value.items.map((i) => i.id));
+  const ids = new Set(activeLayout.value.items.map((i) => i.id));
   for (const id of [...widgetEls.value.keys()]) {
     if (!ids.has(id)) widgetEls.value.delete(id);
   }
   // Refresh the subscription index now that elements + props are current.
-  idxCache.value = buildDataIndex(layout.value, widgetEls.value);
+  idxCache.value = buildDataIndex(activeLayout.value, widgetEls.value);
 }
 
 function handleMessage(msg: WsServerMsg) {
@@ -127,7 +180,7 @@ function handleMessage(msg: WsServerMsg) {
 }
 
 function applySnapshot(snap: SnapshotMsg) {
-  for (const item of layout.value.items) {
+  for (const item of activeLayout.value.items) {
     const el = widgetEls.value.get(item.id);
     if (!el) continue;
     if (item.type === 'iot-chart') {
@@ -166,7 +219,7 @@ function applySnapshot(snap: SnapshotMsg) {
 function applyUpdate(u: UpdateMsg) {
   // Reuse the cached index; fall back to a build if an update lands before the
   // first post-layout sync has run.
-  const idx = idxCache.value ?? buildDataIndex(layout.value, widgetEls.value);
+  const idx = idxCache.value ?? buildDataIndex(activeLayout.value, widgetEls.value);
   const targets = idx.byKey.get(u.variable);
   if (!targets) return;
   for (const el of targets) {
@@ -316,10 +369,33 @@ function exitToView() {
 
 <template>
   <main class="flex h-full">
-    <WidgetPalette @add="addWidget" />
+    <WidgetPalette v-if="viewMode === 'desktop'" @add="addWidget" />
 
     <div class="relative flex flex-1 flex-col">
       <Teleport to="#topbar-actions" defer>
+        <div class="mr-1 inline-flex items-center rounded-md border border-neutral-300 p-0.5 dark:border-neutral-700">
+          <button
+            type="button"
+            class="rounded px-2.5 py-1 text-sm"
+            :class="viewMode === 'desktop' ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            @click="setViewMode('desktop')"
+          >Desktop</button>
+          <button
+            type="button"
+            class="rounded px-2.5 py-1 text-sm"
+            :class="viewMode === 'mobile' ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            @click="setViewMode('mobile')"
+          >Mobile</button>
+        </div>
+        <button
+          v-if="viewMode === 'mobile'"
+          type="button"
+          class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          :disabled="!layout.mobile"
+          :class="layout.mobile ? '' : 'cursor-not-allowed opacity-50'"
+          title="Revert the phone layout to the auto-generated arrangement"
+          @click="resetMobileLayout"
+        >Reset layout</button>
         <button
           class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           @click="exitToView"
@@ -334,15 +410,26 @@ function exitToView() {
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ err }}</div>
 
       <div class="canvas-dots flex-1 overflow-auto p-6 select-none" @click="selectedId = null">
+        <p
+          v-if="viewMode === 'mobile'"
+          class="mx-auto mb-3 max-w-[412px] text-center text-xs text-neutral-500 dark:text-neutral-400"
+        >Phone layout (&lt;768px). Drag to customize; widget settings are edited in Desktop.</p>
+        <div
+          :class="viewMode === 'mobile'
+            ? 'mx-auto w-full max-w-[412px] rounded-2xl border border-neutral-300 bg-white p-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-900'
+            : ''"
+        >
+        <!-- :key remounts the grid on toggle so it re-measures the phone frame width. -->
         <GridLayout
+          :key="viewMode"
           :layout="gridItems"
-          :col-num="layout.grid.columns"
+          :col-num="activeLayout.grid.columns"
           :row-height="ROW_HEIGHT_EDIT"
           :is-draggable="true"
           :is-resizable="true"
           :margin="[GRID_MARGIN, GRID_MARGIN]"
           :use-css-transforms="true"
-          @layout-updated="onGridLayoutUpdated"
+          @layout-updated="onLayoutUpdated"
         >
           <GridItem
             v-for="g in gridItems"
@@ -376,9 +463,11 @@ function exitToView() {
             </div>
           </GridItem>
         </GridLayout>
+        </div>
       </div>
 
       <WidgetConfigPanel
+        v-if="viewMode === 'desktop'"
         :item="selected"
         @update="updateItem"
         @remove="removeItem"
