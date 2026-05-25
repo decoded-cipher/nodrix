@@ -3,10 +3,12 @@ import { computed, h, type FunctionalComponent } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
+import { useThemeStore } from '../stores/theme';
 import ProjectSwitcher from './ProjectSwitcher.vue';
 
 const session = useSessionStore();
 const ui = useUiStore();
+const theme = useThemeStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -174,11 +176,14 @@ const initials = computed(() => {
       >
         <img src="/white_logo.png" alt="nodrix" class="h-6 w-6 object-contain" />
       </div>
-      <!-- Expanded: dark logo in light mode, white logo in dark mode -->
-      <template v-else>
-        <img src="/dark_logo.png" alt="nodrix" class="h-7 w-auto dark:hidden" />
-        <img src="/white_logo.png" alt="nodrix" class="hidden h-7 w-auto dark:block" />
-      </template>
+      <!-- Expanded: bind src to the active theme so only one variant downloads
+           (CSS `hidden` would still fetch both). -->
+      <img
+        v-else
+        :src="theme.resolved === 'dark' ? '/white_logo.png' : '/dark_logo.png'"
+        alt="nodrix"
+        class="h-7 w-auto"
+      />
     </div>
 
     <!-- Project switcher -->
