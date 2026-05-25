@@ -98,8 +98,12 @@ function onShareChange(next: { visibility: 'private' | 'public'; share_token: st
             <circle cx="18" cy="19" r="2.5" />
             <path d="M8.2 10.7l7.6-4.4M8.2 13.3l7.6 4.4" />
           </svg>
-          <span v-if="dashboard.visibility === 'public'">Shared</span>
-          <span v-else>Share</span>
+          <span>Share</span>
+          <span
+            v-if="dashboard.visibility === 'public'"
+            class="h-1.5 w-1.5 rounded-full bg-emerald-500"
+            title="This dashboard is public"
+          ></span>
         </button>
         <RouterLink
           :to="`/p/${project.currentProjectId}/d/${dashboard.id}/edit`"

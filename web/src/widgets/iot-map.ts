@@ -90,6 +90,7 @@ const WIDGET_CSS = `
     box-sizing: border-box;
     font-family: system-ui, sans-serif;
     color: var(--color-text, #171717);
+    isolation: isolate;
   }
   .card {
     display: grid;
