@@ -19,6 +19,7 @@ import usersRouter from './admin/users';
 import settingsRouter from './admin/settings';
 import publicInvite from './public/invite';
 import publicDashboards from './public/dashboards';
+import { serveDashboardSeo } from './public/dashboard-seo';
 import telemetry from './device/telemetry';
 import control from './device/control';
 import events from './device/events';
@@ -257,6 +258,9 @@ app.route('/v1/projects/:proj/variables/:key/series', readSeries);
 
 // WebSocket: dashboard live feed (session auth).
 app.route('/ws', ws);
+
+// Public dashboard viewer: SPA shell with dynamic <head> meta. Before the SPA fallback.
+app.get('/share/:token', (c) => serveDashboardSeo(c.env, c.req.raw, c.req.param('token')));
 
 // SPA fallback (includes /embed/:token — the security middleware makes those
 // frame-able).
