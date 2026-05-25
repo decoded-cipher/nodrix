@@ -447,12 +447,13 @@ function exitToView() {
           v-else
           class="mb-3 text-xs text-neutral-500 lg:hidden dark:text-neutral-400"
         >Desktop layout — scroll to pan. Switch to Mobile to arrange the phone view.</p>
-        <!-- Desktop keeps a usable min-width and scrolls horizontally on narrow
-             screens; mobile uses a centered phone frame. -->
+        <!-- Below lg the desktop grid renders at a true desktop width and pans
+             (so widgets keep proper proportions instead of being squished); lg+
+             fills the canvas responsively. Mobile uses a centered phone frame. -->
         <div
           :class="viewMode === 'mobile'
             ? 'mx-auto w-full max-w-[412px] rounded-2xl border border-neutral-300 bg-white p-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-900'
-            : 'min-w-[760px]'"
+            : 'min-w-[1280px] lg:min-w-0'"
         >
         <!-- :key remounts the grid on toggle so it re-measures the phone frame width. -->
         <GridLayout
