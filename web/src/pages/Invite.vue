@@ -76,7 +76,7 @@ async function submit() {
 </script>
 
 <template>
-  <main class="mx-auto flex h-full max-w-md flex-col justify-center px-6 py-12">
+  <main class="mx-auto flex h-full max-w-md flex-col justify-center px-4 py-12 sm:px-6">
     <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div v-if="loading" class="flex justify-center py-8">
         <Spinner size="lg" />

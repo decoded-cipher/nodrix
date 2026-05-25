@@ -142,7 +142,7 @@ const variableCount = computed(() => project.variables.length);
 </script>
 
 <template>
-  <main class="mx-auto max-w-4xl px-6 py-8">
+  <main class="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
     <h2 class="text-xl font-semibold tracking-tight">Variables</h2>
     <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
       Project-scoped data points. New keys appear automatically the first time hardware posts to them.
@@ -176,18 +176,19 @@ const variableCount = computed(() => project.variables.length);
           {{ variableCount }} {{ variableCount === 1 ? 'variable' : 'variables' }}
         </span>
       </div>
-      <table v-if="project.variables.length > 0" class="w-full text-left text-sm">
+      <div v-if="project.variables.length > 0" class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
         <thead class="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
           <tr>
-            <th class="px-4 py-2 font-medium">Key</th>
-            <th class="px-4 py-2 font-medium">Unit</th>
-            <th class="px-4 py-2 font-medium">Last seen</th>
-            <th class="px-4 py-2"><span class="sr-only">Actions</span></th>
+            <th class="px-3 py-2 font-medium sm:px-4">Key</th>
+            <th class="px-3 py-2 font-medium sm:px-4">Unit</th>
+            <th class="hidden px-3 py-2 font-medium sm:table-cell sm:px-4">Last seen</th>
+            <th class="px-3 py-2 sm:px-4"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
           <tr v-for="v in project.variables" :key="v.id" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-            <td class="px-4 py-2.5">
+            <td class="px-3 py-2.5 sm:px-4">
               <div class="flex items-center gap-2.5">
                 <span
                   class="h-2 w-2 shrink-0 rounded-full"
@@ -197,7 +198,7 @@ const variableCount = computed(() => project.variables.length);
                 <span class="font-mono text-sm font-medium">{{ v.key }}</span>
               </div>
             </td>
-            <td class="px-4 py-2.5">
+            <td class="px-3 py-2.5 sm:px-4">
               <Combobox
                 v-if="editingId === v.id"
                 ref="comboRef"
@@ -211,11 +212,11 @@ const variableCount = computed(() => project.variables.length);
                 {{ v.unit || '—' }}
               </span>
             </td>
-            <td class="px-4 py-2.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <td class="hidden px-3 py-2.5 text-xs text-neutral-500 sm:table-cell sm:px-4 dark:text-neutral-400">
               <span v-if="v.last_seen" :title="formatAbsolute(v.last_seen)">{{ relativeTime(v.last_seen) }}</span>
               <span v-else class="italic text-neutral-400 dark:text-neutral-600">Never</span>
             </td>
-            <td class="px-4 py-2.5">
+            <td class="px-3 py-2.5 sm:px-4">
               <div class="flex items-center justify-end gap-1">
                 <template v-if="editingId === v.id">
                   <button
@@ -262,7 +263,8 @@ const variableCount = computed(() => project.variables.length);
           </tr>
         </tbody>
       </table>
-      <div v-else class="px-4 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
+      </div>
+      <div v-if="project.variables.length === 0" class="px-4 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
         No variables yet. Post telemetry or add one above.
       </div>
     </div>
@@ -292,7 +294,7 @@ const variableCount = computed(() => project.variables.length);
     <ul class="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
       <li v-for="t in project.projectTokens" :key="t.id" class="flex items-center justify-between gap-4 px-4 py-3">
         <div class="min-w-0 flex-1">
-          <div class="font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ t.id }}</div>
+          <div class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ t.id }}</div>
           <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
             created {{ fmt(t.created_at) }} · last used {{ fmt(t.last_used_at) }}
           </div>

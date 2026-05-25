@@ -137,18 +137,39 @@ const initials = computed(() => {
 </script>
 
 <template>
+  <!-- Backdrop behind the drawer on mobile. -->
+  <div
+    v-if="ui.mobileSidebarOpen"
+    class="fixed inset-0 z-40 bg-black/40 lg:hidden"
+    aria-hidden="true"
+    @click="ui.closeMobileSidebar()"
+  />
   <aside
-    class="flex h-full flex-col border-r border-neutral-200 bg-white transition-[width] duration-150 dark:border-neutral-800 dark:bg-neutral-900"
-    :class="ui.sidebarCollapsed ? 'w-16' : 'w-60'"
+    class="fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:w-60 lg:translate-x-0 lg:transition-[width] dark:border-neutral-800 dark:bg-neutral-900"
+    :class="[
+      ui.sidebarRailed ? 'lg:w-16' : 'lg:w-60',
+      ui.mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
+    ]"
   >
     <!-- Brand -->
     <div
       class="flex h-14 items-center border-b border-neutral-200 dark:border-neutral-800"
-      :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'px-4'"
+      :class="ui.sidebarRailed ? 'justify-center px-0' : 'px-4'"
     >
+      <!-- Close button (mobile drawer only) -->
+      <button
+        type="button"
+        class="absolute right-2 top-3 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 lg:hidden dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+        aria-label="Close menu"
+        @click="ui.closeMobileSidebar()"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
       <!-- Collapsed: white logo on a dark square -->
       <div
-        v-if="ui.sidebarCollapsed"
+        v-if="ui.sidebarRailed"
         class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-neutral-900 dark:bg-neutral-800"
       >
         <img src="/white_logo.png" alt="nodrix" class="h-6 w-6 object-contain" />
@@ -161,7 +182,7 @@ const initials = computed(() => {
     </div>
 
     <!-- Project switcher -->
-    <div v-if="!ui.sidebarCollapsed" class="border-b border-neutral-200 p-3 dark:border-neutral-800">
+    <div v-if="!ui.sidebarRailed" class="border-b border-neutral-200 p-3 dark:border-neutral-800">
       <ProjectSwitcher />
     </div>
 
@@ -173,20 +194,20 @@ const initials = computed(() => {
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="[
-              ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5',
+              ui.sidebarRailed ? 'justify-center px-0' : 'gap-3 px-2.5',
               isActive(item) ? ACTIVE_CLASSES : '',
             ]"
-            :title="ui.sidebarCollapsed ? item.label : undefined"
+            :title="ui.sidebarRailed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
-            <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
+            <span v-if="!ui.sidebarRailed">{{ item.label }}</span>
           </RouterLink>
         </li>
       </ul>
 
       <div class="mt-5 mb-1.5 px-2.5">
         <div
-          v-if="!ui.sidebarCollapsed"
+          v-if="!ui.sidebarRailed"
           class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500"
         >Project</div>
         <div v-else class="h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -198,29 +219,29 @@ const initials = computed(() => {
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="[
-              ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5',
+              ui.sidebarRailed ? 'justify-center px-0' : 'gap-3 px-2.5',
               isActive(item) ? ACTIVE_CLASSES : '',
             ]"
-            :title="ui.sidebarCollapsed ? item.label : undefined"
+            :title="ui.sidebarRailed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
-            <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
+            <span v-if="!ui.sidebarRailed">{{ item.label }}</span>
           </RouterLink>
           <span
             v-else
             class="flex cursor-not-allowed items-center rounded-md py-2 text-neutral-400 dark:text-neutral-600"
-            :class="ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5'"
-            :title="ui.sidebarCollapsed ? `${item.label} — select a project first` : 'Select a project first'"
+            :class="ui.sidebarRailed ? 'justify-center px-0' : 'gap-3 px-2.5'"
+            :title="ui.sidebarRailed ? `${item.label} — select a project first` : 'Select a project first'"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
-            <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
+            <span v-if="!ui.sidebarRailed">{{ item.label }}</span>
           </span>
         </li>
       </ul>
 
       <div class="mt-5 mb-1.5 px-2.5">
         <div
-          v-if="!ui.sidebarCollapsed"
+          v-if="!ui.sidebarRailed"
           class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500"
         >Account</div>
         <div v-else class="h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -231,13 +252,13 @@ const initials = computed(() => {
             :to="item.to"
             class="flex items-center rounded-md py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             :class="[
-              ui.sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2.5',
+              ui.sidebarRailed ? 'justify-center px-0' : 'gap-3 px-2.5',
               isActive(item) ? ACTIVE_CLASSES : '',
             ]"
-            :title="ui.sidebarCollapsed ? item.label : undefined"
+            :title="ui.sidebarRailed ? item.label : undefined"
           >
             <component :is="iconFor(item.icon)" class="h-[18px] w-[18px] shrink-0" />
-            <span v-if="!ui.sidebarCollapsed">{{ item.label }}</span>
+            <span v-if="!ui.sidebarRailed">{{ item.label }}</span>
           </RouterLink>
         </li>
       </ul>
@@ -245,7 +266,7 @@ const initials = computed(() => {
 
     <!-- Footer: user + sign out + collapse toggle -->
     <div class="border-t border-neutral-200 p-3 dark:border-neutral-800">
-      <div v-if="!ui.sidebarCollapsed" class="mb-2 flex items-center gap-2 px-1">
+      <div v-if="!ui.sidebarRailed" class="mb-2 flex items-center gap-2 px-1">
         <div class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
           {{ initials }}
         </div>
@@ -290,18 +311,18 @@ const initials = computed(() => {
 
       <button
         type="button"
-        class="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800"
+        class="hidden w-full items-center justify-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 lg:flex dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800"
         @click="ui.toggleSidebar()"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
           class="h-3.5 w-3.5"
-          :class="ui.sidebarCollapsed ? 'rotate-180' : ''"
+          :class="ui.sidebarRailed ? 'rotate-180' : ''"
         >
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
         </svg>
-        <span v-if="!ui.sidebarCollapsed">Collapse</span>
+        <span v-if="!ui.sidebarRailed">Collapse</span>
       </button>
     </div>
   </aside>

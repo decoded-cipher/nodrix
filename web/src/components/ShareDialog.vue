@@ -113,7 +113,7 @@ function onKey(e: KeyboardEvent) {
     @click.self="emit('close')"
     @keydown="onKey"
   >
-    <div class="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
+    <div class="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
       <header class="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
         <div>
           <div class="text-sm font-semibold">Share “{{ dashboard.name }}”</div>
@@ -196,10 +196,10 @@ function onKey(e: KeyboardEvent) {
           <!-- Embed single widget -->
           <label v-if="widgets.length" class="block">
             <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Embed a single widget</span>
-            <div class="mt-1 flex gap-2">
+            <div class="mt-1 flex flex-col gap-2 sm:flex-row">
               <select
                 v-model="selectedItem"
-                class="w-40 shrink-0 rounded-md border border-neutral-300 bg-white px-2 py-2 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                class="w-full shrink-0 rounded-md border border-neutral-300 bg-white px-2 py-2 text-xs sm:w-40 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
               >
                 <option v-for="w in widgets" :key="w.id" :value="w.id">{{ widgetLabel(w) }}</option>
               </select>

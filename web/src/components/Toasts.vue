@@ -12,7 +12,7 @@ const tone: Record<ToastKind, { icon: string; bar: string }> = {
 </script>
 
 <template>
-  <div class="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-xs flex-col gap-2">
+  <div class="pointer-events-none fixed bottom-4 left-4 right-4 z-[100] flex flex-col gap-2 sm:left-auto sm:w-full sm:max-w-xs">
     <TransitionGroup name="toast">
       <div
         v-for="t in toasts"

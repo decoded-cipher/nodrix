@@ -99,7 +99,7 @@ function expiryLabel(ts: number | null | undefined): string {
 </script>
 
 <template>
-  <main class="mx-auto max-w-4xl px-6 py-8">
+  <main class="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">API tokens</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">

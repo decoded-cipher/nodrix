@@ -107,7 +107,7 @@ async function removeUser(u: InstanceUser) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl px-6 py-8">
+  <div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">Users</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
@@ -205,10 +205,10 @@ async function removeUser(u: InstanceUser) {
             </div>
             <div class="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
               <span class="truncate">{{ s.agentLabel }}</span>
-              <span v-if="s.ip_address" class="text-neutral-300 dark:text-neutral-600">·</span>
-              <span v-if="s.ip_address" class="font-mono">{{ s.ip_address }}</span>
+              <span v-if="s.ip_address" class="hidden text-neutral-300 sm:inline dark:text-neutral-600">·</span>
+              <span v-if="s.ip_address" class="hidden font-mono sm:inline">{{ s.ip_address }}</span>
               <span class="text-neutral-300 dark:text-neutral-600">·</span>
-              <span>active {{ relativeTime(s.last_seen_at) }}</span>
+              <span class="shrink-0">active {{ relativeTime(s.last_seen_at) }}</span>
             </div>
           </div>
 

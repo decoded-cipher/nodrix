@@ -26,7 +26,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey));
         aria-modal="true"
         @click.self="resolveConfirm(false)"
       >
-        <div class="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
+        <div class="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl bg-white shadow-2xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
           <div class="flex items-start gap-3 px-5 py-4">
             <!-- Danger icon -->
             <div

@@ -44,6 +44,12 @@ watch(routeProjId, async (id) => {
   await project.switchTo(id);
 });
 
+// Navigating closes the mobile drawer so it doesn't linger over the new page.
+watch(
+  () => route.fullPath,
+  () => ui.closeMobileSidebar()
+);
+
 // After session loads, make sure the stored project still exists.
 watch(
   () => session.projects.length,

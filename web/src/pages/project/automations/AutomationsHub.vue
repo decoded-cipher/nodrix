@@ -27,7 +27,7 @@ const activeName = computed(() => (route.name === 'connections' ? 'connections' 
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-6 py-8">
+  <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
     <header class="mb-5">
       <h1 class="text-xl font-semibold tracking-tight">Automations</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">

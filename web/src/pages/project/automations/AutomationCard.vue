@@ -102,7 +102,7 @@ async function remove() {
 
 <template>
   <div
-    class="flex items-start gap-4 px-4 py-3.5"
+    class="flex items-start gap-3 px-3 py-3.5 sm:gap-4 sm:px-4"
     :class="automation.enabled ? '' : 'opacity-60'"
   >
     <!-- Trigger icon -->
