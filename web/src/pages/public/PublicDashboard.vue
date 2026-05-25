@@ -105,7 +105,7 @@ function onVisibility() {
   <main :class="isEmbed ? 'flex h-full w-full flex-col bg-transparent' : 'flex min-h-screen flex-col bg-neutral-50 dark:bg-neutral-950'">
     <header
       v-if="!isEmbed && status === 'ready'"
-      class="flex items-center justify-between border-b border-neutral-200 px-6 py-3 dark:border-neutral-800"
+      class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 sm:px-6 dark:border-neutral-800"
     >
       <h1 class="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ name }}</h1>
       <span class="ml-3 inline-flex shrink-0 items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">

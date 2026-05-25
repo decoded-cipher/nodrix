@@ -85,7 +85,7 @@ async function signInWith(provider: 'google' | 'github') {
 </script>
 
 <template>
-  <main class="mx-auto flex h-full max-w-md flex-col justify-center px-6 py-12">
+  <main class="mx-auto flex h-full max-w-md flex-col justify-center px-4 py-12 sm:px-6">
     <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <h1 class="text-xl font-semibold tracking-tight">
         {{ mode === 'register' ? 'Create owner account' : 'Sign in to nodrix' }}

@@ -65,22 +65,33 @@ const crumbs = computed<Crumb[]>(() => {
 </script>
 
 <template>
-  <header class="flex h-14 items-center justify-between border-b border-neutral-200 bg-white px-5 dark:border-neutral-800 dark:bg-neutral-900">
-    <nav class="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+  <header class="flex h-14 items-center justify-between gap-2 border-b border-neutral-200 bg-white px-3 sm:px-5 dark:border-neutral-800 dark:bg-neutral-900">
+    <!-- Hamburger: opens the sidebar drawer on mobile. -->
+    <button
+      type="button"
+      class="-ml-1 shrink-0 rounded-md p-2 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 lg:hidden dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+      aria-label="Open menu"
+      @click="ui.openMobileSidebar()"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
+        <path d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+      </svg>
+    </button>
+    <nav class="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-sm text-neutral-500 dark:text-neutral-400">
       <template v-for="(c, i) in crumbs" :key="i">
         <RouterLink
           v-if="c.to && i !== crumbs.length - 1"
           :to="c.to"
-          class="hover:text-neutral-900 dark:hover:text-neutral-100"
+          class="hidden shrink-0 whitespace-nowrap hover:text-neutral-900 sm:inline dark:hover:text-neutral-100"
         >{{ c.label }}</RouterLink>
         <span
           v-else
-          class="font-medium text-neutral-900 dark:text-neutral-100"
+          class="truncate font-medium text-neutral-900 dark:text-neutral-100"
         >{{ c.label }}</span>
         <svg
           v-if="i < crumbs.length - 1"
           xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-          stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5 text-neutral-300 dark:text-neutral-600"
+          stroke-width="2" stroke="currentColor" class="hidden h-3.5 w-3.5 shrink-0 text-neutral-300 sm:block dark:text-neutral-600"
         >
           <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
         </svg>

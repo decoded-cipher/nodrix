@@ -5,11 +5,40 @@ import { useSessionStore } from './session';
 const LAST_PROJECT_KEY = 'nodrix:last-project';
 const SIDEBAR_COLLAPSED_KEY = 'nodrix:sidebar-collapsed';
 
+// Below this width the sidebar becomes an off-canvas drawer instead of a static
+// column. Matches Tailwind's `lg` breakpoint (1024px).
+const MOBILE_QUERY = '(max-width: 1023px)';
+
 export const useUiStore = defineStore('ui', () => {
   const session = useSessionStore();
 
   const currentProjectId = ref<string | null>(localStorage.getItem(LAST_PROJECT_KEY));
   const sidebarCollapsed = ref<boolean>(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
+
+  // Viewport tracking for the responsive shell. `isMobile` drives whether the
+  // sidebar renders as a drawer; `mobileSidebarOpen` is its open/closed state.
+  const mql = typeof window !== 'undefined' ? window.matchMedia(MOBILE_QUERY) : null;
+  const isMobile = ref<boolean>(mql?.matches ?? false);
+  const mobileSidebarOpen = ref<boolean>(false);
+  mql?.addEventListener('change', (e) => {
+    isMobile.value = e.matches;
+    // Leaving mobile width should never leave a stray drawer open.
+    if (!e.matches) mobileSidebarOpen.value = false;
+  });
+
+  // On desktop the sidebar can be collapsed to an icon rail; on mobile the drawer
+  // always shows full content, so the collapsed rail only applies off-mobile.
+  const sidebarRailed = computed(() => sidebarCollapsed.value && !isMobile.value);
+
+  function openMobileSidebar(): void {
+    mobileSidebarOpen.value = true;
+  }
+  function closeMobileSidebar(): void {
+    mobileSidebarOpen.value = false;
+  }
+  function toggleMobileSidebar(): void {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value;
+  }
 
   // Pre-edit state stash. When the dashboard editor opens we collapse the sidebar
   // for screen space; when it closes we restore whatever the user had before.
@@ -57,6 +86,12 @@ export const useUiStore = defineStore('ui', () => {
     currentProjectId,
     currentProject,
     sidebarCollapsed,
+    isMobile,
+    mobileSidebarOpen,
+    sidebarRailed,
+    openMobileSidebar,
+    closeMobileSidebar,
+    toggleMobileSidebar,
     setCurrentProject,
     ensureValidProject,
     toggleSidebar,

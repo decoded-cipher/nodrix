@@ -198,7 +198,7 @@ async function save() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-8">
+  <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
     <button type="button" class="mb-4 inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100" @click="backToList">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5"><path d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
       Automations
@@ -219,7 +219,7 @@ async function save() {
           v-for="t in TRIGGERS"
           :key="t.key"
           type="button"
-          class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 text-left transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
+          class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-300 hover:shadow-sm sm:p-5 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
           @click="pick(t.key)"
         >
           <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
@@ -246,7 +246,7 @@ async function save() {
       </div>
 
       <!-- Details -->
-      <div class="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
         <label class="block">
           <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name</span>
           <input v-model="draft.name" type="text" required class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" placeholder="e.g. Fan on when hot" />
@@ -258,7 +258,7 @@ async function save() {
       </div>
 
       <!-- When -->
-      <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
         <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">When</h3>
 
         <div v-if="draft.trigger_type === 'variable'" class="flex flex-wrap items-center gap-2">
@@ -278,7 +278,7 @@ async function save() {
         <div v-else-if="draft.trigger_type === 'schedule'" class="space-y-3">
           <div class="flex flex-wrap items-center gap-2">
             <input v-model="draft.trigger_config.time" type="time" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" />
-            <input v-model="draft.trigger_config.tz" type="text" class="w-56 rounded-md border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950" placeholder="IANA timezone" />
+            <input v-model="draft.trigger_config.tz" type="text" class="w-56 max-w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950" placeholder="IANA timezone" />
           </div>
           <div class="flex flex-wrap gap-1.5">
             <button
@@ -313,7 +313,7 @@ async function save() {
       </div>
 
       <!-- Then -->
-      <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
         <div class="mb-3 flex items-center justify-between">
           <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Then do</h3>
           <button type="button" class="rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="addAction">Add action</button>

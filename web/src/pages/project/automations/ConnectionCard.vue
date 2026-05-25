@@ -72,7 +72,7 @@ async function remove() {
 </script>
 
 <template>
-  <div class="flex items-start gap-4 px-4 py-3.5" :class="integration.enabled ? '' : 'opacity-60'">
+  <div class="flex items-start gap-3 px-3 py-3.5 sm:gap-4 sm:px-4" :class="integration.enabled ? '' : 'opacity-60'">
     <div class="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
       <Icon :path="spec.icon" class="h-5 w-5" />
     </div>
@@ -96,7 +96,7 @@ async function remove() {
       <div v-if="testMsg" class="mt-1 text-[11px]" :class="testMsg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">{{ testMsg.text }}</div>
     </div>
 
-    <div class="flex shrink-0 items-center gap-2">
+    <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
       <button
         v-if="spec.executable"
         type="button"

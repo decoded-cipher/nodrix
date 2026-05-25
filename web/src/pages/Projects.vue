@@ -147,7 +147,7 @@ watch(
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-6 py-8">
+  <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">Projects</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
@@ -157,7 +157,7 @@ watch(
 
     <form
       v-if="isManager"
-      class="mb-6 flex gap-2 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+      class="mb-6 flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 sm:flex-row dark:border-neutral-800 dark:bg-neutral-900"
       @submit.prevent="create"
     >
       <input
@@ -169,7 +169,7 @@ watch(
       <button
         type="submit"
         :disabled="creating"
-        class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+        class="shrink-0 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
       >
         Create project
       </button>
@@ -206,7 +206,7 @@ watch(
         <div class="absolute right-2 top-2">
           <button
             type="button"
-            class="rounded-md p-1 text-neutral-400 opacity-0 transition group-hover:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            class="rounded-md p-1 text-neutral-400 opacity-100 transition hover:bg-neutral-100 hover:text-neutral-700 lg:opacity-0 lg:group-hover:opacity-100 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
             :class="{ 'opacity-100 bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200': openMenuFor === p.id }"
             aria-label="Project options"
             @click="toggleMenu(p.id, $event)"
@@ -244,7 +244,7 @@ watch(
       class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 px-4 dark:bg-black/70"
       @click.self="closeModal"
     >
-      <div class="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
+      <div class="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
         <header class="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
           <div>
             <div class="text-sm font-semibold">Edit project</div>

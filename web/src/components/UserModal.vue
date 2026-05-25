@@ -102,7 +102,7 @@ async function copyLink(text: string) {
 
 <template>
   <div class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" @click.self="emit('close')">
-    <div class="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+    <div class="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
       <!-- Invite result: the one-time accept link. -->
       <template v-if="inviteResult">
         <h2 class="text-lg font-semibold">Invite created</h2>

@@ -316,7 +316,7 @@ const PROVIDER_META = {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-8">
+  <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
     <header class="mb-6">
       <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
@@ -559,7 +559,7 @@ const PROVIDER_META = {
             <div class="font-medium">Accent color</div>
             <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 capitalize">{{ accent.accent }}</div>
           </div>
-          <div role="radiogroup" aria-label="Accent color" class="flex items-center gap-2">
+          <div role="radiogroup" aria-label="Accent color" class="flex flex-wrap items-center justify-end gap-2">
             <button
               v-for="opt in accentOptions"
               :key="opt.value"
@@ -593,7 +593,7 @@ const PROVIDER_META = {
 
       <div class="space-y-3 px-4 py-4 text-sm">
         <!-- Current build -->
-        <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Current</div>
             <div class="mt-0.5 font-mono text-sm">
@@ -608,7 +608,7 @@ const PROVIDER_META = {
           </div>
 
           <!-- Upstream -->
-          <div class="text-right">
+          <div class="sm:text-right">
             <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Upstream</div>
             <div v-if="versionInfo?.upstream" class="mt-0.5">
               <a
@@ -617,7 +617,7 @@ const PROVIDER_META = {
                 rel="noreferrer"
                 class="font-mono text-sm text-accent-700 hover:underline dark:text-accent-400"
               >{{ versionInfo.upstream.commit.short_sha }} ↗</a>
-              <div class="mt-0.5 max-w-[260px] truncate text-[11px] text-neutral-500 dark:text-neutral-400" :title="versionInfo.upstream.commit.message">
+              <div class="mt-0.5 max-w-full truncate text-[11px] text-neutral-500 sm:max-w-[260px] dark:text-neutral-400" :title="versionInfo.upstream.commit.message">
                 {{ versionInfo.upstream.commit.message }}
               </div>
               <div class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">

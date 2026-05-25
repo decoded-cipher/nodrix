@@ -122,7 +122,7 @@ const rangeEnd = computed(() =>
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl px-6 py-8">
+  <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
     <header class="mb-5">
       <h1 class="text-xl font-semibold tracking-tight">Audit log</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
@@ -161,7 +161,8 @@ const rangeEnd = computed(() =>
     </div>
 
     <div class="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <table class="w-full text-left text-sm">
+      <div class="overflow-x-auto">
+      <table class="w-full min-w-[720px] text-left text-sm">
         <thead class="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
           <tr>
             <th class="px-4 py-2 font-medium">When</th>
@@ -210,6 +211,7 @@ const rangeEnd = computed(() =>
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Pagination -->
