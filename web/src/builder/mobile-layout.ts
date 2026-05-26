@@ -6,11 +6,14 @@
 
 import { GRID_COLUMNS } from './grid';
 import type { Layout, MobilePlacement, WidgetInstance } from '../types';
+import { manifestFor, type WidgetType } from '@nodrix/widgets-shared';
 
 const HALF = GRID_COLUMNS / 2; // 12 cols — a paired "small" widget
 
-// Widgets that pair two-up; everything else spans full width on a phone.
-const SMALL_TYPES = new Set(['iot-value', 'iot-toggle', 'iot-push']);
+// Driven by each widget's manifest.quirks.mobile.paired.
+function isPaired(type: string): boolean {
+  return manifestFor(type as WidgetType).quirks?.mobile?.paired === true;
+}
 
 // Top-to-bottom, then left-to-right (matches the viewer's compaction).
 function readingOrder(items: readonly WidgetInstance[]): WidgetInstance[] {
@@ -30,7 +33,7 @@ export function deriveMobilePlacements(desktop: Layout): MobilePlacement[] {
   };
 
   for (const it of readingOrder(desktop.items)) {
-    if (SMALL_TYPES.has(it.type)) {
+    if (isPaired(it.type)) {
       if (pending) {
         const rowH = Math.max(pending.h, it.h);
         out.push({ id: pending.id, x: 0, y, w: HALF, h: pending.h });

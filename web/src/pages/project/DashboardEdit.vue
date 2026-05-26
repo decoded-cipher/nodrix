@@ -4,11 +4,11 @@ import { useRoute, useRouter } from 'vue-router';
 import { GridLayout, GridItem } from 'grid-layout-plus';
 import { useProjectStore } from '../../stores/project';
 import { toast } from '../../lib/toast';
-import { specFor } from '../../builder/widget-catalog';
+import { manifestFor as specFor } from '@nodrix/widgets-shared';
 import { GRID_COLUMNS, ROW_HEIGHT_EDIT, GRID_MARGIN, MIN_UNITS, normalizeLayout } from '../../builder/grid';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
-import { applyProps, createWidgetElement, buildDataIndex, subscriptionVariable, type DataIndex } from '../../builder/render-widget';
+import { applyProps, createWidgetElement, buildDataIndex, applyLiveUpdate, applySnapshotItem, type DataIndex } from '../../builder/render-widget';
 import { effectiveMobileLayout } from '../../builder/mobile-layout';
 import { DashboardWs } from '../../ws';
 import type { Dashboard, Layout, WidgetInstance, WidgetType, WsServerMsg, SnapshotMsg, UpdateMsg } from '../../types';
@@ -185,40 +185,7 @@ function applySnapshot(snap: SnapshotMsg) {
   for (const item of activeLayout.value.items) {
     const el = widgetEls.value.get(item.id);
     if (!el) continue;
-    if (item.type === 'iot-chart') {
-      const series = (item.props['series'] as Array<Record<string, unknown>> | undefined) ?? [];
-      (el as HTMLElement & { series?: unknown }).series = series.map((s) => {
-        const variable = String(s['variable'] ?? '');
-        const col = snap.series[variable];
-        const pts: Array<{ ts: number; value: number }> = [];
-        if (col) {
-          for (let i = 0; i < col.t.length; i++) {
-            const value = Number(col.v[i]);
-            if (Number.isFinite(value)) pts.push({ ts: col.t[i]!, value });
-          }
-        }
-        return {
-          key: variable,
-          label: typeof s['label'] === 'string' ? s['label'] : variable,
-          color: typeof s['color'] === 'string' ? s['color'] : undefined,
-          points: pts,
-        };
-      });
-    } else if (item.type === 'iot-map') {
-      const m = el as HTMLElement & { updateVar?: (k: string, v: unknown, ts: number) => void };
-      for (const key of mapVariableKeys(item)) {
-        const latest = snap.variables[key];
-        if (latest !== undefined) m.updateVar?.(key, latest.value, latest.received_at);
-      }
-    } else {
-      const variable = subscriptionVariable(item);
-      if (!variable) continue;
-      const latest = snap.variables[variable];
-      if (latest !== undefined) {
-        (el as HTMLElement & { value?: unknown; ts?: number }).value = latest.value;
-        (el as HTMLElement & { value?: unknown; ts?: number }).ts = latest.received_at;
-      }
-    }
+    applySnapshotItem(el, item, snap.variables, snap.series);
   }
 }
 
@@ -229,46 +196,10 @@ function applyUpdate(u: UpdateMsg) {
   const targets = idx.byKey.get(u.variable);
   if (!targets) return;
   for (const el of targets) {
-    if (el.tagName === 'IOT-CHART') {
-      const itemId = [...widgetEls.value.entries()].find(([, e]) => e === el)?.[0];
-      const sk = itemId ? idx.chartKeys.get(itemId)?.get(u.variable) : null;
-      if (sk && Number.isFinite(Number(u.value))) {
-        (el as HTMLElement & {
-          appendPoint?: (k: string, p: { ts: number; value: number }) => void;
-        }).appendPoint?.(sk, { ts: u.ts, value: Number(u.value) });
-      }
-    } else if (el.tagName === 'IOT-TOGGLE') {
-      (el as HTMLElement & { current?: unknown; ts?: number }).current = u.value;
-      (el as HTMLElement & { current?: unknown; ts?: number }).ts = u.ts;
-    } else if (el.tagName === 'IOT-MAP') {
-      (el as HTMLElement & { updateVar?: (k: string, v: unknown, ts: number) => void }).updateVar?.(
-        u.variable,
-        u.value,
-        u.ts
-      );
-    } else {
-      (el as HTMLElement & { value?: unknown; ts?: number }).value = u.value;
-      (el as HTMLElement & { value?: unknown; ts?: number }).ts = u.ts;
-    }
+    const itemId = [...widgetEls.value.entries()].find(([, e]) => e === el)?.[0];
+    const km = itemId ? idx.chartKeys.get(itemId) : undefined;
+    applyLiveUpdate(el, el.tagName.toLowerCase(), u, km);
   }
-}
-
-// Variable keys a map widget subscribes to (lat/lng of live markers + any
-// value variable). Mirrors the subscription logic in buildDataIndex.
-function mapVariableKeys(item: { props: Record<string, unknown> }): string[] {
-  const markers = (item.props['markers'] as Array<Record<string, unknown>> | undefined) ?? [];
-  const keys = new Set<string>();
-  for (const mk of markers) {
-    if ((mk['source'] ?? 'static') === 'variable') {
-      const lat = String(mk['latVar'] ?? '');
-      const lng = String(mk['lngVar'] ?? '');
-      if (lat) keys.add(lat);
-      if (lng) keys.add(lng);
-    }
-    const value = String(mk['valueVar'] ?? '');
-    if (value) keys.add(value);
-  }
-  return [...keys];
 }
 
 function newWidgetId(): string {
@@ -322,14 +253,10 @@ function duplicateItem(id: string) {
 
 function updateItem(next: WidgetInstance) {
   const prev = layout.value.items.find((it) => it.id === next.id);
-  // Swap w/h when a slider's orientation flips — a 4×2 horizontal slider
-  // should become a 2×4 vertical one, so the user doesn't have to manually
-  // re-shape the widget after switching orientation.
-  if (
-    prev &&
-    next.type === 'iot-slider' &&
-    prev.props['orientation'] !== next.props['orientation']
-  ) {
+  // Manifest-driven: a widget may declare `quirks.swapDimensionsOnPropChange`
+  // so flipping that prop also swaps w/h (e.g. iot-slider orientation rotates).
+  const swapProp = prev ? specFor(next.type).quirks?.swapDimensionsOnPropChange : undefined;
+  if (prev && swapProp && prev.props[swapProp] !== next.props[swapProp]) {
     next = { ...next, w: next.h, h: next.w };
   }
   layout.value = {

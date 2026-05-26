@@ -14,6 +14,15 @@ import { listDashboards, getDashboard } from '../domains/dashboards/service';
 import { listAutomations } from '../domains/automations/service';
 import { listIntegrations } from '../domains/integrations/service';
 import { redactIntegration } from './redact';
+import { CATALOG as WIDGET_CATALOG } from '@nodrix/widgets-shared';
+
+// Public MCP shape — mirrors what the old worker/src/mcp/widget-specs.ts exposed.
+const WIDGET_SPECS = WIDGET_CATALOG.map((m) => ({
+  type: m.id,
+  description: m.mcp.description,
+  defaultProps: m.defaultProps,
+  propTypes: m.mcp.propTypes,
+}));
 
 const READ_ONLY = { readOnlyHint: true } as const;
 const project = z.string().describe('Project id. Optional for a project-scoped token; required for an all-projects token.');
@@ -114,6 +123,17 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
         const pid = await resolveProjectId(env, props, args.project);
         return await getDashboard(env, pid, args.dashboard_id);
       })
+  );
+
+  server.registerTool(
+    'list_widget_types',
+    {
+      description:
+        'List the available widget types and their canonical prop shapes. Call before add_widget / update_widget to know what `props` each type expects.',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    () => run(async () => ({ widget_types: WIDGET_SPECS }))
   );
 
   server.registerTool(

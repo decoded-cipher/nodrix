@@ -1,19 +1,13 @@
-// Lightweight validator for the dashboard layout JSON. Mirrors the shape in
-// web/src/builder/layout-schema.ts. Kept loose on purpose — widget props are
-// validated client-side; the server just enforces the structural envelope so
-// we never persist a layout that the renderer can't even iterate over.
+// Lightweight validator for the dashboard layout JSON. Allowed widget types
+// and variable extractors are driven by the shared manifest catalog — never
+// per-type branches in this file.
 
-export type WidgetType = 'iot-value' | 'iot-gauge' | 'iot-chart' | 'iot-toggle' | 'iot-push' | 'iot-slider' | 'iot-map';
+import { extractVariables, isChartSeriesExtractor } from '@nodrix/widgets-shared';
+import { ALLOWED_TYPES as MANIFEST_ALLOWED, manifestFor } from '@nodrix/widgets-shared';
 
-const ALLOWED_TYPES: ReadonlySet<string> = new Set([
-  'iot-value',
-  'iot-gauge',
-  'iot-chart',
-  'iot-toggle',
-  'iot-push',
-  'iot-slider',
-  'iot-map',
-]);
+export type { WidgetType } from '@nodrix/widgets-shared';
+
+const ALLOWED_TYPES: ReadonlySet<string> = MANIFEST_ALLOWED;
 
 export type WidgetInstance = {
   id: string;
@@ -21,7 +15,7 @@ export type WidgetInstance = {
   y: number;
   w: number;
   h: number;
-  type: WidgetType;
+  type: string;
   props: Record<string, unknown>;
 };
 
@@ -111,42 +105,27 @@ function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
-// Variable keys referenced by a layout. Charts use a `series` array of
-// `{ variable }`; maps use a `markers` array of `{ latVar, lngVar, valueVar }`;
-// every other widget uses a single `variable` prop.
+// Variable keys referenced by a layout. Driven by each widget's manifest
+// variableExtractor — no per-type branches in this file.
 export function variablesFromLayout(layout: Layout): string[] {
   const set = new Set<string>();
   for (const item of layout.items) {
-    const props = item.props;
-    if (item.type === 'iot-chart' && Array.isArray(props['series'])) {
-      for (const s of props['series'] as Array<Record<string, unknown>>) {
-        if (typeof s['variable'] === 'string') set.add(s['variable']);
-      }
-    } else if (item.type === 'iot-map' && Array.isArray(props['markers'])) {
-      for (const m of props['markers'] as Array<Record<string, unknown>>) {
-        if ((m['source'] ?? 'static') === 'variable') {
-          if (typeof m['latVar'] === 'string') set.add(m['latVar']);
-          if (typeof m['lngVar'] === 'string') set.add(m['lngVar']);
-        }
-        if (typeof m['valueVar'] === 'string') set.add(m['valueVar']);
-      }
-    } else if (typeof props['variable'] === 'string') {
-      set.add(props['variable']);
-    }
+    const m = manifestFor(item.type as Parameters<typeof manifestFor>[0]);
+    if (!m) continue;
+    for (const v of extractVariables(m, item.props)) set.add(v);
   }
   return [...set];
 }
 
-// Variable keys that actually need historical series on a dashboard. Only chart
-// widgets consume series; every other widget renders from latest state alone, so
-// the snapshot doesn't need to ship history for them.
+// Variable keys that need historical series on a dashboard. Only widgets whose
+// extractor declares isChartSeries consume series; others render from latest
+// state alone, so the snapshot doesn't ship history for them.
 export function chartVariablesFromLayout(layout: Layout): string[] {
   const set = new Set<string>();
   for (const item of layout.items) {
-    if (item.type !== 'iot-chart' || !Array.isArray(item.props['series'])) continue;
-    for (const s of item.props['series'] as Array<Record<string, unknown>>) {
-      if (typeof s['variable'] === 'string') set.add(s['variable']);
-    }
+    const m = manifestFor(item.type as Parameters<typeof manifestFor>[0]);
+    if (!m || !isChartSeriesExtractor(m.runtime.variableExtractor)) continue;
+    for (const v of extractVariables(m, item.props)) set.add(v);
   }
   return [...set];
 }

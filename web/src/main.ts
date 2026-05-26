@@ -2,7 +2,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import { router } from './router';
-import { registerWidgets } from './widgets/register';
+import { registerWidgets } from '@nodrix/widgets-shared/registry';
 import { onUnauthorized } from './api';
 import { progress } from './lib/progress';
 import { useThemeStore } from './stores/theme';

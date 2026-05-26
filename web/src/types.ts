@@ -88,7 +88,8 @@ export type UserToken = {
   expires_at?: number | null;
 };
 
-export type WidgetType = 'iot-value' | 'iot-gauge' | 'iot-chart' | 'iot-toggle' | 'iot-push' | 'iot-slider' | 'iot-map';
+export type { WidgetType } from '@nodrix/widgets-shared';
+import type { WidgetType as _WT } from '@nodrix/widgets-shared';
 
 export type WidgetInstance = {
   id: string;
@@ -96,7 +97,7 @@ export type WidgetInstance = {
   y: number;
   w: number;
   h: number;
-  type: WidgetType;
+  type: _WT;
   props: Record<string, unknown>;
 };
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { specFor } from './widget-catalog';
+import { manifestFor as specFor } from '@nodrix/widgets-shared';
 import { useProjectStore } from '../stores/project';
 import Dropdown from '../components/Dropdown.vue';
 import Toggle from '../components/Toggle.vue';

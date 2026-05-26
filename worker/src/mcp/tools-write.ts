@@ -14,6 +14,7 @@ import { createProject, updateProject } from '../domains/projects/service';
 import { createVariable, updateVariable, setVariableControl } from '../domains/variables/service';
 import { createDashboard, updateDashboard, getDashboard } from '../domains/dashboards/service';
 import { newId } from '../platform/lib/ids';
+import { WIDGET_IDS, type WidgetType } from '@nodrix/widgets-shared';
 import { createAutomation, updateAutomation, runAutomationNow } from '../domains/automations/service';
 import { createIntegration, updateIntegration, testIntegration } from '../domains/integrations/service';
 
@@ -106,9 +107,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       )
   );
 
-  const widgetType = z.enum([
-    'iot-value', 'iot-gauge', 'iot-chart', 'iot-toggle', 'iot-push', 'iot-slider', 'iot-map',
-  ]);
+  const widgetType = z.enum(WIDGET_IDS as unknown as readonly [WidgetType, ...WidgetType[]]);
 
   type WidgetItem = { id: string; type: string; x: number; y: number; w: number; h: number; props: Record<string, unknown> };
   type DashboardLayout = { grid: { columns: number }; items: WidgetItem[]; mobile?: unknown; refresh?: number };
@@ -117,7 +116,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     'add_widget',
     {
       description:
-        'Add a widget to a dashboard. Generates the widget id if omitted. Returns the inserted widget.',
+        'Add a widget to a dashboard. Generates the widget id if omitted. Returns the inserted widget. Call list_widget_types first to see the canonical shape of `props` for each widget type — passing the wrong keys (e.g. `series: ["power"]` instead of `series: [{variable:"power"}]`) silently drops the binding.',
       inputSchema: {
         project,
         dashboard_id: z.string(),
@@ -154,7 +153,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     'update_widget',
     {
       description:
-        'Update a single widget in a dashboard. Any field omitted is left unchanged; props REPLACES (not merges) — fetch via list_widgets first if you want to merge.',
+        'Update a single widget in a dashboard. Any field omitted is left unchanged; props REPLACES (not merges) — fetch via list_widgets first if you want to merge. See list_widget_types for the canonical `props` shape of each widget type.',
       inputSchema: {
         project,
         dashboard_id: z.string(),

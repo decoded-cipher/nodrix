@@ -1,0 +1,44 @@
+{
+  "id": "iot-gauge",
+  "label": "Gauge",
+  "description": "Arc gauge with min/max bounds.",
+  "category": "Monitor",
+  "dataTypes": ["Numeric (bounded)"],
+  "whenToUse": "Visualize a single bounded value such as battery percentage, fill level, or signal strength.",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 17a9 9 0 0 1 18 0\"/><path d=\"M12 17l4.5-4.5\"/><circle cx=\"12\" cy=\"17\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+
+  "defaultSize": { "w": 6, "h": 6 },
+  "defaultProps": { "title": "", "variable": "", "min": 0, "max": 100 },
+
+  "fields": [
+    { "key": "title", "label": "Title", "type": "string" },
+    { "key": "variable", "label": "Variable", "type": "variable" },
+    { "key": "min", "label": "Min", "type": "number" },
+    { "key": "max", "label": "Max", "type": "number" }
+  ],
+  "bindings": {
+    "attributes": [
+      { "prop": "title", "type": "string" },
+      { "prop": "variable", "type": "string" },
+      { "prop": "min", "type": "number" },
+      { "prop": "max", "type": "number" }
+    ],
+    "properties": []
+  },
+
+  "runtime": {
+    "variableExtractor": { "kind": "scalar", "prop": "variable" },
+    "liveUpdate": { "kind": "valueProperty" },
+    "snapshot": { "kind": "valueProperty" }
+  },
+
+  "mcp": {
+    "description": "Arc gauge with min/max bounds.",
+    "propTypes": {
+      "title": "string",
+      "variable": "string (variable key)",
+      "min": "number",
+      "max": "number"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "id": "iot-map",
+  "label": "Map",
+  "description": "Geographic markers from static coords or live lat/lng variables.",
+  "category": "Monitor",
+  "dataTypes": ["Lat/Lng pairs", "Static coordinates"],
+  "whenToUse": "Plot device or asset locations on a map — fleet tracking, or fixed sensors across a site. Each marker can sit at fixed coordinates or follow a lat/lng variable pair, with an optional value shown on click.",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z\"/><circle cx=\"12\" cy=\"11\" r=\"2.25\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+
+  "defaultSize": { "w": 12, "h": 8 },
+  "defaultProps": {
+    "title": "",
+    "basemap": "auto",
+    "zoom": 13,
+    "centerLat": 0,
+    "centerLng": 0,
+    "markers": []
+  },
+
+  "fields": [
+    { "key": "title", "label": "Title", "type": "string" },
+    {
+      "key": "basemap",
+      "label": "Basemap",
+      "type": "select",
+      "options": ["auto", "streets", "light", "dark", "satellite"]
+    },
+    { "key": "zoom", "label": "Default zoom (before data)", "type": "number" },
+    { "key": "centerLat", "label": "Center latitude", "type": "number" },
+    { "key": "centerLng", "label": "Center longitude", "type": "number" },
+    { "key": "markers", "label": "Markers", "type": "markers" }
+  ],
+  "bindings": {
+    "attributes": [
+      { "prop": "title", "type": "string" },
+      { "prop": "basemap", "type": "string" },
+      { "prop": "zoom", "type": "number" },
+      { "prop": "centerLat", "type": "number", "attr": "data-center-lat" },
+      { "prop": "centerLng", "type": "number", "attr": "data-center-lng" }
+    ],
+    "properties": [{ "prop": "markers", "as": "markers", "transform": "raw" }]
+  },
+
+  "runtime": {
+    "variableExtractor": {
+      "kind": "markerArray",
+      "prop": "markers",
+      "sourceField": "source",
+      "sourceVariableValue": "variable",
+      "gatedVarKeys": ["latVar", "lngVar"],
+      "unconditionalVarKeys": ["valueVar"]
+    },
+    "liveUpdate": { "kind": "updateVar", "method": "updateVar" },
+    "snapshot": { "kind": "updateVar", "method": "updateVar" }
+  },
+
+  "mcp": {
+    "description": "Geographic markers from static coords or live lat/lng variables.",
+    "propTypes": {
+      "title": "string",
+      "basemap": "\"auto\" | \"streets\" | \"light\" | \"dark\" | \"satellite\"",
+      "zoom": "number",
+      "centerLat": "number",
+      "centerLng": "number",
+      "markers": "Array<{ source: \"static\" | \"variable\", lat?: number, lng?: number, latVar?: string, lngVar?: string, label?: string, valueVar?: string, color?: string }>"
+    }
+  }
+}

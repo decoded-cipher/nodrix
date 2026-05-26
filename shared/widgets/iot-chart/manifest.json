@@ -1,0 +1,79 @@
+{
+  "id": "iot-chart",
+  "label": "Chart",
+  "description": "Time-series chart with one or more series.",
+  "category": "Monitor",
+  "dataTypes": ["Numeric time series"],
+  "whenToUse": "Plot trends for one or more metrics over a time window (15m to 24h). Good for spotting drift, spikes, or correlations.",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 3v18h18\"/><path d=\"M7 14l3.5-3.5 3 2L19 6\"/><circle cx=\"19\" cy=\"6\" r=\"1.4\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+
+  "defaultSize": { "w": 12, "h": 6 },
+  "defaultProps": {
+    "title": "",
+    "window": "1h",
+    "chartType": "line",
+    "zoom": false,
+    "series": []
+  },
+
+  "fields": [
+    { "key": "title", "label": "Title", "type": "string" },
+    {
+      "key": "window",
+      "label": "Window",
+      "type": "select",
+      "options": ["15m", "1h", "6h", "24h"]
+    },
+    {
+      "key": "chartType",
+      "label": "Type",
+      "type": "select",
+      "options": ["line", "area", "bar", "stepline"]
+    },
+    { "key": "zoom", "label": "Enable zoom", "type": "boolean" },
+    { "key": "series", "label": "Series", "type": "series" }
+  ],
+  "bindings": {
+    "attributes": [
+      { "prop": "title", "type": "string" },
+      { "prop": "chartType", "type": "string", "attr": "data-chart-type" },
+      { "prop": "zoom", "type": "boolean" }
+    ],
+    "properties": [
+      {
+        "prop": "series",
+        "as": "series",
+        "transform": "seriesArray",
+        "keyField": "variable",
+        "labelField": "label",
+        "colorField": "color"
+      }
+    ]
+  },
+
+  "runtime": {
+    "variableExtractor": {
+      "kind": "arrayItems",
+      "prop": "series",
+      "varKey": "variable",
+      "isChartSeries": true
+    },
+    "liveUpdate": {
+      "kind": "appendPoint",
+      "method": "appendPoint",
+      "coerceNumeric": true
+    },
+    "snapshot": { "kind": "seriesPrePopulate", "prop": "series" }
+  },
+
+  "mcp": {
+    "description": "Time-series chart with one or more series.",
+    "propTypes": {
+      "title": "string",
+      "window": "\"15m\" | \"1h\" | \"6h\" | \"24h\"",
+      "chartType": "\"line\" | \"area\" | \"bar\" | \"stepline\"",
+      "zoom": "boolean",
+      "series": "Array<{ variable: string, label?: string, color?: string }>"
+    }
+  }
+}

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { CATALOG, CATEGORY_ORDER, type WidgetCategory, type WidgetSpec } from './widget-catalog';
+import type { WidgetManifest } from '@nodrix/widgets-shared';
+import { CATALOG } from '@nodrix/widgets-shared';
+type WidgetCategory = 'Monitor' | 'Control';
+type WidgetSpec = WidgetManifest;
+const CATEGORY_ORDER: ReadonlyArray<WidgetCategory> = ['Monitor', 'Control'];
 import type { WidgetType } from '../types';
 
 // `open` drives the off-canvas drawer below lg; on lg+ the palette is a static
@@ -14,9 +18,10 @@ const tipPos = ref<{ top: number; left: number }>({ top: 0, left: 0 });
 const groups = computed(() => {
   const seen = new Map<WidgetCategory, WidgetSpec[]>();
   for (const w of CATALOG) {
-    const arr = seen.get(w.category) ?? [];
+    const cat = w.category as WidgetCategory;
+    const arr = seen.get(cat) ?? [];
     arr.push(w);
-    seen.set(w.category, arr);
+    seen.set(cat, arr);
   }
   return CATEGORY_ORDER.filter((c) => seen.has(c)).map((c) => ({
     category: c,
@@ -64,10 +69,10 @@ function hideTip() {
         <div class="grid grid-cols-3 gap-1.5">
           <button
             v-for="w in g.items"
-            :key="w.type"
+            :key="(w.id as WidgetType)"
             type="button"
             class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-900/30 dark:hover:text-accent-300"
-            @click="$emit('add', w.type)"
+            @click="$emit('add', (w.id as WidgetType))"
             @mouseenter="showTip(w, $event)"
             @mouseleave="hideTip"
             @focus="showTip(w, $event)"

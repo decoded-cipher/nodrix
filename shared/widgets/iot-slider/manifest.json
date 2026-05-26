@@ -1,0 +1,70 @@
+{
+  "id": "iot-slider",
+  "label": "Slider",
+  "description": "Set a numeric value within a range.",
+  "category": "Control",
+  "dataTypes": ["Numeric command"],
+  "whenToUse": "Set a continuous numeric value — brightness, fan speed, setpoint, volume. Sends the command on release; reflects reported state via the chosen metric.",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12h18\"/><circle cx=\"14\" cy=\"12\" r=\"3.25\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+
+  "defaultSize": { "w": 8, "h": 4 },
+  "defaultProps": {
+    "title": "",
+    "variable": "",
+    "orientation": "horizontal",
+    "min": 0,
+    "max": 100,
+    "step": 1,
+    "unit": ""
+  },
+
+  "fields": [
+    { "key": "title", "label": "Title", "type": "string" },
+    { "key": "variable", "label": "Variable", "type": "variable" },
+    {
+      "key": "orientation",
+      "label": "Orientation",
+      "type": "select",
+      "options": ["horizontal", "vertical"]
+    },
+    { "key": "min", "label": "Min", "type": "number" },
+    { "key": "max", "label": "Max", "type": "number" },
+    { "key": "step", "label": "Step", "type": "number" },
+    { "key": "unit", "label": "Unit", "type": "string" }
+  ],
+  "bindings": {
+    "attributes": [
+      { "prop": "title", "type": "string" },
+      { "prop": "variable", "type": "string" },
+      { "prop": "orientation", "type": "string" },
+      { "prop": "min", "type": "number" },
+      { "prop": "max", "type": "number" },
+      { "prop": "step", "type": "number" },
+      { "prop": "unit", "type": "string" }
+    ],
+    "properties": []
+  },
+
+  "runtime": {
+    "variableExtractor": { "kind": "scalar", "prop": "variable" },
+    "liveUpdate": { "kind": "valueProperty" },
+    "snapshot": { "kind": "valueProperty" }
+  },
+
+  "quirks": {
+    "swapDimensionsOnPropChange": "orientation"
+  },
+
+  "mcp": {
+    "description": "Set a numeric value within a range.",
+    "propTypes": {
+      "title": "string",
+      "variable": "string (variable key)",
+      "orientation": "\"horizontal\" | \"vertical\"",
+      "min": "number",
+      "max": "number",
+      "step": "number",
+      "unit": "string"
+    }
+  }
+}

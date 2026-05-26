@@ -1,0 +1,10 @@
+{
+  "name": "@nodrix/widgets-shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./registry": "./registry.ts"
+  }
+}

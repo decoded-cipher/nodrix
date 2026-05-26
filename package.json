@@ -6,7 +6,8 @@
   "workspaces": [
     "worker",
     "web",
-    "promo"
+    "promo",
+    "shared/*"
   ],
   "scripts": {
     "dev": "bun run --filter @nodrix/worker dev",

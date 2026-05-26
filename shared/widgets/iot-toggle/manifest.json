@@ -1,0 +1,53 @@
+{
+  "id": "iot-toggle",
+  "label": "Toggle",
+  "description": "Send an on/off command to a device.",
+  "category": "Control",
+  "dataTypes": ["Boolean command"],
+  "whenToUse": "Send an on/off command to a device — relays, switches, actuators. Reflects the latest reported state.",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"2.5\" y=\"7\" width=\"19\" height=\"10\" rx=\"5\"/><circle cx=\"16.5\" cy=\"12\" r=\"2.5\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+
+  "defaultSize": { "w": 6, "h": 4 },
+  "defaultProps": {
+    "title": "",
+    "variable": "",
+    "onValue": "on",
+    "offValue": "off"
+  },
+
+  "fields": [
+    { "key": "title", "label": "Title", "type": "string" },
+    { "key": "variable", "label": "Variable", "type": "variable" },
+    { "key": "onValue", "label": "On value", "type": "string" },
+    { "key": "offValue", "label": "Off value", "type": "string" }
+  ],
+  "bindings": {
+    "attributes": [
+      { "prop": "title", "type": "string" },
+      { "prop": "variable", "type": "string" },
+      { "prop": "onValue", "type": "string", "attr": "data-on-value" },
+      { "prop": "offValue", "type": "string", "attr": "data-off-value" }
+    ],
+    "properties": []
+  },
+
+  "runtime": {
+    "variableExtractor": { "kind": "scalar", "prop": "variable" },
+    "liveUpdate": { "kind": "currentProperty" },
+    "snapshot": { "kind": "valueProperty" }
+  },
+
+  "quirks": {
+    "mobile": { "paired": true }
+  },
+
+  "mcp": {
+    "description": "Send an on/off command to a device.",
+    "propTypes": {
+      "title": "string",
+      "variable": "string (variable key)",
+      "onValue": "string",
+      "offValue": "string"
+    }
+  }
+}

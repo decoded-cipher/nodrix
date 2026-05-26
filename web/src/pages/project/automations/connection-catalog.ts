@@ -1,6 +1,5 @@
 // Registry of connection (integration) kinds. Drives the catalog grid AND the
-// create/edit form — same pattern as builder/widget-catalog.ts. Adding a kind
-// is a single entry here; no morphing v-if forms.
+// create/edit form. Adding a kind is a single entry here; no morphing v-if forms.
 
 import type { IntegrationKind } from '../../../types';
 
