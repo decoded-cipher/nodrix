@@ -28,11 +28,14 @@ import readSeries from './read/series';
 import readList from './read/list';
 import ws from './dashboard/ws';
 import { sha256Hex } from './lib/ids';
+import { NodrixMcpAgent } from './mcp/agent';
+import { authenticateMcp, touchToken } from './mcp/gate';
 
 export { ProjectDO } from './do/project-do';
 export { DashboardDO } from './do/dashboard-do';
 export { SchedulerDO } from './do/scheduler-do';
 export { Provision } from './workflows/provision';
+export { NodrixMcpAgent } from './mcp/agent';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -255,6 +258,19 @@ app.route('/v1/events', events);
 app.route('/v1/projects/:proj/variables', readList);
 app.route('/v1/projects/:proj/state', readState);
 app.route('/v1/projects/:proj/variables/:key/series', readSeries);
+
+// MCP server (Streamable HTTP). Owner-gated — returns 404 when disabled — and
+// authenticated with the existing user_tokens. The `agents` handler routes to a
+// per-session Durable Object (MCP_OBJECT); auth is resolved here and handed to
+// the agent as ctx.props so every tool is scoped to the token. See worker/src/mcp.
+const mcpHandler = NodrixMcpAgent.serve('/v1/mcp');
+app.all('/v1/mcp', async (c) => {
+  const auth = await authenticateMcp(c.env, c.req.raw);
+  if (auth instanceof Response) return auth;
+  c.executionCtx.waitUntil(touchToken(c.env, auth.tokenId));
+  (c.executionCtx as unknown as { props?: unknown }).props = auth;
+  return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx);
+});
 
 // WebSocket: dashboard live feed (session auth).
 app.route('/ws', ws);
