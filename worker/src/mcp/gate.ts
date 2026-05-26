@@ -3,9 +3,11 @@
 // instance role, and returns props the agent scopes every tool by. MCP never
 // grants more than the human behind the token.
 
+import type { Context } from 'hono';
 import type { Env } from '../env';
 import { extractBearer, lookupUserToken, touchTokenLastUsed } from '../platform/lib/tokens';
 import { mcpEnabled } from './flags';
+import { NodrixMcpAgent } from './agent';
 import type { ActorRole } from '../platform/lib/service';
 
 export type McpProps = {
@@ -40,6 +42,19 @@ export async function authenticateMcp(env: Env, req: Request): Promise<McpProps 
 // Best-effort last_used_at bump; call inside waitUntil.
 export function touchToken(env: Env, tokenId: string): Promise<void> {
   return touchTokenLastUsed(env, 'user', tokenId);
+}
+
+const mcpHandler = NodrixMcpAgent.serve('/v1/mcp');
+
+// Bearer MCP endpoint (mounted at /v1/mcp): authenticate, then hand off to the
+// per-session agent DO with the resolved props. (OAuth-auth MCP is on
+// /v1/mcp/oauth, wired in index.ts.)
+export async function mcpBearerHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const auth = await authenticateMcp(c.env, c.req.raw);
+  if (auth instanceof Response) return auth;
+  c.executionCtx.waitUntil(touchToken(c.env, auth.tokenId));
+  (c.executionCtx as unknown as { props?: unknown }).props = auth;
+  return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx);
 }
 
 function json(body: unknown, status: number): Response {

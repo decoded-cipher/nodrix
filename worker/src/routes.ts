@@ -4,7 +4,7 @@
 import { Hono } from 'hono';
 import type { Env } from './env';
 
-import { authApp } from './platform/auth/handler';
+import { authApp } from './platform/auth';
 
 // identity
 import me from './domains/identity/me';
@@ -28,8 +28,7 @@ import integrations from './domains/integrations/routes';
 
 // telemetry (device ingress)
 import telemetry from './domains/telemetry/telemetry';
-import control from './domains/telemetry/control';
-import { controlWsHandler } from './domains/telemetry/control-ws';
+import control, { controlWsHandler } from './domains/telemetry/control';
 import events from './domains/telemetry/events';
 
 // settings
@@ -38,7 +37,7 @@ import versionInfo from './domains/settings/version';
 import auditLog from './domains/settings/audit-log';
 
 // mcp
-import { mcpBearerHandler } from './mcp/http';
+import { mcpBearerHandler } from './mcp/gate';
 import oauthRoutes from './mcp/oauth';
 
 type App = Hono<{ Bindings: Env }>;
