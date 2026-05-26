@@ -117,6 +117,65 @@ async function toggleAuditLog(next: boolean) {
   }
 }
 
+// ─── MCP server (owner-only, opt-in) ──────────────────────────────────────────
+const mcpEnabled = ref(false);
+const mcpSaving = ref(false);
+const mcpUrl = computed(() => `${window.location.origin}/v1/mcp`);
+const mcpOAuthUrl = computed(() => `${window.location.origin}/v1/mcp/oauth`);
+const mcpConnectSnippet = computed(
+  () => `claude mcp add --transport http nodrix ${mcpUrl.value} \\\n  --header "Authorization: Bearer <your token>"`
+);
+
+async function toggleMcp(next: boolean) {
+  mcpSaving.value = true;
+  try {
+    const res = await api.put<{ mcp_enabled: boolean }>('/v1/admin/settings/mcp', { enabled: next });
+    mcpEnabled.value = res.mcp_enabled;
+    toast.success(res.mcp_enabled ? 'MCP server enabled' : 'MCP server disabled');
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    mcpSaving.value = false;
+  }
+}
+
+// Control-write sub-toggle: gates the management/control tools (incl.
+// set_variable). Default off; only meaningful when MCP is on.
+const mcpWriteEnabled = ref(false);
+const mcpWriteSaving = ref(false);
+
+async function toggleMcpWrite(next: boolean) {
+  if (next) {
+    const ok = await confirm({
+      title: 'Allow MCP control writes?',
+      message:
+        'Admin-scope tokens will be able to create, update, run automations and set variable values — including commands sent to hardware.',
+      details: ['No delete operations are ever exposed', 'Enabling the audit log is recommended'],
+      confirmLabel: 'Enable writes',
+    });
+    if (!ok) return;
+  }
+  mcpWriteSaving.value = true;
+  try {
+    const res = await api.put<{ mcp_write_enabled: boolean }>('/v1/admin/settings/mcp-write', { enabled: next });
+    mcpWriteEnabled.value = res.mcp_write_enabled;
+    toast.success(res.mcp_write_enabled ? 'MCP control writes enabled' : 'MCP control writes disabled');
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    mcpWriteSaving.value = false;
+  }
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  } catch {
+    toast.error('Copy failed');
+  }
+}
+
 // Version & updates state. Polled once on mount — the worker side
 // KV-caches the upstream lookup (1h) so this is cheap to re-fetch.
 type VersionInfo = {
@@ -218,8 +277,10 @@ onMounted(async () => {
       providers.value = [];
     }
     try {
-      const s = await api.get<{ audit_log_enabled: boolean }>('/v1/admin/settings');
+      const s = await api.get<{ audit_log_enabled: boolean; mcp_enabled: boolean; mcp_write_enabled: boolean }>('/v1/admin/settings');
       auditLogEnabled.value = s.audit_log_enabled;
+      mcpEnabled.value = s.mcp_enabled;
+      mcpWriteEnabled.value = s.mcp_write_enabled;
     } catch { /* ignore */ }
     await refreshVersion();
   }
@@ -684,6 +745,93 @@ const PROVIDER_META = {
 
         <div class="border-t border-neutral-100 pt-3 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
           Tracking upstream <span class="font-mono">{{ versionInfo?.upstream_repo ?? '…' }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- MCP server (owner-only) -->
+    <section v-if="isOwner" class="mb-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="flex items-center justify-between gap-4 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold">MCP server</div>
+          <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Let AI clients (Claude, IDEs) read your projects over the Model Context
+            Protocol, authenticated with an API token. Off by default; read-only.
+          </div>
+        </div>
+        <Toggle
+          :model-value="mcpEnabled"
+          :disabled="mcpSaving"
+          label="MCP server"
+          class="shrink-0"
+          @update:model-value="toggleMcp"
+        />
+      </div>
+      <div v-if="mcpEnabled" class="space-y-3 px-4 py-3 text-sm">
+        <div>
+          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Endpoint</div>
+          <div class="flex items-center gap-2">
+            <code class="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800">{{ mcpUrl }}</code>
+            <button
+              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="copyText(mcpUrl)"
+            >Copy</button>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (Claude Code)</div>
+          <div class="flex items-start gap-2">
+            <pre class="min-w-0 flex-1 overflow-x-auto rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800"><code>{{ mcpConnectSnippet }}</code></pre>
+            <button
+              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="copyText(mcpConnectSnippet)"
+            >Copy</button>
+          </div>
+          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Create a read-scoped token in
+            <router-link :to="{ name: 'tokens' }" class="underline">Tokens</router-link>
+            and paste it in place of <code>&lt;your token&gt;</code>.
+          </div>
+        </div>
+
+        <!-- OAuth connector URL (claude.ai web) -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai — OAuth)</div>
+          <div class="flex items-center gap-2">
+            <code class="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800">{{ mcpOAuthUrl }}</code>
+            <button
+              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="copyText(mcpOAuthUrl)"
+            >Copy</button>
+          </div>
+          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Add as a custom connector in claude.ai — you'll sign in here and approve access. No token needed.
+          </div>
+        </div>
+
+        <!-- Control-write sub-toggle -->
+        <div class="flex items-start justify-between gap-4 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+          <div class="min-w-0">
+            <div class="font-medium">Allow control writes</div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+              Let admin-scope tokens create, update, run automations, and set variable
+              values (including hardware commands). Read tools stay available regardless.
+              No delete operations are ever exposed.
+            </div>
+            <div
+              v-if="mcpWriteEnabled && !auditLogEnabled"
+              class="mt-1.5 rounded bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+            >
+              Tip: enable the Audit log below to record MCP-driven changes.
+            </div>
+          </div>
+          <Toggle
+            :model-value="mcpWriteEnabled"
+            :disabled="mcpWriteSaving"
+            label="Allow control writes"
+            class="shrink-0"
+            @update:model-value="toggleMcpWrite"
+          />
         </div>
       </div>
     </section>

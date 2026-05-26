@@ -11,10 +11,14 @@
     "types": "wrangler types --config ../wrangler.toml"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.13.2",
     "better-auth": "^1.6.11",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.6.12",
-    "nanoid": "^5.1.11"
+    "nanoid": "^5.1.11",
+    "zod": "^4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241224.0",

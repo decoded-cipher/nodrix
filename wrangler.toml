@@ -38,7 +38,7 @@ run_worker_first = true
 binding = "DB"
 database_name = "nodrix"
 database_id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
-migrations_dir = "worker/src/db/migrations"
+migrations_dir = "worker/src/platform/db/migrations"
 
 # R2 — cold telemetry history, NDJSON partitioned by project + hour.
 [[r2_buckets]]
@@ -48,6 +48,12 @@ bucket_name = "nodrix-telemetry"
 # KV — short-TTL read cache for /state + cached Access JWKS.
 [[kv_namespaces]]
 binding = "KV"
+id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
+
+# KV — OAuth 2.1 storage (clients, grants, tokens) for the MCP connector flow.
+# Managed entirely by @cloudflare/workers-oauth-provider; encrypted props at rest.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
 id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
 
 # Durable Objects.
@@ -64,9 +70,16 @@ class_name = "DashboardDO"
 name = "SCHEDULER_DO"
 class_name = "SchedulerDO"
 
+# MCP server agent (Streamable HTTP). The `agents` library keys one DO instance
+# per client session, so requests never funnel through a singleton. Only spun up
+# when the owner-gated /v1/mcp endpoint is enabled and hit.
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "NodrixMcpAgent"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["ProjectDO", "DashboardDO", "SchedulerDO"]
+new_sqlite_classes = ["ProjectDO", "DashboardDO", "SchedulerDO", "NodrixMcpAgent"]
 
 # Workflows — provisioning only. Never on the hot path. See plan §10.
 # (Schedule/sunset automations are driven by the SchedulerDO alarm, not a Workflow.)
