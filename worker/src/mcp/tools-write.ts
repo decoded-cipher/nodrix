@@ -10,11 +10,11 @@ import type { McpProps } from './gate';
 import { actorOf, scopeProjectId } from './scope';
 import { run } from './result';
 import { redactIntegration } from './redact';
-import { createProject, updateProject } from '../services/projects';
-import { createVariable, updateVariable, setVariableControl } from '../services/variables';
-import { createDashboard, updateDashboard } from '../services/dashboards';
-import { createAutomation, updateAutomation, runAutomationNow } from '../services/automations';
-import { createIntegration, updateIntegration, testIntegration } from '../services/integrations';
+import { createProject, updateProject } from '../domains/projects/service';
+import { createVariable, updateVariable, setVariableControl } from '../domains/variables/service';
+import { createDashboard, updateDashboard } from '../domains/dashboards/service';
+import { createAutomation, updateAutomation, runAutomationNow } from '../domains/automations/service';
+import { createIntegration, updateIntegration, testIntegration } from '../domains/integrations/service';
 
 const project = z
   .string()
@@ -24,7 +24,6 @@ const project = z
 export function registerWriteTools(server: McpServer, env: Env, props: McpProps): void {
   const actor = () => actorOf(props);
 
-  // ---- projects -----------------------------------------------------------
   server.registerTool(
     'create_project',
     { description: 'Create a project. Requires an owner/admin token.', inputSchema: { name: z.string() } },
@@ -41,7 +40,6 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       run(() => updateProject(env, actor(), scopeProjectId(props, args.project), { name: args.name, description: args.description }))
   );
 
-  // ---- variables ----------------------------------------------------------
   server.registerTool(
     'create_variable',
     {
@@ -74,7 +72,6 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     (args) => run(() => setVariableControl(env, actor(), scopeProjectId(props, args.project), { variable: args.variable, value: args.value }))
   );
 
-  // ---- dashboards ---------------------------------------------------------
   server.registerTool(
     'create_dashboard',
     {
@@ -108,7 +105,6 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       )
   );
 
-  // ---- automations --------------------------------------------------------
   server.registerTool(
     'create_automation',
     {
@@ -171,7 +167,6 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     (args) => run(() => runAutomationNow(env, actor(), scopeProjectId(props, args.project), args.automation_id))
   );
 
-  // ---- integrations -------------------------------------------------------
   server.registerTool(
     'create_integration',
     {

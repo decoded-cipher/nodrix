@@ -8,11 +8,11 @@ import type { Env } from '../env';
 import type { McpProps } from './gate';
 import { actorOf, resolveProjectId } from './scope';
 import { run } from './result';
-import { listAccessibleProjects, getProject } from '../services/projects';
-import { listVariables, getState, getSeries } from '../services/variables';
-import { listDashboards, getDashboard } from '../services/dashboards';
-import { listAutomations } from '../services/automations';
-import { listIntegrations } from '../services/integrations';
+import { listAccessibleProjects, getProject } from '../domains/projects/service';
+import { listVariables, getState, getSeries } from '../domains/variables/service';
+import { listDashboards, getDashboard } from '../domains/dashboards/service';
+import { listAutomations } from '../domains/automations/service';
+import { listIntegrations } from '../domains/integrations/service';
 import { redactIntegration } from './redact';
 
 const READ_ONLY = { readOnlyHint: true } as const;

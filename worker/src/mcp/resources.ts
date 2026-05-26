@@ -7,8 +7,8 @@ import { ResourceTemplate, type McpServer } from '@modelcontextprotocol/sdk/serv
 import type { Env } from '../env';
 import type { McpProps } from './gate';
 import { actorOf, resolveProjectId } from './scope';
-import { listAccessibleProjects, getProject, type ProjectSummary } from '../services/projects';
-import { getState, listVariables } from '../services/variables';
+import { listAccessibleProjects, getProject, type ProjectSummary } from '../domains/projects/service';
+import { getState, listVariables } from '../domains/variables/service';
 
 export function registerResources(server: McpServer, env: Env, props: McpProps): void {
   const accessibleProjects = async (): Promise<ProjectSummary[]> => {

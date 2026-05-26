@@ -12,10 +12,10 @@
 import { Hono } from 'hono';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
 import type { Env } from '../env';
-import { buildAuth } from '../auth';
+import { buildAuth } from '../platform/auth';
 import { mcpEnabled } from './flags';
 import type { McpProps } from './gate';
-import type { ActorRole } from '../services/context';
+import type { ActorRole } from '../platform/lib/service';
 
 const oauth = new Hono<{ Bindings: Env }>();
 

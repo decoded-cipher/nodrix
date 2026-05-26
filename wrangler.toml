@@ -38,7 +38,7 @@ run_worker_first = true
 binding = "DB"
 database_name = "nodrix"
 database_id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
-migrations_dir = "worker/src/db/migrations"
+migrations_dir = "worker/src/platform/db/migrations"
 
 # R2 — cold telemetry history, NDJSON partitioned by project + hour.
 [[r2_buckets]]

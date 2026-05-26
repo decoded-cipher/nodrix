@@ -2,7 +2,7 @@
 // and turn a thrown ServiceError (or any error) into an MCP tool error result
 // instead of crashing the request.
 
-import { isServiceError } from '../services/errors';
+import { isServiceError } from '../platform/lib/service';
 
 type ToolResult = {
   content: { type: 'text'; text: string }[];

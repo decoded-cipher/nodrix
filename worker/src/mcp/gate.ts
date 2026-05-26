@@ -4,9 +4,9 @@
 // grants more than the human behind the token.
 
 import type { Env } from '../env';
-import { sha256Hex } from '../lib/ids';
+import { extractBearer, lookupUserToken, touchTokenLastUsed } from '../platform/lib/tokens';
 import { mcpEnabled } from './flags';
-import type { ActorRole } from '../services/context';
+import type { ActorRole } from '../platform/lib/service';
 
 export type McpProps = {
   tokenId: string;
@@ -22,28 +22,10 @@ export type McpProps = {
 export async function authenticateMcp(env: Env, req: Request): Promise<McpProps | Response> {
   if (!(await mcpEnabled(env))) return json({ error: 'not_found' }, 404);
 
-  const authz = req.headers.get('authorization');
-  const token = authz?.startsWith('Bearer ') ? authz.slice(7).trim() : '';
+  const token = extractBearer(req);
   if (!token) return unauthorized();
 
-  const hash = await sha256Hex(token);
-  const now = Math.floor(Date.now() / 1000);
-  const row = await env.DB
-    .prepare(
-      `SELECT t.id, t.project_id, t.scope, t.created_by, u.role
-         FROM user_tokens t
-         JOIN users u ON u.id = t.created_by
-        WHERE t.hash = ? AND t.revoked_at IS NULL
-          AND (t.expires_at IS NULL OR t.expires_at > ?)`
-    )
-    .bind(hash, now)
-    .first<{
-      id: string;
-      project_id: string | null;
-      scope: 'read' | 'admin';
-      created_by: string;
-      role: ActorRole | null;
-    }>();
+  const row = await lookupUserToken(env, token);
   if (!row) return unauthorized();
 
   return {
@@ -51,18 +33,13 @@ export async function authenticateMcp(env: Env, req: Request): Promise<McpProps 
     scope: row.scope,
     projectId: row.project_id,
     createdBy: row.created_by,
-    role: row.role ?? 'member',
+    role: row.role,
   };
 }
 
 // Best-effort last_used_at bump; call inside waitUntil.
-export async function touchToken(env: Env, tokenId: string): Promise<void> {
-  try {
-    await env.DB
-      .prepare(`UPDATE user_tokens SET last_used_at = ? WHERE id = ?`)
-      .bind(Math.floor(Date.now() / 1000), tokenId)
-      .run();
-  } catch { /* best-effort */ }
+export function touchToken(env: Env, tokenId: string): Promise<void> {
+  return touchTokenLastUsed(env, 'user', tokenId);
 }
 
 function json(body: unknown, status: number): Response {

@@ -8,7 +8,7 @@
 //                        so an LLM can never command hardware by default.
 
 import type { Env } from '../env';
-import { getSetting } from '../lib/deployment-settings';
+import { getSetting } from '../platform/lib/deployment-settings';
 
 export const MCP_ENABLED_KEY = 'mcp_enabled';
 export const MCP_WRITE_ENABLED_KEY = 'mcp_write_enabled';

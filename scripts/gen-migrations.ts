@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
-const srcDir = join(repoRoot, 'worker', 'src', 'db', 'migrations');
-const outPath = join(repoRoot, 'worker', 'src', 'db', 'migrations.gen.ts');
+const srcDir = join(repoRoot, 'worker', 'src', 'platform', 'db', 'migrations');
+const outPath = join(repoRoot, 'worker', 'src', 'platform', 'db', 'migrations.gen.ts');
 
 // Splits a SQL file into individual statements. Handles:
 //   - `--` line comments (stripped)
