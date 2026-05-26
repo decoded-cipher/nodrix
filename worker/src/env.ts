@@ -17,6 +17,10 @@ export interface Env {
   // Singleton scheduler DO: one alarm set to the next schedule/sunset automation
   // fire time. Re-armed when automations change. Replaces the every-minute cron.
   SCHEDULER_DO: DurableObjectNamespace;
+  // MCP server agent. One DO instance per client session (streamable-http:<id>),
+  // only instantiated when the owner-gated /v1/mcp endpoint is hit. Bound under
+  // the name the `agents` library expects by default (MCP_OBJECT).
+  MCP_OBJECT: DurableObjectNamespace;
   PROVISION: Workflow;
 
   // Upstream repo (owner/repo) the Settings → Version & updates page polls

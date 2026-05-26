@@ -64,9 +64,16 @@ class_name = "DashboardDO"
 name = "SCHEDULER_DO"
 class_name = "SchedulerDO"
 
+# MCP server agent (Streamable HTTP). The `agents` library keys one DO instance
+# per client session, so requests never funnel through a singleton. Only spun up
+# when the owner-gated /v1/mcp endpoint is enabled and hit.
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "NodrixMcpAgent"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["ProjectDO", "DashboardDO", "SchedulerDO"]
+new_sqlite_classes = ["ProjectDO", "DashboardDO", "SchedulerDO", "NodrixMcpAgent"]
 
 # Workflows — provisioning only. Never on the hot path. See plan §10.
 # (Schedule/sunset automations are driven by the SchedulerDO alarm, not a Workflow.)
