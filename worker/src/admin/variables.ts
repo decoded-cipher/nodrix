@@ -5,6 +5,8 @@ import { resolveProject, type ProjectContextVars } from '../middleware/resolve-p
 import { newId, newToken, sha256Hex } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import type { ProjectDO } from '../do/project-do';
+import { createVariable, updateVariable } from '../services/variables';
+import { actorFromSession, serviceErrorResponse } from '../lib/service-http';
 
 const variables = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
@@ -36,39 +38,17 @@ variables.get('/', async (c) => {
 // POST /v1/admin/projects/:proj/variables  body: { key, unit? }
 // Manual declaration (telemetry also auto-creates variables on first sight).
 variables.post('/', async (c) => {
-  const body = await c.req.json<{ key?: string; unit?: string | null }>();
-  const key = (body.key ?? '').trim();
-  if (!key) return c.json({ error: 'bad_request', reason: 'missing_key' }, 400);
-
   const project = c.get('project');
-  const user = c.get('user');
-  const id = newId('variable');
-  const now = Math.floor(Date.now() / 1000);
-
+  const body = await c.req.json<{ key?: string; unit?: string | null }>();
   try {
-    await c.env.DB
-      .prepare(
-        `INSERT INTO project_variables (id, project_id, key, unit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      )
-      .bind(id, project.id, key, body.unit ?? null, now, now)
-      .run();
-  } catch {
-    return c.json({ error: 'conflict', reason: 'duplicate_key' }, 409);
+    const v = await createVariable(c.env, actorFromSession(c.get('user')), project.id, {
+      key: body.key ?? '',
+      unit: body.unit ?? null,
+    });
+    return c.json(v, 201);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
   }
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: 'variable.create',
-      targetType: 'variable',
-      targetId: id,
-      metadata: { key },
-    })
-  );
-
-  return c.json({ id, key, unit: body.unit ?? null, created_at: now, updated_at: now }, 201);
 });
 
 // PATCH /v1/admin/projects/:proj/variables/:id  body: { unit? }
@@ -76,21 +56,15 @@ variables.patch('/:id', async (c) => {
   const project = c.get('project');
   const id = c.req.param('id');
   const body = await c.req.json<{ unit?: string | null }>();
-
   if (!('unit' in body)) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
-
-  const now = Math.floor(Date.now() / 1000);
-  const res = await c.env.DB
-    .prepare(`UPDATE project_variables SET unit = ?, updated_at = ? WHERE id = ? AND project_id = ?`)
-    .bind(body.unit ?? null, now, id, project.id)
-    .run();
-  if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
-
-  const row = await c.env.DB
-    .prepare(`SELECT id, key, unit, created_at, updated_at, last_seen FROM project_variables WHERE id = ?`)
-    .bind(id)
-    .first();
-  return c.json(row);
+  try {
+    const row = await updateVariable(c.env, actorFromSession(c.get('user')), project.id, id, {
+      unit: body.unit ?? null,
+    });
+    return c.json(row);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
+  }
 });
 
 // DELETE /v1/admin/projects/:proj/variables/:id

@@ -2,11 +2,10 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
-import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
-import { runAutomation } from '../engine/run';
-import type { AutomationContext } from '../engine/types';
 import { rescheduleScheduler, ensureScheduler } from '../do/scheduler-do';
+import { createAutomation, updateAutomation, runAutomationNow } from '../services/automations';
+import { actorFromSession, serviceErrorResponse } from '../lib/service-http';
 
 const automations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
@@ -99,7 +98,6 @@ automations.get('/', async (c) => {
 // POST /v1/admin/projects/:proj/automations
 automations.post('/', async (c) => {
   const project = c.get('project');
-  const user = c.get('user');
   const body = await c.req.json<{
     name?: string;
     description?: string | null;
@@ -108,59 +106,19 @@ automations.post('/', async (c) => {
     actions?: unknown[];
     enabled?: boolean;
   }>();
-
-  const name = (body.name ?? '').trim();
-  if (!name) return c.json({ error: 'bad_request', reason: 'missing_name' }, 400);
-  if (!TRIGGER_TYPES.includes(body.trigger_type as TriggerType)) {
-    return c.json({ error: 'bad_request', reason: 'invalid_trigger_type' }, 400);
+  try {
+    const a = await createAutomation(c.env, actorFromSession(c.get('user')), project.id, {
+      name: body.name ?? '',
+      description: body.description ?? null,
+      trigger_type: body.trigger_type ?? '',
+      trigger_config: body.trigger_config,
+      actions: body.actions,
+      enabled: body.enabled,
+    });
+    return c.json(a, 201);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
   }
-
-  const id = newId('automation');
-  const now = Math.floor(Date.now() / 1000);
-  const enabled = body.enabled === false ? 0 : 1;
-  const triggerConfig = JSON.stringify(body.trigger_config ?? {});
-  const actions = JSON.stringify(Array.isArray(body.actions) ? body.actions : []);
-
-  await c.env.DB
-    .prepare(
-      `INSERT INTO automations
-         (id, project_id, name, description, enabled, trigger_type,
-          trigger_config, actions, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      id,
-      project.id,
-      name,
-      body.description ?? null,
-      enabled,
-      body.trigger_type,
-      triggerConfig,
-      actions,
-      user.id,
-      now,
-      now
-    )
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: 'automation.create',
-      targetType: 'automation',
-      targetId: id,
-      metadata: { name, trigger_type: body.trigger_type },
-    })
-  );
-  c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
-  if (isScheduled(body.trigger_type)) c.executionCtx.waitUntil(rescheduleScheduler(c.env));
-
-  const row = await c.env.DB
-    .prepare(`SELECT * FROM automations WHERE id = ?`)
-    .bind(id)
-    .first<AutomationRow>();
-  return c.json(shape(row!), 201);
 });
 
 // POST /v1/admin/projects/:proj/automations/:id/run
@@ -169,32 +127,17 @@ automations.post('/', async (c) => {
 automations.post('/:id/run', async (c) => {
   const project = c.get('project');
   const id = c.req.param('id');
-
-  const row = await c.env.DB
-    .prepare(`SELECT * FROM automations WHERE id = ? AND project_id = ?`)
-    .bind(id, project.id)
-    .first<AutomationRow>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
-
-  const ctx: AutomationContext = {
-    source: 'manual',
-    projectId: project.id,
-    ts: Math.floor(Date.now() / 1000),
-    depth: 0,
-  };
-  const result = await runAutomation(c.env, row, ctx);
-
-  const updated = await c.env.DB
-    .prepare(`SELECT * FROM automations WHERE id = ?`)
-    .bind(id)
-    .first<AutomationRow>();
-  return c.json({ result, automation: shape(updated!) });
+  try {
+    const out = await runAutomationNow(c.env, actorFromSession(c.get('user')), project.id, id);
+    return c.json(out);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
+  }
 });
 
 // PATCH /v1/admin/projects/:proj/automations/:id
 automations.patch('/:id', async (c) => {
   const project = c.get('project');
-  const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json<{
     name?: string;
@@ -203,60 +146,18 @@ automations.patch('/:id', async (c) => {
     trigger_config?: unknown;
     actions?: unknown[];
   }>();
-
-  const existing = await c.env.DB
-    .prepare(`SELECT id, trigger_type FROM automations WHERE id = ? AND project_id = ?`)
-    .bind(id, project.id)
-    .first<{ id: string; trigger_type: string }>();
-  if (!existing) return c.json({ error: 'not_found' }, 404);
-
-  const sets: string[] = [];
-  const vals: unknown[] = [];
-  if (typeof body.name === 'string' && body.name.trim()) {
-    sets.push('name = ?'); vals.push(body.name.trim());
+  try {
+    const a = await updateAutomation(c.env, actorFromSession(c.get('user')), project.id, id, {
+      name: body.name,
+      ...('description' in body ? { description: body.description ?? null } : {}),
+      enabled: body.enabled,
+      ...('trigger_config' in body ? { trigger_config: body.trigger_config } : {}),
+      ...('actions' in body ? { actions: body.actions } : {}),
+    });
+    return c.json(a);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
   }
-  if ('description' in body) {
-    sets.push('description = ?'); vals.push(body.description ?? null);
-  }
-  if (typeof body.enabled === 'boolean') {
-    sets.push('enabled = ?'); vals.push(body.enabled ? 1 : 0);
-  }
-  if ('trigger_config' in body) {
-    sets.push('trigger_config = ?'); vals.push(JSON.stringify(body.trigger_config ?? {}));
-  }
-  if ('actions' in body) {
-    sets.push('actions = ?'); vals.push(JSON.stringify(Array.isArray(body.actions) ? body.actions : []));
-  }
-  if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
-
-  const now = Math.floor(Date.now() / 1000);
-  sets.push('updated_at = ?'); vals.push(now);
-  vals.push(id, project.id);
-
-  await c.env.DB
-    .prepare(`UPDATE automations SET ${sets.join(', ')} WHERE id = ? AND project_id = ?`)
-    .bind(...vals)
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: typeof body.enabled === 'boolean' && Object.keys(body).length === 1
-        ? `automation.${body.enabled ? 'enable' : 'disable'}`
-        : 'automation.update',
-      targetType: 'automation',
-      targetId: id,
-    })
-  );
-  c.executionCtx.waitUntil(invalidateProjectDO(c.env, project.id));
-  if (isScheduled(existing.trigger_type)) c.executionCtx.waitUntil(rescheduleScheduler(c.env));
-
-  const row = await c.env.DB
-    .prepare(`SELECT * FROM automations WHERE id = ?`)
-    .bind(id)
-    .first<AutomationRow>();
-  return c.json(shape(row!));
 });
 
 // DELETE /v1/admin/projects/:proj/automations/:id

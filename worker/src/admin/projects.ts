@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession, type UserContextVars } from '../middleware/require-session';
-import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import type { ProjectDO } from '../do/project-do';
+import { createProject, updateProject } from '../services/projects';
+import { actorFromSession, serviceErrorResponse } from '../lib/service-http';
 
 const projects = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -49,87 +50,28 @@ projects.get('/', async (c) => {
 });
 
 projects.post('/', async (c) => {
-  const user = c.get('user');
-  // Members can't create projects; they're assigned to existing ones.
-  if (user.role !== 'owner' && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
-
   const body = await c.req.json<{ name?: string }>();
-  const name = (body.name ?? '').trim();
-  if (!name) return c.json({ error: 'bad_request', reason: 'missing_name' }, 400);
-
-  const id = newId('project');
-  const now = Math.floor(Date.now() / 1000);
-
-  await c.env.DB
-    .prepare(
-      `INSERT INTO projects (id, name, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(id, name, user.id, now, now)
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: id,
-      userId: user.id,
-      action: 'project.create',
-      targetType: 'project',
-      targetId: id,
-      metadata: { name },
-    })
-  );
-
-  return c.json({ id, name, created_at: now, updated_at: now }, 201);
+  try {
+    const p = await createProject(c.env, actorFromSession(c.get('user')), { name: body.name ?? '' });
+    return c.json(p, 201);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
+  }
 });
 
 // PATCH /v1/admin/projects/:proj  body: { name?, description? }
 projects.patch('/:proj', async (c) => {
   const projId = c.req.param('proj');
-  const user = c.get('user');
-
-  if (!(await canAccess(c.env, user, projId))) return c.json({ error: 'forbidden' }, 403);
-
-  const body = await c.req.json<{
-    name?: string;
-    description?: string | null;
-  }>();
-
-  const sets: string[] = [];
-  const vals: unknown[] = [];
-  if (typeof body.name === 'string' && body.name.trim()) {
-    sets.push('name = ?'); vals.push(body.name.trim());
+  const body = await c.req.json<{ name?: string; description?: string | null }>();
+  try {
+    const row = await updateProject(c.env, actorFromSession(c.get('user')), projId, {
+      name: body.name,
+      ...('description' in body ? { description: body.description ?? null } : {}),
+    });
+    return c.json(row);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
   }
-  if ('description' in body) { sets.push('description = ?'); vals.push(body.description ?? null); }
-  if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
-
-  const now = Math.floor(Date.now() / 1000);
-  sets.push('updated_at = ?'); vals.push(now);
-  vals.push(projId);
-
-  await c.env.DB
-    .prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...vals)
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: projId,
-      userId: user.id,
-      action: 'project.update',
-      targetType: 'project',
-      targetId: projId,
-      metadata: { fields: Object.keys(body) },
-    })
-  );
-
-  const row = await c.env.DB
-    .prepare(
-      `SELECT id, name, description, created_at, updated_at, archived_at
-         FROM projects WHERE id = ?`
-    )
-    .bind(projId)
-    .first();
-  return c.json(row);
 });
 
 // POST /v1/admin/projects/:proj/flush  -> { flushed, keys, newCursor }

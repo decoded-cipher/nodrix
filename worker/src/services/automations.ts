@@ -179,10 +179,11 @@ export async function updateAutomation(
   vals.push(id, projectId);
   await env.DB.prepare(`UPDATE automations SET ${sets.join(', ')} WHERE id = ? AND project_id = ?`).bind(...vals).run();
 
+  const providedCount = Object.values(input).filter((v) => v !== undefined).length;
   await recordAudit(env, {
     projectId,
     userId: actor.userId,
-    action: typeof input.enabled === 'boolean' && Object.keys(input).length === 1
+    action: typeof input.enabled === 'boolean' && providedCount === 1
       ? `automation.${input.enabled ? 'enable' : 'disable'}`
       : 'automation.update',
     targetType: 'automation',
