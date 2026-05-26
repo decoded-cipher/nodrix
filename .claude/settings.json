@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kill 66202)",
+      "Bash(bunx esbuild *)",
+      "Read(//tmp/**)",
+      "Bash(ls -la /tmp/nodrix-bundle-check.js)",
+      "Bash(cd \"/Users/arjunkrishna/Developer/My Projects/nodrix\" && cat /private/tmp/claude-501/-Users-arjunkrishna-Developer-My-Projects-nodrix/b6e6209c-4e62-408f-b784-09db1dbcd9df/tasks/bji3aoapv.output 2>/dev/null | tail -15; echo \"--- dist updated now? ---\"; ls -la worker/dist/index.js; echo \"--- handler bundled in? ---\"; grep -c \"share_token = ? AND visibility\" worker/dist/index.js 2>/dev/null; rm -f /tmp/nodrix-bundle-check.js /tmp/esbuild-check.log)",
+      "Bash(rm -f _probe_p13.ts _probe_p123.ts)",
+      "Bash(git checkout *)",
+      "Bash(sed -n '14,65p' worker/src/admin/dashboards.ts)",
+      "Bash(sed -n '77,99p' worker/src/admin/automations.ts)",
+      "Bash(sed -n '15,72p' worker/src/admin/integrations.ts)",
+      "Bash(grep -nA14 \"AutomationRow\" worker/src/engine/types.ts)",
+      "Bash(perl -0pi -e 's/if \\\\\\(isScheduled\\\\\\(input\\\\.trigger_type\\\\\\)\\\\\\) await rescheduleScheduler\\\\\\(env\\\\\\);/if \\(isScheduled\\(input.trigger_type\\)\\) await safeReschedule\\(env\\);/; s/if \\\\\\(isScheduled\\\\\\(existing\\\\.trigger_type\\\\\\)\\\\\\) await rescheduleScheduler\\\\\\(env\\\\\\);/if \\(isScheduled\\(existing.trigger_type\\)\\) await safeReschedule\\(env\\);/' src/services/automations.ts)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"wrangler.*dry-run\")",
+      "Bash(sed -n '105,116p' public/dashboards.ts)",
+      "Bash(sed -n '126,140p' engine/run.ts)",
+      "Bash(sed -n '35,55p' dashboard/ws.ts)",
+      "Bash(sed -n '78,102p' admin/dashboards.ts)",
+      "Bash(bun scripts/gen-migrations.ts)",
+      "Bash(bun scripts/gen-version.ts)",
+      "Bash(git -C \"/Users/arjunkrishna/Developer/My Projects/nodrix\" status --short)",
+      "Bash(bun /tmp/remap-imports.mjs)",
+      "Bash(bun /tmp/restore-markers.mjs)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

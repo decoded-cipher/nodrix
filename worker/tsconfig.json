@@ -6,7 +6,9 @@
     "jsxImportSource": "hono/jsx",
     "outDir": "dist",
     "rootDir": "src",
-    "noEmit": true
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src/**/*", "worker-configuration.d.ts"],
   "exclude": ["test/**/*", "dist", "node_modules"]

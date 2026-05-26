@@ -3,9 +3,8 @@
 
 import type { Env } from '../env';
 import type { McpProps } from './gate';
-import type { Actor } from '../services/context';
-import { ServiceError } from '../services/errors';
-import { assertProjectAccess } from '../services/projects';
+import { type Actor, ServiceError } from '../platform/lib/service';
+import { assertProjectAccess } from '../domains/projects/service';
 
 export function actorOf(props: McpProps): Actor {
   return { userId: props.createdBy, role: props.role, source: 'mcp' };
