@@ -15,7 +15,7 @@ import type { CompactSeries } from '../../platform/lib/series';
 // token to a dashboard that is BOTH public and not archived, or 404s; nothing
 // here ever exposes data outside the shared dashboard's own layout.
 //
-// Live data is delivered by polling /:token/state (see plan): the public side
+// Live data is delivered by polling /:token/state — the public side
 // deliberately does NOT touch the Dashboard DO / WebSocket, which stay
 // session-gated for members. Both endpoints are edge-cached so a popular embed
 // collapses to one origin hit per TTL.

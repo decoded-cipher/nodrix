@@ -1,5 +1,5 @@
-// Management MCP tools (Phase 3): create/update + run + control writes. Never
-// delete. Registered only when the token is admin-scope AND mcp_write_enabled is
+// Management MCP tools: create/update + run + control writes. Never delete.
+// Registered only when the token is admin-scope AND mcp_write_enabled is
 // on (see agent.ts), and each tool delegates to the shared service layer, which
 // re-derives the token creator's authority — so MCP can never exceed the human.
 

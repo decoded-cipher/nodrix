@@ -3,10 +3,10 @@ import type { Env } from '../../env';
 import { ensureMigrated } from '../db/auto-migrate';
 
 // Provisioning workflow. Reserved for durable-execution provisioning tasks that
-// genuinely need checkpointing/retries (post-v1: dataset imports, complex
+// genuinely need checkpointing/retries (dataset imports, complex
 // re-provisioning). Routine migration application happens automatically in the
-// request pipeline; this Workflow exists for the §10 contract and is exposed
-// via /v1/admin/reprovision (admin-only) for forcing a fresh migration check.
+// request pipeline; this Workflow is exposed via /v1/admin/reprovision
+// (admin-only) for forcing a fresh migration check.
 //
 // MUST NEVER be invoked from the telemetry/commands/dashboard hot paths.
 export type ProvisionParams = {

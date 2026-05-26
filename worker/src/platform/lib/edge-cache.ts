@@ -1,10 +1,9 @@
 // Cache API wrapper for the read API's /state endpoint.
 //
-// Why this exists (plan §7.2 / invariant #5): without an edge cache, every
-// /state read funnels through the Device DO that's also ingesting telemetry —
-// the DO is single-threaded, so one chatty client can starve ingest. A 1s
-// edge cache is enough to absorb realistic polling without sacrificing
-// freshness for a dashboard.
+// Without an edge cache, every /state read funnels through the Device DO that's
+// also ingesting telemetry — the DO is single-threaded, so one chatty client
+// can starve ingest. A 1s edge cache absorbs realistic polling without
+// sacrificing freshness for a dashboard.
 
 const DEFAULT_TTL_SECONDS = 1;
 

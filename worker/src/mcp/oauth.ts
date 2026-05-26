@@ -1,4 +1,4 @@
-// OAuth 2.1 authorization endpoint (Phase 2). The token, registration, and
+// OAuth 2.1 authorization endpoint. The token, registration, and
 // discovery (.well-known) endpoints are served by @cloudflare/workers-oauth-provider
 // itself; this module renders the human consent step at /authorize and completes
 // the grant. The actual MCP access tokens are minted and validated by the

@@ -1,6 +1,5 @@
 // <iot-value> — shows the latest value of a single metric.
-//
-// Contract (plan §9): data in via property/attribute, no transport knowledge.
+// Data in via property/attribute, no transport knowledge.
 // The page calls `el.value = ...` from WS updates.
 
 const TEMPLATE = `

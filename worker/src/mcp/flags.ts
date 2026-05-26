@@ -3,7 +3,7 @@
 //
 //   mcp_enabled        — master switch. When absent, /v1/mcp returns 404 so a
 //                        disabled server looks absent, not merely forbidden.
-//   mcp_write_enabled  — gates the management/control tools (Phase 3). Even an
+//   mcp_write_enabled  — gates the management/control tools. Even an
 //                        admin-scope token gets read-only tools unless this is on,
 //                        so an LLM can never command hardware by default.
 

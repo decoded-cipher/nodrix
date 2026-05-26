@@ -12,7 +12,7 @@ export interface Env {
   DB: D1Database;
   R2: R2Bucket;
   KV: KVNamespace;
-  // OAuth 2.1 store + helpers, injected by the OAuthProvider wrapper (Phase 2).
+  // OAuth 2.1 store + helpers, injected by the OAuthProvider wrapper.
   OAUTH_KV: KVNamespace;
   OAUTH_PROVIDER: OAuthHelpers;
   ASSETS: Fetcher;
