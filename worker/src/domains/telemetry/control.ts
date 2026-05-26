@@ -1,6 +1,7 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
+import { lookupProjectToken, touchTokenLastUsed } from '../../platform/lib/tokens';
 import { projectStub } from '../../platform/durable-objects/stubs';
 
 const control = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
@@ -27,5 +28,20 @@ control.post('/ack', async (c) => {
   const result = await stub.ackControl(ids);
   return c.json(result);
 });
+
+// Control WebSocket upgrade (mounted at /v1/control/ws). Separate from the routes
+// above because the token may arrive as ?token= (WS clients can't set headers on
+// the upgrade), so it can't use the requireProjectToken middleware.
+export async function controlWsHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim() || c.req.query('token');
+  if (!token) return c.text('unauthorized', 401);
+  if (c.req.header('upgrade') !== 'websocket') return c.text('expected websocket', 426);
+
+  const row = await lookupProjectToken(c.env, token);
+  if (!row) return c.text('unauthorized', 401);
+
+  c.executionCtx.waitUntil(touchTokenLastUsed(c.env, 'project', row.id));
+  return projectStub(c.env, row.project_id).fetch(c.req.raw);
+}
 
 export default control;
