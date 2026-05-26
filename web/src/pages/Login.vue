@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { authClient } from '../lib/auth-client';
 import { toast } from '../lib/toast';
@@ -8,6 +8,15 @@ import Spinner from '../components/Spinner.vue';
 
 const session = useSessionStore();
 const router = useRouter();
+const route = useRoute();
+
+// Post-login destination. Used by the OAuth consent flow (/authorize bounces
+// here when no session). Same-origin relative paths only — guards open redirect.
+const redirectTarget = computed(() => {
+  const r = route.query['redirect'];
+  const path = typeof r === 'string' ? r : '';
+  return path.startsWith('/') && !path.startsWith('//') ? path : '';
+});
 
 // Bootstrap detection: ask the worker how many users exist so we can show
 // the registration form instead of login when the deployment is empty.
@@ -64,7 +73,9 @@ async function submit() {
       if (res.error) { toast.error(res.error.message ?? `Sign-in failed (${res.error.status})`); return; }
     }
     await session.load();
-    router.replace('/');
+    // /authorize is a worker route, so a full navigation (not router.replace).
+    if (redirectTarget.value) window.location.assign(redirectTarget.value);
+    else router.replace('/');
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
@@ -76,7 +87,7 @@ async function signInWith(provider: 'google' | 'github') {
   try {
     await authClient.signIn.social({
       provider,
-      callbackURL: `${location.origin}/`,
+      callbackURL: redirectTarget.value ? `${location.origin}${redirectTarget.value}` : `${location.origin}/`,
     });
   } catch (e) {
     toast.error((e as Error).message);
