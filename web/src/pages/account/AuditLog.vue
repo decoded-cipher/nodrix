@@ -85,6 +85,16 @@ function fmt(ts: number): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
+// Pull `source` out of the metadata blob (typed as unknown). 'mcp' surfaces a
+// badge; 'http' (or absent) renders without one.
+function entrySource(e: { metadata: unknown }): string | null {
+  const m = e.metadata;
+  if (m && typeof m === 'object' && 'source' in m && typeof (m as { source: unknown }).source === 'string') {
+    return (m as { source: string }).source;
+  }
+  return null;
+}
+
 function actionTone(action: string): string {
   if (action === 'user.register') return 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800';
   if (action === 'user.login')    return 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:ring-sky-800';
@@ -176,10 +186,17 @@ const rangeEnd = computed(() =>
           <tr v-for="e in session.auditLog" :key="e.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
             <td class="px-4 py-2 text-xs text-neutral-600 dark:text-neutral-400">{{ fmt(e.created_at) }}</td>
             <td class="px-4 py-2">
-              <span
-                class="rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
-                :class="actionTone(e.action)"
-              >{{ e.action }}</span>
+              <div class="flex flex-wrap items-center gap-1">
+                <span
+                  class="rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
+                  :class="actionTone(e.action)"
+                >{{ e.action }}</span>
+                <span
+                  v-if="entrySource(e) === 'mcp'"
+                  class="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-950/60 dark:text-orange-400"
+                  title="Triggered via MCP"
+                >MCP</span>
+              </div>
             </td>
             <td class="px-4 py-2 text-xs">
               <span v-if="e.project_name" class="text-neutral-700 dark:text-neutral-300">{{ e.project_name }}</span>

@@ -201,5 +201,13 @@ export async function runAutomationNow(env: Env, actor: Actor, projectId: string
   };
   const result = await runAutomationEngine(env, row, ctx);
   const updated = await env.DB.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
+  await recordAudit(env, {
+    projectId,
+    userId: actor.userId,
+    action: 'automation.run',
+    targetType: 'automation',
+    targetId: id,
+    metadata: { status: result.status, source: actor.source },
+  });
   return { result, automation: shape(updated!) };
 }
