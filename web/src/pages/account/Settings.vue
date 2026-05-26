@@ -122,71 +122,15 @@ const mcpEnabled = ref(false);
 const mcpSaving = ref(false);
 const mcpUrl = computed(() => `${window.location.origin}/v1/mcp`);
 const mcpOAuthUrl = computed(() => `${window.location.origin}/v1/mcp/oauth`);
-
-// Inline token creation. `mcpJustCreatedToken` holds the one-time plaintext;
-// the bearer snippet inlines it until "Hide" clears it.
-const mcpJustCreatedToken = ref<string | null>(null);
-const mcpCreatingToken = ref(false);
-const mcpSnippetToken = computed(() => mcpJustCreatedToken.value ?? '<your token>');
 const mcpConnectSnippet = computed(
-  () => `claude mcp add --transport http nodrix ${mcpUrl.value} \\\n  --header "Authorization: Bearer ${mcpSnippetToken.value}"`
+  () => `claude mcp add --transport http nodrix ${mcpUrl.value} \\\n  --header "Authorization: Bearer <your token>"`
 );
-
-async function createMcpToken() {
-  mcpCreatingToken.value = true;
-  try {
-    const t = await api.post<{ token: string }>('/v1/admin/tokens', {
-      scope: 'read',
-      name: 'MCP',
-      project_id: null,
-    });
-    mcpJustCreatedToken.value = t.token;
-    toast.success('Token created — copy the command now');
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    mcpCreatingToken.value = false;
-  }
-}
-
-function clearMcpToken() {
-  mcpJustCreatedToken.value = null;
-}
-
-// Tools exposed by the server. Mirrors worker/src/mcp/tools-{read,write}.ts —
-// keep in sync. Write tools are only listed when control writes are on.
-const mcpReadTools: ReadonlyArray<readonly [string, string]> = [
-  ['list_projects', 'List accessible projects'],
-  ['list_variables', 'List declared variables in a project'],
-  ['get_state', 'Latest value of every variable'],
-  ['get_series', 'Recent time-series ring buffer for a variable'],
-  ['list_dashboards', 'List dashboards'],
-  ['get_dashboard', 'Get a dashboard with its layout'],
-  ['list_automations', 'List automations + last run status'],
-  ['list_integrations', 'List integrations (secrets redacted)'],
-];
-const mcpWriteTools: ReadonlyArray<readonly [string, string]> = [
-  ['create_project', 'Create a project'],
-  ['update_project', 'Rename or re-describe a project'],
-  ['create_variable', 'Declare a variable'],
-  ['update_variable', "Update a variable's unit"],
-  ['set_variable', 'Set a variable value (hardware command)'],
-  ['create_dashboard', 'Create a dashboard'],
-  ['update_dashboard', 'Update a dashboard layout'],
-  ['create_automation', 'Create an automation'],
-  ['update_automation', 'Update an automation'],
-  ['run_automation', 'Run an automation now'],
-  ['create_integration', 'Create an integration'],
-  ['update_integration', 'Update an integration'],
-  ['test_integration', 'Run an integration once for testing'],
-];
 
 async function toggleMcp(next: boolean) {
   mcpSaving.value = true;
   try {
     const res = await api.put<{ mcp_enabled: boolean }>('/v1/admin/settings/mcp', { enabled: next });
     mcpEnabled.value = res.mcp_enabled;
-    if (!next) mcpJustCreatedToken.value = null; // don't leave the plaintext on screen
     toast.success(res.mcp_enabled ? 'MCP server enabled' : 'MCP server disabled');
   } catch (e) {
     toast.error((e as Error).message);
@@ -222,10 +166,6 @@ async function toggleMcpWrite(next: boolean) {
     mcpWriteSaving.value = false;
   }
 }
-
-const mcpTools = computed(() =>
-  mcpWriteEnabled.value ? [...mcpReadTools, ...mcpWriteTools] : mcpReadTools
-);
 
 async function copyText(text: string) {
   try {
@@ -816,7 +756,7 @@ const PROVIDER_META = {
           <div class="text-sm font-semibold">MCP server</div>
           <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
             Let AI clients (Claude, IDEs) read your projects over the Model Context
-            Protocol, authenticated with an API token. Off by default; read-only.
+            Protocol, authenticated with an API token. Off by default.
           </div>
         </div>
         <Toggle
@@ -827,8 +767,7 @@ const PROVIDER_META = {
           @update:model-value="toggleMcp"
         />
       </div>
-      <div v-if="mcpEnabled" class="space-y-4 px-4 py-3 text-sm">
-        <!-- Endpoint -->
+      <div v-if="mcpEnabled" class="space-y-3 px-4 py-3 text-sm">
         <div>
           <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Endpoint</div>
           <div class="flex items-center gap-2">
@@ -839,13 +778,25 @@ const PROVIDER_META = {
             >Copy</button>
           </div>
         </div>
-
-        <!-- OAuth (recommended) -->
         <div>
-          <div class="mb-1 flex items-center gap-2">
-            <div class="text-xs font-medium text-neutral-500 dark:text-neutral-400">OAuth (browser-based clients)</div>
-            <span class="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-950/60 dark:text-orange-400">Recommended</span>
+          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (Claude Code)</div>
+          <div class="flex items-start gap-2">
+            <pre class="min-w-0 flex-1 overflow-x-auto rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800"><code>{{ mcpConnectSnippet }}</code></pre>
+            <button
+              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="copyText(mcpConnectSnippet)"
+            >Copy</button>
           </div>
+          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Create a read-scoped token in
+            <router-link :to="{ name: 'tokens' }" class="underline">Tokens</router-link>
+            and paste it in place of <code>&lt;your token&gt;</code>.
+          </div>
+        </div>
+
+        <!-- OAuth connector URL (claude.ai web) -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai — OAuth)</div>
           <div class="flex items-center gap-2">
             <code class="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800">{{ mcpOAuthUrl }}</code>
             <button
@@ -854,59 +805,8 @@ const PROVIDER_META = {
             >Copy</button>
           </div>
           <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-            Add as a custom MCP connector in claude.ai (or any OAuth-capable client). You'll sign in and approve access — no token to manage.
+            Add as a custom connector in claude.ai — you'll sign in here and approve access. No token needed.
           </div>
-        </div>
-
-        <!-- Bearer (CLI / IDE) -->
-        <div>
-          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Bearer token (CLI &amp; IDE clients)</div>
-          <div class="flex items-start gap-2">
-            <pre class="min-w-0 flex-1 overflow-x-auto rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800"><code>{{ mcpConnectSnippet }}</code></pre>
-            <button
-              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              @click="copyText(mcpConnectSnippet)"
-            >Copy</button>
-          </div>
-
-          <div
-            v-if="mcpJustCreatedToken"
-            class="mt-2 rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300"
-          >
-            <div class="font-medium">Token shown once — copy the command now.</div>
-            <div class="mt-1">You won't be able to see this token again after hiding it.</div>
-            <button
-              class="mt-2 rounded border border-amber-400 px-2 py-1 text-amber-900 hover:bg-amber-100 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/60"
-              @click="clearMcpToken"
-            >Hide token</button>
-          </div>
-          <div
-            v-else
-            class="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400"
-          >
-            <div>
-              Need a token? Create one now, or pick an existing one from
-              <router-link :to="{ name: 'tokens' }" class="underline">Tokens</router-link>.
-            </div>
-            <button
-              class="shrink-0 rounded border border-neutral-200 px-2 py-1 text-neutral-700 hover:bg-neutral-50 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
-              :disabled="mcpCreatingToken"
-              @click="createMcpToken"
-            >{{ mcpCreatingToken ? 'Creating…' : 'Create read-scoped token' }}</button>
-          </div>
-        </div>
-
-        <!-- Tools exposed -->
-        <div>
-          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-            Tools available to clients ({{ mcpTools.length }})
-          </div>
-          <ul class="grid grid-cols-1 gap-x-3 gap-y-1 rounded bg-neutral-50 p-2 text-xs sm:grid-cols-2 dark:bg-neutral-800/40">
-            <li v-for="[name, desc] in mcpTools" :key="name" class="flex items-baseline gap-2">
-              <code class="shrink-0 font-mono text-neutral-700 dark:text-neutral-300">{{ name }}</code>
-              <span class="truncate text-neutral-500 dark:text-neutral-400" :title="desc">{{ desc }}</span>
-            </li>
-          </ul>
         </div>
 
         <!-- Control-write sub-toggle -->

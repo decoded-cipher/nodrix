@@ -15,18 +15,13 @@ const stack = [
 const features = [
   {
     title: 'Telemetry over plain HTTPS',
-    body: 'Hardware POSTs JSON to your project. Variables create themselves on first sight — no schema to declare, no MQTT broker to run, no SDK to install. If it can make an HTTPS request, it can talk to nodrix.',
+    body: 'Hardware POSTs JSON to your project. Variables create themselves on first sight — no schema to declare, no MQTT broker to run, no SDK to install.',
     icon: 'm4 14 5-5 4 4 7-7 M21 14V6h-8',
   },
   {
-    title: 'Realtime drag-and-drop dashboards',
+    title: 'Realtime dashboards, two-way',
     body: 'Drop widgets onto a grid, bind them to variables, and watch values update live over hibernating WebSockets that cost nothing while they sit idle.',
     icon: 'M3 4h18v16H3z M3 9h18 M9 9v11',
-  },
-  {
-    title: 'Control that flows both ways',
-    body: 'Toggles, sliders, and buttons write values back down. Hardware picks them up over a short poll or a WebSocket, applies them, and acks when done.',
-    icon: 'M7 8 3 12l4 4 M17 8l4 4-4 4 M14 4l-4 16',
   },
   {
     title: 'Automations without a server',
@@ -42,6 +37,11 @@ const features = [
     title: 'Single-tenant by design',
     body: 'Every deploy lands in your own account, on your own D1, R2, and Durable Objects. Email + password out of the box, with optional Google or GitHub sign-in.',
     icon: 'M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5z',
+  },
+  {
+    title: 'MCP for AI clients',
+    body: 'MCP server lets any client query projects, read state, and — with your explicit toggle — drive automations. Owner-gated, off by default, audit-logged.',
+    icon: 'M12 8V4H8 M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z M2 14h2 M20 14h2 M9 13v2 M15 13v2',
   },
 ];
 

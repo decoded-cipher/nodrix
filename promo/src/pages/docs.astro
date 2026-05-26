@@ -8,6 +8,7 @@ const toc = [
   { href: '#protocol', label: 'Device protocol' },
   { href: '#read-api', label: 'Read API' },
   { href: '#automations', label: 'Automations' },
+  { href: '#mcp', label: 'MCP (AI clients)' },
 ];
 
 const site = Astro.site!;
@@ -216,6 +217,62 @@ const jsonLd = {
         <p class="mt-4 text-sm leading-relaxed text-neutral-600">
           Webhook deliveries can be HMAC-signed with a shared secret, so the receiving end can verify
           the payload genuinely came from your instance.
+        </p>
+      </section>
+
+      <section id="mcp" class="mt-20 scroll-mt-24">
+        <h2 class="text-2xl font-bold tracking-tight text-neutral-900">MCP server for AI clients</h2>
+        <p class="mt-4 text-sm leading-relaxed text-neutral-700">
+          Optional Model Context Protocol server. Off by default. The owner enables it from
+          Settings → MCP server, exposing two endpoints on the same worker.
+        </p>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 class="font-mono text-sm font-semibold text-neutral-900">/v1/mcp</h3>
+            <p class="mt-2 text-sm text-neutral-600">
+              Bearer-token transport, for CLI and IDE clients (Claude Code, Cursor). Authenticates
+              with a user token from Settings → Tokens.
+            </p>
+          </div>
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 class="font-mono text-sm font-semibold text-neutral-900">/v1/mcp/oauth</h3>
+            <p class="mt-2 text-sm text-neutral-600">
+              OAuth 2.1 transport, for browser-based clients (claude.ai connectors). No token to
+              manage — the user signs in and approves a consent screen.
+            </p>
+          </div>
+        </div>
+
+        <h3 class="mt-8 text-base font-semibold text-neutral-900">What the server can do</h3>
+        <p class="mt-2 text-sm leading-relaxed text-neutral-700">
+          Read tools are always on when MCP is enabled. Management tools require a second toggle —
+          and even then, the connecting user must explicitly grant <code class="rounded bg-neutral-100 px-1 py-0.5 text-xs">mcp:manage</code> at consent time.
+          No delete operations are ever exposed.
+        </p>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h4 class="text-sm font-semibold text-neutral-900">Read</h4>
+            <ul class="mt-2 space-y-1.5 text-sm text-neutral-600">
+              <li>• Browse projects, variables, dashboards</li>
+              <li>• Read current state and recent time-series</li>
+              <li>• View automations and integrations (secrets redacted)</li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-neutral-200 bg-white p-5">
+            <h4 class="text-sm font-semibold text-neutral-900">Manage (opt-in)</h4>
+            <ul class="mt-2 space-y-1.5 text-sm text-neutral-600">
+              <li>• Create / update projects, variables, dashboards</li>
+              <li>• Create, update, and run automations</li>
+              <li>• Create / update integrations</li>
+              <li>• Send commands to hardware (set variable values)</li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="mt-4 text-sm leading-relaxed text-neutral-600">
+          Every MCP-driven write is recorded in the audit log when enabled, tagged as MCP-sourced so
+          you can tell AI-initiated changes apart from web/API ones.
         </p>
       </section>
 

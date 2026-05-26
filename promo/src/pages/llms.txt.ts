@@ -19,10 +19,11 @@ export const GET: APIRoute = ({ site }) => {
 - Two-way control: toggles/sliders/buttons write values back to hardware.
 - Edge automations: trigger on variable thresholds, schedules, sunrise/sunset, or custom events; act via variables, webhooks, or Slack.
 - Clean read API: edge-cached latest state, time-series, and variable listings behind one bearer token.
+- Optional MCP (Model Context Protocol) server — owner-gated, off by default. Lets Claude, Claude Code, and any MCP-aware client read projects and (with an explicit toggle) drive automations. Bearer transport at /v1/mcp; OAuth at /v1/mcp/oauth.
 
 ## Pages
 - [Home](${u()}): Product overview, features, and how it works.
-- [Documentation](${u('docs')}): Device protocol, read API, and automation model.
+- [Documentation](${u('docs')}): Device protocol, read API, automation model, and MCP.
 - [Widgets](${u('widgets')}): Built-in, framework-agnostic Web Component widgets.
 
 ## Markdown & full text (for machines)

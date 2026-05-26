@@ -22,11 +22,11 @@ Source: ${repo}
 
 ## Features
 1. Telemetry over plain HTTPS — Hardware POSTs JSON to the project. Variables create themselves on first sight: no schema to declare, no MQTT broker to run, no SDK to install. Anything that can make an HTTPS request can talk to nodrix.
-2. Realtime drag-and-drop dashboards — Drop widgets onto a grid, bind them to variables, and watch values update live over hibernating WebSockets that cost nothing while idle.
-3. Control that flows both ways — Toggles, sliders, and buttons write values back down. Hardware picks them up over a short poll or a WebSocket, applies them, and acks when done.
-4. Automations without a server — Fire on a variable threshold, a clock, sunrise/sunset, or a custom event. Then set variables, call webhooks, or ping Slack — all running at the edge.
-5. A clean read API — Edge-cached latest state, recent time-series, and variable listings behind one bearer token. Plug in Grafana, a React app, or a Raspberry Pi screen.
-6. Single-tenant by design — Every deploy lands in the user's own account. Email + password out of the box, with optional Google or GitHub sign-in.
+2. Realtime dashboards, two-way — Drop widgets onto a grid, bind them to variables, watch values stream live over hibernating WebSockets that cost nothing while idle. Toggles, sliders, and buttons write back to hardware on the same channel; devices ack when applied.
+3. Automations without a server — Fire on a variable threshold, a clock, sunrise/sunset, or a custom event. Then set variables, call webhooks, or ping Slack — all running at the edge.
+4. A clean read API — Edge-cached latest state, recent time-series, and variable listings behind one bearer token. Plug in Grafana, a React app, or a Raspberry Pi screen.
+5. Single-tenant by design — Every deploy lands in the user's own account. Email + password out of the box, with optional Google or GitHub sign-in.
+6. MCP server for AI clients — Optional, off by default, owner-gated. Two transports on the same worker: bearer-token at /v1/mcp (for CLI/IDE clients like Claude Code) and OAuth 2.1 at /v1/mcp/oauth (for browser-based clients like claude.ai connectors). Read tools (list/get projects, variables, dashboards, automations, integrations, state, series) are exposed when the server is on; management tools (create/update of projects, variables, dashboards, automations, integrations; run automations; set variable values) require an additional deployment-wide writes toggle AND an explicit mcp:manage scope at the consent step. No delete operations are ever exposed. Every write is recorded in the audit log when enabled, tagged with source=mcp so AI-initiated changes are distinguishable from web/API ones.
 
 ## How it works (four steps)
 1. Deploy in one click — Hit "Deploy to Cloudflare". It provisions D1, R2, KV, and the Worker straight into the account.
