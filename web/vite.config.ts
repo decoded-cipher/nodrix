@@ -25,8 +25,8 @@ export default defineConfig({
         // og.png is only for social scrapers — no need to precache it offline.
         globIgnores: ['**/og.png'],
         navigateFallback: '/index.html',
-        // Never hijack API / WebSocket requests with the SPA fallback.
-        navigateFallbackDenylist: [/^\/v1/, /^\/ws/],
+        // Never hijack worker-rendered routes with the SPA fallback.
+        navigateFallbackDenylist: [/^\/v1/, /^\/ws/, /^\/authorize/, /^\/\.well-known\//],
         cleanupOutdatedCaches: true,
       },
     }),

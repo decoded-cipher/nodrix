@@ -1,0 +1,15 @@
+{
+  "name": "nodrix-mcp-inspector",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "ui": "bun inspect.mjs",
+    "list-tools": "bun inspect.mjs --method tools/list",
+    "list-resources": "bun inspect.mjs --method resources/list",
+    "list-projects": "bun inspect.mjs --method tools/call --tool-name list_projects",
+    "list-dashboards": "bun inspect.mjs --method tools/call --tool-name list_dashboards --tool-arg project=$PROJECT",
+    "list-variables": "bun inspect.mjs --method tools/call --tool-name list_variables --tool-arg project=$PROJECT",
+    "get-state": "bun inspect.mjs --method tools/call --tool-name get_state --tool-arg project=$PROJECT"
+  }
+}

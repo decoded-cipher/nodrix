@@ -77,7 +77,7 @@ cp -Rf "${UPSTREAM_DIR}"/. .
 #     any source file upstream no longer has. We remove individual FILES only,
 #     never a directory, so the worker/ CWD inode the parent process holds stays
 #     valid.
-for dir in web worker promo scripts examples; do
+for dir in web worker promo scripts; do
   [ -d "$dir" ] || continue
   find "$dir" -type f \
     -not -path '*/node_modules/*' -not -path '*/dist/*' \

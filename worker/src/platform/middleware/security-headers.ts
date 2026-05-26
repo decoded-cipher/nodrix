@@ -8,22 +8,26 @@ const CSP_COMMON =
   'img-src \'self\' data: blob: https:; font-src \'self\' data: https://fonts.gstatic.com; ' +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; " +
   "connect-src 'self' https: wss:; worker-src 'self' blob:; " +
-  'manifest-src \'self\'; form-action \'self\'';
+  'manifest-src \'self\'';
 
-const buildCsp = (isEmbed: boolean): string =>
-  `${CSP_COMMON}; frame-ancestors ${isEmbed ? '*' : "'self'"}`;
+// form-action is enforced across the redirect chain; /authorize must allow
+// arbitrary OAuth client redirect_uris. Strict 'self' everywhere else.
+const buildCsp = (isEmbed: boolean, isAuthorize: boolean): string =>
+  `${CSP_COMMON}; form-action ${isAuthorize ? "'self' https: http:" : "'self'"}; ` +
+  `frame-ancestors ${isEmbed ? '*' : "'self'"}`;
 
 export const securityHeaders = createMiddleware(async (c, next) => {
   await next();
   if (c.res.status === 101) return; // WebSocket upgrade — leave its headers alone
 
   const isEmbed = c.req.path.startsWith('/embed/'); // embeddable, must stay frame-able
+  const isAuthorize = c.req.path.startsWith('/authorize');
   const apply = (h: Headers): void => {
     h.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
     h.set('x-content-type-options', 'nosniff');
     h.set('referrer-policy', 'strict-origin-when-cross-origin');
     h.set('permissions-policy', 'geolocation=(), camera=(), microphone=(), payment=()');
-    h.set('content-security-policy', buildCsp(isEmbed));
+    h.set('content-security-policy', buildCsp(isEmbed, isAuthorize));
     if (isEmbed) h.delete('x-frame-options');
     else h.set('x-frame-options', 'SAMEORIGIN');
   };
