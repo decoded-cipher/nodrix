@@ -45,15 +45,9 @@ migrations_dir = "worker/src/platform/db/migrations"
 binding = "R2"
 bucket_name = "nodrix-telemetry"
 
-# KV — short-TTL read cache for /state + cached Access JWKS.
+# KV — read cache and OAuth provider storage (aliased to OAUTH_KV in worker entry).
 [[kv_namespaces]]
 binding = "KV"
-id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
-
-# KV — OAuth 2.1 storage (clients, grants, tokens) for the MCP connector flow.
-# Managed entirely by @cloudflare/workers-oauth-provider; encrypted props at rest.
-[[kv_namespaces]]
-binding = "OAUTH_KV"
 id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
 
 # Durable Objects.

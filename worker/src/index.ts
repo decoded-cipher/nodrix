@@ -33,7 +33,7 @@ const apiHandler = {
   },
 };
 
-export default new OAuthProvider({
+const oauthProvider = new OAuthProvider({
   apiRoute: '/v1/mcp/oauth',
   apiHandler,
   defaultHandler: app as unknown as ExportedHandler<Env>,
@@ -42,3 +42,12 @@ export default new OAuthProvider({
   clientRegistrationEndpoint: '/v1/oauth/register',
   scopesSupported: ['mcp:read', 'mcp:manage'],
 });
+
+// OAuth provider hardcodes env.OAUTH_KV with no custom-storage option; alias
+// it to the single KV binding so wrangler.toml only declares one namespace.
+export default {
+  fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    (env as { OAUTH_KV: KVNamespace }).OAUTH_KV = env.KV;
+    return oauthProvider.fetch(req, env, ctx);
+  },
+} satisfies ExportedHandler<Env>;
