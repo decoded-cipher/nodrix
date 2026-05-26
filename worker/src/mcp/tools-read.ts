@@ -117,6 +117,28 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
   );
 
   server.registerTool(
+    'list_widgets',
+    {
+      description:
+        'List widgets in a dashboard (id, type, position, props). Mutating tools take the whole layout — read this, edit items, write back via update_dashboard.',
+      inputSchema: { project: project.optional(), dashboard_id: z.string() },
+      annotations: READ_ONLY,
+    },
+    (args) =>
+      run(async () => {
+        const pid = await resolveProjectId(env, props, args.project);
+        const d = await getDashboard(env, pid, args.dashboard_id);
+        const layout = d.layout as { grid?: { columns: number }; items?: unknown[] } | null;
+        return {
+          dashboard_id: d.id,
+          updated_at: d.updated_at,
+          grid: layout?.grid ?? { columns: 24 },
+          widgets: Array.isArray(layout?.items) ? layout!.items : [],
+        };
+      })
+  );
+
+  server.registerTool(
     'list_automations',
     {
       description: 'List automations (triggers + actions, last run status) in a project.',

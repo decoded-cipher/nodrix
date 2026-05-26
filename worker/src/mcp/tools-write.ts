@@ -12,7 +12,8 @@ import { run } from './result';
 import { redactIntegration } from './redact';
 import { createProject, updateProject } from '../domains/projects/service';
 import { createVariable, updateVariable, setVariableControl } from '../domains/variables/service';
-import { createDashboard, updateDashboard } from '../domains/dashboards/service';
+import { createDashboard, updateDashboard, getDashboard } from '../domains/dashboards/service';
+import { newId } from '../platform/lib/ids';
 import { createAutomation, updateAutomation, runAutomationNow } from '../domains/automations/service';
 import { createIntegration, updateIntegration, testIntegration } from '../domains/integrations/service';
 
@@ -103,6 +104,97 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
           if_updated_at: args.if_updated_at,
         })
       )
+  );
+
+  const widgetType = z.enum([
+    'iot-value', 'iot-gauge', 'iot-chart', 'iot-toggle', 'iot-push', 'iot-slider', 'iot-map',
+  ]);
+
+  type WidgetItem = { id: string; type: string; x: number; y: number; w: number; h: number; props: Record<string, unknown> };
+  type DashboardLayout = { grid: { columns: number }; items: WidgetItem[]; mobile?: unknown; refresh?: number };
+
+  server.registerTool(
+    'add_widget',
+    {
+      description:
+        'Add a widget to a dashboard. Generates the widget id if omitted. Returns the inserted widget.',
+      inputSchema: {
+        project,
+        dashboard_id: z.string(),
+        type: widgetType,
+        x: z.number(),
+        y: z.number(),
+        w: z.number(),
+        h: z.number(),
+        props: z.record(z.string(), z.unknown()).optional(),
+        widget_id: z.string().optional(),
+      },
+    },
+    (args) =>
+      run(async () => {
+        const pid = scopeProjectId(props, args.project);
+        const dash = await getDashboard(env, pid, args.dashboard_id);
+        const layout = (dash.layout ?? { grid: { columns: 24 }, items: [] }) as DashboardLayout;
+        const widget: WidgetItem = {
+          id: args.widget_id ?? newId('widget'),
+          type: args.type,
+          x: args.x, y: args.y, w: args.w, h: args.h,
+          props: args.props ?? {},
+        };
+        const next: DashboardLayout = { ...layout, items: [...(layout.items ?? []), widget] };
+        await updateDashboard(env, actor(), pid, args.dashboard_id, {
+          layout: next,
+          if_updated_at: dash.updated_at,
+        });
+        return { dashboard_id: dash.id, widget };
+      })
+  );
+
+  server.registerTool(
+    'update_widget',
+    {
+      description:
+        'Update a single widget in a dashboard. Any field omitted is left unchanged; props REPLACES (not merges) — fetch via list_widgets first if you want to merge.',
+      inputSchema: {
+        project,
+        dashboard_id: z.string(),
+        widget_id: z.string(),
+        type: widgetType.optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        w: z.number().optional(),
+        h: z.number().optional(),
+        props: z.record(z.string(), z.unknown()).optional(),
+      },
+    },
+    (args) =>
+      run(async () => {
+        const pid = scopeProjectId(props, args.project);
+        const dash = await getDashboard(env, pid, args.dashboard_id);
+        const layout = (dash.layout ?? { grid: { columns: 24 }, items: [] }) as DashboardLayout;
+        const items = layout.items ?? [];
+        const idx = items.findIndex((w) => w.id === args.widget_id);
+        if (idx === -1) {
+          throw new Error(`widget ${args.widget_id} not found in dashboard ${args.dashboard_id}`);
+        }
+        const cur = items[idx]!;
+        const next: WidgetItem = {
+          id: cur.id,
+          type: args.type ?? cur.type,
+          x: args.x ?? cur.x,
+          y: args.y ?? cur.y,
+          w: args.w ?? cur.w,
+          h: args.h ?? cur.h,
+          props: args.props ?? cur.props,
+        };
+        const newItems = items.slice();
+        newItems[idx] = next;
+        await updateDashboard(env, actor(), pid, args.dashboard_id, {
+          layout: { ...layout, items: newItems },
+          if_updated_at: dash.updated_at,
+        });
+        return { dashboard_id: dash.id, widget: next };
+      })
   );
 
   server.registerTool(
