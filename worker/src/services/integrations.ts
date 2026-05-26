@@ -129,10 +129,11 @@ export async function updateIntegration(
   vals.push(id, projectId);
   await env.DB.prepare(`UPDATE integrations SET ${sets.join(', ')} WHERE id = ? AND project_id = ?`).bind(...vals).run();
 
+  const providedCount = Object.values(input).filter((v) => v !== undefined).length;
   await recordAudit(env, {
     projectId,
     userId: actor.userId,
-    action: typeof input.enabled === 'boolean' && Object.keys(input).length === 1
+    action: typeof input.enabled === 'boolean' && providedCount === 1
       ? `integration.${input.enabled ? 'enable' : 'disable'}`
       : 'integration.update',
     targetType: 'integration',

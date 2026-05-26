@@ -2,10 +2,9 @@ import { Hono } from 'hono';
 import type { Env } from '../env';
 import { requireSession } from '../middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../middleware/resolve-project';
-import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
-import { executeIntegration, recordIntegrationRun } from '../engine/integrations';
-import type { AutomationContext } from '../engine/types';
+import { createIntegration, updateIntegration, testIntegration } from '../services/integrations';
+import { actorFromSession, serviceErrorResponse } from '../lib/service-http';
 
 const integrations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
@@ -71,59 +70,18 @@ integrations.get('/', async (c) => {
 // POST /v1/admin/projects/:proj/integrations
 integrations.post('/', async (c) => {
   const project = c.get('project');
-  const user = c.get('user');
-  const body = await c.req.json<{
-    name?: string;
-    kind?: string;
-    config?: unknown;
-    enabled?: boolean;
-  }>();
-
-  const name = (body.name ?? '').trim();
-  if (!name) return c.json({ error: 'bad_request', reason: 'missing_name' }, 400);
-  if (!KINDS.includes(body.kind as Kind)) {
-    return c.json({ error: 'bad_request', reason: 'invalid_kind' }, 400);
+  const body = await c.req.json<{ name?: string; kind?: string; config?: unknown; enabled?: boolean }>();
+  try {
+    const i = await createIntegration(c.env, actorFromSession(c.get('user')), project.id, {
+      name: body.name ?? '',
+      kind: body.kind ?? '',
+      config: body.config,
+      enabled: body.enabled,
+    });
+    return c.json(i, 201);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
   }
-
-  const id = newId('integration');
-  const now = Math.floor(Date.now() / 1000);
-  const enabled = body.enabled === false ? 0 : 1;
-
-  await c.env.DB
-    .prepare(
-      `INSERT INTO integrations
-         (id, project_id, name, kind, config, enabled, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      id,
-      project.id,
-      name,
-      body.kind,
-      JSON.stringify(body.config ?? {}),
-      enabled,
-      user.id,
-      now,
-      now
-    )
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: 'integration.create',
-      targetType: 'integration',
-      targetId: id,
-      metadata: { name, kind: body.kind },
-    })
-  );
-
-  const row = await c.env.DB
-    .prepare(`SELECT * FROM integrations WHERE id = ?`)
-    .bind(id)
-    .first<IntegrationRow>();
-  return c.json(shape(row!), 201);
 });
 
 // POST /v1/admin/projects/:proj/integrations/:id/test
@@ -131,103 +89,30 @@ integrations.post('/', async (c) => {
 // delivery without wiring up an automation. Records the outcome on the row.
 integrations.post('/:id/test', async (c) => {
   const project = c.get('project');
-  const user = c.get('user');
   const id = c.req.param('id');
-
-  const row = await c.env.DB
-    .prepare(
-      `SELECT id, project_id, name, kind, config, enabled
-         FROM integrations
-        WHERE id = ? AND project_id = ? AND archived_at IS NULL`
-    )
-    .bind(id, project.id)
-    .first<{ id: string; project_id: string; name: string; kind: string; config: string; enabled: number }>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
-
-  const ctx: AutomationContext = {
-    source: 'manual',
-    projectId: project.id,
-    ts: Math.floor(Date.now() / 1000),
-    variable: 'test_variable',
-    value: 42,
-    event: 'test',
-    depth: 0,
-  };
-
-  // Force-enable for the test so users can verify config before flipping it on.
-  const result = await executeIntegration(c.env, { ...row, enabled: 1 }, ctx, { test: true });
-  await recordIntegrationRun(c.env, id, result).catch(() => {});
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: 'integration.test',
-      targetType: 'integration',
-      targetId: id,
-      metadata: { status: result.status, ...(result.detail ? { detail: result.detail } : {}) },
-    })
-  );
-
-  return c.json(result);
+  try {
+    const result = await testIntegration(c.env, actorFromSession(c.get('user')), project.id, id);
+    return c.json(result);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
+  }
 });
 
 // PATCH /v1/admin/projects/:proj/integrations/:id
 integrations.patch('/:id', async (c) => {
   const project = c.get('project');
-  const user = c.get('user');
   const id = c.req.param('id');
-  const body = await c.req.json<{
-    name?: string;
-    config?: unknown;
-    enabled?: boolean;
-  }>();
-
-  const existing = await c.env.DB
-    .prepare(`SELECT id FROM integrations WHERE id = ? AND project_id = ?`)
-    .bind(id, project.id)
-    .first<{ id: string }>();
-  if (!existing) return c.json({ error: 'not_found' }, 404);
-
-  const sets: string[] = [];
-  const vals: unknown[] = [];
-  if (typeof body.name === 'string' && body.name.trim()) {
-    sets.push('name = ?'); vals.push(body.name.trim());
+  const body = await c.req.json<{ name?: string; config?: unknown; enabled?: boolean }>();
+  try {
+    const i = await updateIntegration(c.env, actorFromSession(c.get('user')), project.id, id, {
+      name: body.name,
+      ...('config' in body ? { config: body.config } : {}),
+      enabled: body.enabled,
+    });
+    return c.json(i);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
   }
-  if ('config' in body) {
-    sets.push('config = ?'); vals.push(JSON.stringify(body.config ?? {}));
-  }
-  if (typeof body.enabled === 'boolean') {
-    sets.push('enabled = ?'); vals.push(body.enabled ? 1 : 0);
-  }
-  if (sets.length === 0) return c.json({ error: 'bad_request', reason: 'no_fields' }, 400);
-
-  const now = Math.floor(Date.now() / 1000);
-  sets.push('updated_at = ?'); vals.push(now);
-  vals.push(id, project.id);
-
-  await c.env.DB
-    .prepare(`UPDATE integrations SET ${sets.join(', ')} WHERE id = ? AND project_id = ?`)
-    .bind(...vals)
-    .run();
-
-  c.executionCtx.waitUntil(
-    recordAudit(c.env, {
-      projectId: project.id,
-      userId: user.id,
-      action: typeof body.enabled === 'boolean' && Object.keys(body).length === 1
-        ? `integration.${body.enabled ? 'enable' : 'disable'}`
-        : 'integration.update',
-      targetType: 'integration',
-      targetId: id,
-    })
-  );
-
-  const row = await c.env.DB
-    .prepare(`SELECT * FROM integrations WHERE id = ?`)
-    .bind(id)
-    .first<IntegrationRow>();
-  return c.json(shape(row!));
 });
 
 // DELETE /v1/admin/projects/:proj/integrations/:id  (soft delete via archived_at)
