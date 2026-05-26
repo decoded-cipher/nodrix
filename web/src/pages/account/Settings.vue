@@ -121,6 +121,7 @@ async function toggleAuditLog(next: boolean) {
 const mcpEnabled = ref(false);
 const mcpSaving = ref(false);
 const mcpUrl = computed(() => `${window.location.origin}/v1/mcp`);
+const mcpOAuthUrl = computed(() => `${window.location.origin}/v1/mcp/oauth`);
 const mcpConnectSnippet = computed(
   () => `claude mcp add --transport http nodrix ${mcpUrl.value} \\\n  --header "Authorization: Bearer <your token>"`
 );
@@ -790,6 +791,21 @@ const PROVIDER_META = {
             Create a read-scoped token in
             <router-link :to="{ name: 'tokens' }" class="underline">Tokens</router-link>
             and paste it in place of <code>&lt;your token&gt;</code>.
+          </div>
+        </div>
+
+        <!-- OAuth connector URL (claude.ai web) -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai — OAuth)</div>
+          <div class="flex items-center gap-2">
+            <code class="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800">{{ mcpOAuthUrl }}</code>
+            <button
+              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="copyText(mcpOAuthUrl)"
+            >Copy</button>
+          </div>
+          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Add as a custom connector in claude.ai — you'll sign in here and approve access. No token needed.
           </div>
         </div>
 

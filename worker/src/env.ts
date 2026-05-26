@@ -6,11 +6,15 @@ import type {
   Fetcher,
   Workflow,
 } from '@cloudflare/workers-types';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 export interface Env {
   DB: D1Database;
   R2: R2Bucket;
   KV: KVNamespace;
+  // OAuth 2.1 store + helpers, injected by the OAuthProvider wrapper (Phase 2).
+  OAUTH_KV: KVNamespace;
+  OAUTH_PROVIDER: OAuthHelpers;
   ASSETS: Fetcher;
   PROJECT_DO: DurableObjectNamespace;
   DASHBOARD_DO: DurableObjectNamespace;

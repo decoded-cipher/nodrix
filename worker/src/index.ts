@@ -30,6 +30,9 @@ import ws from './dashboard/ws';
 import { sha256Hex } from './lib/ids';
 import { NodrixMcpAgent } from './mcp/agent';
 import { authenticateMcp, touchToken } from './mcp/gate';
+import { mcpEnabled } from './mcp/flags';
+import oauthRoutes from './mcp/oauth';
+import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 
 export { ProjectDO } from './do/project-do';
 export { DashboardDO } from './do/dashboard-do';
@@ -272,6 +275,11 @@ app.all('/v1/mcp', async (c) => {
   return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx);
 });
 
+// OAuth 2.1 authorization (consent) endpoint for MCP connectors. The provider
+// (default export below) serves /token, /register, and the .well-known docs; the
+// human consent step lives here. See worker/src/mcp/oauth.ts.
+app.route('/authorize', oauthRoutes);
+
 // WebSocket: dashboard live feed (session auth).
 app.route('/ws', ws);
 
@@ -282,4 +290,31 @@ app.get('/share/:token', (c) => serveDashboardSeo(c.env, c.req.raw, c.req.param(
 // frame-able).
 app.all('*', async (c) => c.env.ASSETS.fetch(c.req.raw));
 
-export default app;
+// OAuth 2.1 wrapper (Phase 2). Lets claude.ai-style connectors authenticate via
+// OAuth on /v1/mcp/oauth, while the bearer-token path on /v1/mcp (handled inside
+// `app`) keeps working for CLI/IDE clients. The provider serves /v1/oauth/token,
+// /v1/oauth/register, and the .well-known discovery docs; /authorize is handled
+// by `app` (mcp/oauth.ts). The OAuth MCP handler 404s when MCP is disabled, like
+// the bearer path. Named DO/Workflow exports above are unaffected.
+const oauthMcpHandler = NodrixMcpAgent.serve('/v1/mcp/oauth');
+const apiHandler = {
+  fetch: async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
+    if (!(await mcpEnabled(env))) {
+      return new Response(JSON.stringify({ error: 'not_found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return oauthMcpHandler.fetch(request, env, ctx);
+  },
+};
+
+export default new OAuthProvider({
+  apiRoute: '/v1/mcp/oauth',
+  apiHandler,
+  defaultHandler: app as unknown as ExportedHandler<Env>,
+  authorizeEndpoint: '/authorize',
+  tokenEndpoint: '/v1/oauth/token',
+  clientRegistrationEndpoint: '/v1/oauth/register',
+  scopesSupported: ['mcp:read', 'mcp:manage'],
+});

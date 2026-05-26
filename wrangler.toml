@@ -50,6 +50,12 @@ bucket_name = "nodrix-telemetry"
 binding = "KV"
 id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
 
+# KV — OAuth 2.1 storage (clients, grants, tokens) for the MCP connector flow.
+# Managed entirely by @cloudflare/workers-oauth-provider; encrypted props at rest.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
+
 # Durable Objects.
 [[durable_objects.bindings]]
 name = "PROJECT_DO"
