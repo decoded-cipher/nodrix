@@ -1,20 +1,19 @@
-// Controller side — WebSocket control + state echo.
+// Controller side — WebSocket control + state echo for the Greenhouse tunnel.
 //
-// Connects to the worker's control WS and prints (i.e. "applies") whatever
-// variable writes come in from dashboard widgets. After applying, POSTs the new
-// value back as telemetry under the SAME variable key — that's how toggles and
-// sliders subscribe for state, so retention works on refresh.
+// Connects to the worker's control WS and "applies" whatever variable writes
+// come in from dashboard widgets. After applying, POSTs the new value back as
+// telemetry under the SAME variable key — that's how toggles and sliders
+// hydrate on dashboard refresh.
 //
-// Demonstrates the three control widget types:
+// Control widgets on the Tunnel A dashboard:
 //
-//   power      — iot-toggle  ("on" / "off")
-//   restart    — iot-push    (one-shot, no echo)
-//   brightness — iot-slider  (numeric)
+//   fan              — iot-toggle  ("on" / "off")  — Relay 1
+//   light_intensity  — iot-slider  (0..100)
+//   restart          — iot-push    (one-shot, no echo)
 //
 // The keys in `handlers` below must match the "Variable" field of the
-// corresponding widget in your dashboard — rename freely. Replace the body
-// of each handler with a GPIO write / serial / MQTT publish for real hardware.
-// Acks each write so the worker stops retrying.
+// corresponding widget. Replace each handler body with a GPIO write / serial /
+// MQTT publish for real hardware. Acks each write so the worker stops retrying.
 
 import WebSocket from 'ws';
 import axios from 'axios';
@@ -33,8 +32,8 @@ function required(name) {
 // Local mirror of state. Echoed back as telemetry after each write so the
 // dashboard widget stays in sync.
 const state = {
-  power: 'off',
-  brightness: 0,
+  fan: 'off',
+  light_intensity: 62,
 };
 
 async function echo(metrics) {
@@ -50,21 +49,21 @@ async function echo(metrics) {
 }
 
 const handlers = {
-  power(value) {
-    state.power = String(value);
-    console.log(`  → power = ${state.power}`);
-    echo({ power: state.power });
+  fan(value) {
+    state.fan = String(value);
+    console.log(`  → fan = ${state.fan}`);
+    echo({ fan: state.fan });
+  },
+  light_intensity(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    state.light_intensity = Math.round(n);
+    console.log(`  → light_intensity = ${state.light_intensity}`);
+    echo({ light_intensity: state.light_intensity });
   },
   restart() {
     // One-shot — no state to echo.
-    console.log(`  → restart! (e.g. trigger a scene, reset a counter, kick a script)`);
-  },
-  brightness(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return;
-    state.brightness = Math.round(n);
-    console.log(`  → brightness = ${state.brightness}`);
-    echo({ brightness: state.brightness });
+    console.log(`  → restart! (e.g. reboot the controller, kick a watchdog)`);
   },
 };
 
@@ -84,6 +83,9 @@ function connect() {
   ws.on('open', () => {
     backoffMs = 500;
     console.log(`[ws] connected as controller — waiting for control writes…`);
+    // Seed current state so a freshly-loaded dashboard shows real values
+    // instead of widget defaults.
+    echo({ fan: state.fan, light_intensity: state.light_intensity });
   });
 
   ws.on('message', (raw) => {

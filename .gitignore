@@ -14,3 +14,4 @@ worker/src/version.gen.ts
 web/dist/
 marketing/dist/
 bun.lockb
+scripts/ph-gallery
