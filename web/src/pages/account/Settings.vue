@@ -167,10 +167,20 @@ async function toggleMcpWrite(next: boolean) {
   }
 }
 
-async function copyText(text: string) {
+// Tracks which field was last copied so the button can flash a checkmark.
+const copiedKey = ref<string | null>(null);
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function copyText(text: string, key?: string) {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
+    if (key) {
+      copiedKey.value = key;
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => (copiedKey.value = null), 1500);
+    } else {
+      toast.success('Copied to clipboard');
+    }
   } catch {
     toast.error('Copy failed');
   }
@@ -265,7 +275,10 @@ function scheduleVersionRecheck() {
 }
 
 // Don't keep polling /v1/admin/version after the user leaves Settings.
-onBeforeUnmount(stopVersionRecheck);
+onBeforeUnmount(() => {
+  stopVersionRecheck();
+  clearTimeout(copiedTimer);
+});
 
 onMounted(async () => {
   if (session.user) isOwner.value = session.user.role === 'owner';
@@ -750,59 +763,89 @@ const PROVIDER_META = {
     </section>
 
     <!-- MCP server (owner-only) -->
-    <section v-if="isOwner" class="mb-6 rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="flex items-center justify-between gap-4 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
-        <div class="min-w-0">
-          <div class="text-sm font-semibold">MCP server</div>
-          <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-            Let AI clients (Claude, IDEs) read your projects over the Model Context
-            Protocol, authenticated with an API token. Off by default.
+    <section v-if="isOwner" class="mb-6 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="flex items-start justify-between gap-4 px-4 py-3" :class="mcpEnabled ? 'border-b border-neutral-100 dark:border-neutral-800' : ''">
+        <div class="flex min-w-0 items-start gap-3">
+          <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-100 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2 4 6v6c0 5 3.4 7.7 8 10 4.6-2.3 8-5 8-10V6l-8-4Z" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold">MCP server</span>
+              <span
+                class="rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                :class="mcpEnabled
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                  : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'"
+              >{{ mcpEnabled ? 'On' : 'Off' }}</span>
+            </div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+              Let AI clients (Claude, IDEs) read your projects over the Model Context
+              Protocol, authenticated with an API token.
+            </div>
           </div>
         </div>
         <Toggle
           :model-value="mcpEnabled"
           :disabled="mcpSaving"
           label="MCP server"
-          class="shrink-0"
+          class="mt-0.5 shrink-0"
           @update:model-value="toggleMcp"
         />
       </div>
-      <div v-if="mcpEnabled" class="space-y-3 px-4 py-3 text-sm">
+
+      <div v-if="mcpEnabled" class="space-y-4 px-4 py-4 text-sm">
+        <!-- Endpoint -->
         <div>
-          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Endpoint</div>
-          <div class="flex items-center gap-2">
-            <code class="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800">{{ mcpUrl }}</code>
+          <label class="mb-1.5 block text-xs font-medium text-neutral-500 dark:text-neutral-400">Endpoint</label>
+          <div class="group flex items-stretch overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
+            <code class="min-w-0 flex-1 truncate bg-neutral-50 px-2.5 py-2 font-mono text-xs text-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-300">{{ mcpUrl }}</code>
             <button
-              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              @click="copyText(mcpUrl)"
-            >Copy</button>
-          </div>
-        </div>
-        <div>
-          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (Claude Code)</div>
-          <div class="flex items-start gap-2">
-            <pre class="min-w-0 flex-1 overflow-x-auto rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800"><code>{{ mcpConnectSnippet }}</code></pre>
-            <button
-              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              @click="copyText(mcpConnectSnippet)"
-            >Copy</button>
-          </div>
-          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-            Create a read-scoped token in
-            <router-link :to="{ name: 'tokens' }" class="underline">Tokens</router-link>
-            and paste it in place of <code>&lt;your token&gt;</code>.
+              class="flex shrink-0 items-center gap-1 border-l border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              @click="copyText(mcpUrl, 'endpoint')"
+            >
+              <svg v-if="copiedKey === 'endpoint'" class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5" /></svg>
+              <svg v-else class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              {{ copiedKey === 'endpoint' ? 'Copied' : 'Copy' }}
+            </button>
           </div>
         </div>
 
-        <!-- OAuth connector URL (claude.ai web) -->
+        <!-- Connect (Claude Code) -->
         <div>
-          <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai — OAuth)</div>
-          <div class="flex items-center gap-2">
-            <code class="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1.5 text-xs dark:bg-neutral-800">{{ mcpOAuthUrl }}</code>
+          <label class="mb-1.5 block text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (Claude Code)</label>
+          <div class="relative overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
+            <pre class="overflow-x-auto bg-neutral-50 px-2.5 py-2 pr-12 font-mono text-xs leading-relaxed text-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-300"><code>{{ mcpConnectSnippet }}</code></pre>
             <button
-              class="shrink-0 rounded border border-neutral-200 px-2 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              @click="copyText(mcpOAuthUrl)"
-            >Copy</button>
+              class="absolute right-1.5 top-1.5 flex items-center gap-1 rounded border border-neutral-200 bg-white px-1.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              @click="copyText(mcpConnectSnippet, 'snippet')"
+            >
+              <svg v-if="copiedKey === 'snippet'" class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5" /></svg>
+              <svg v-else class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            </button>
+          </div>
+          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Create a read-scoped token in
+            <router-link :to="{ name: 'tokens' }" class="font-medium text-accent-600 hover:underline dark:text-accent-400">Tokens</router-link>
+            and paste it in place of <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[11px] dark:bg-neutral-800">&lt;your token&gt;</code>.
+          </div>
+        </div>
+
+        <!-- Connect (claude.ai — OAuth) -->
+        <div>
+          <label class="mb-1.5 block text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai — OAuth)</label>
+          <div class="flex items-stretch overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
+            <code class="min-w-0 flex-1 truncate bg-neutral-50 px-2.5 py-2 font-mono text-xs text-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-300">{{ mcpOAuthUrl }}</code>
+            <button
+              class="flex shrink-0 items-center gap-1 border-l border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              @click="copyText(mcpOAuthUrl, 'oauth')"
+            >
+              <svg v-if="copiedKey === 'oauth'" class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5" /></svg>
+              <svg v-else class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              {{ copiedKey === 'oauth' ? 'Copied' : 'Copy' }}
+            </button>
           </div>
           <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
             Add as a custom connector in claude.ai — you'll sign in here and approve access. No token needed.
@@ -810,28 +853,31 @@ const PROVIDER_META = {
         </div>
 
         <!-- Control-write sub-toggle -->
-        <div class="flex items-start justify-between gap-4 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-          <div class="min-w-0">
-            <div class="font-medium">Allow control writes</div>
-            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-              Let admin-scope tokens create, update, run automations, and set variable
-              values (including hardware commands). Read tools stay available regardless.
-              No delete operations are ever exposed.
+        <div class="rounded-md bg-neutral-50 p-3 dark:bg-neutral-800/40">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="text-xs font-semibold">Allow control writes</div>
+              <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                Let admin-scope tokens create, update, run automations, and set variable
+                values (including hardware commands). Read tools stay available regardless.
+                No delete operations are ever exposed.
+              </div>
             </div>
-            <div
-              v-if="mcpWriteEnabled && !auditLogEnabled"
-              class="mt-1.5 rounded bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-            >
-              Tip: enable the Audit log below to record MCP-driven changes.
-            </div>
+            <Toggle
+              :model-value="mcpWriteEnabled"
+              :disabled="mcpWriteSaving"
+              label="Allow control writes"
+              class="shrink-0"
+              @update:model-value="toggleMcpWrite"
+            />
           </div>
-          <Toggle
-            :model-value="mcpWriteEnabled"
-            :disabled="mcpWriteSaving"
-            label="Allow control writes"
-            class="shrink-0"
-            @update:model-value="toggleMcpWrite"
-          />
+          <div
+            v-if="mcpWriteEnabled && !auditLogEnabled"
+            class="mt-2 flex items-start gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+          >
+            <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 17h.01" /></svg>
+            <span>Tip: enable the Audit log below to record MCP-driven changes.</span>
+          </div>
         </div>
       </div>
     </section>
