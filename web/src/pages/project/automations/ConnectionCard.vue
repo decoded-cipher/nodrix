@@ -57,10 +57,10 @@ async function remove() {
     details.push('Those automations will fail until reconfigured');
   }
   const ok = await confirm({
-    title: `Delete connection "${props.integration.name}"?`,
+    title: `Delete integration "${props.integration.name}"?`,
     message: 'This action cannot be undone.',
     details,
-    confirmLabel: 'Delete connection',
+    confirmLabel: 'Delete integration',
   });
   if (!ok) return;
   try {

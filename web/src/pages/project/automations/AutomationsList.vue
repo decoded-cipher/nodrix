@@ -15,7 +15,7 @@ const variableLabel = (key: string): string => {
 };
 const integrationLabel = (id: string): string => {
   const i = project.integrations.find((x) => x.id === id);
-  return i?.name ?? 'a connection';
+  return i?.name ?? 'an integration';
 };
 
 const hasAny = computed(() => project.automations.length > 0);

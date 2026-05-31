@@ -60,7 +60,7 @@ function closeForm() {
       @cancel="closeForm"
     />
 
-    <!-- Existing connections -->
+    <!-- Existing integrations -->
     <div v-if="project.integrations.length" class="mb-8 divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
       <ConnectionCard
         v-for="i in project.integrations"
@@ -71,12 +71,12 @@ function closeForm() {
       />
     </div>
     <div v-else class="mb-8 rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
-      No connections yet. Add one below, then call it from an automation.
+      No integrations yet. Add one below, then call it from an automation.
     </div>
 
     <!-- Catalog -->
     <div>
-      <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Add a connection</h3>
+      <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Add an integration</h3>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <button
           v-for="c in EXECUTABLE_CONNECTIONS"

@@ -44,7 +44,7 @@ export const OPERATORS: readonly { value: VariableOperator; label: string; short
 
 export const ACTION_TYPES = [
   { value: 'set_variable', label: 'Set variable' },
-  { value: 'call_integration', label: 'Call connection' },
+  { value: 'call_integration', label: 'Call integration' },
   { value: 'emit_event', label: 'Emit event' },
 ] as const;
 

@@ -6,8 +6,8 @@ import { useProjectStore } from '../../../stores/project';
 const project = useProjectStore();
 const route = useRoute();
 
-// Load everything both tabs need: automations + connections + variables (for
-// label resolution and the connections "used by" cross-reference).
+// Load everything both tabs need: automations + integrations + variables (for
+// label resolution and the integrations "used by" cross-reference).
 onMounted(() => {
   void Promise.all([
     project.loadAutomations(),
@@ -20,10 +20,10 @@ const proj = computed(() => project.currentProjectId ?? '');
 
 const tabs = computed(() => [
   { name: 'automations', label: 'Automations', to: `/p/${proj.value}/automations`, count: project.automations.length },
-  { name: 'connections', label: 'Connections', to: `/p/${proj.value}/automations/connections`, count: project.integrations.length },
+  { name: 'integrations', label: 'Integrations', to: `/p/${proj.value}/automations/integrations`, count: project.integrations.length },
 ]);
 
-const activeName = computed(() => (route.name === 'connections' ? 'connections' : 'automations'));
+const activeName = computed(() => (route.name === 'integrations' ? 'integrations' : 'automations'));
 </script>
 
 <template>
@@ -31,7 +31,7 @@ const activeName = computed(() => (route.name === 'connections' ? 'connections' 
     <header class="mb-5">
       <h1 class="text-xl font-semibold tracking-tight">Automations</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-        Run actions when something happens — and the connections those actions reach out to.
+        Run actions when something happens — and the integrations those actions reach out to.
       </p>
     </header>
 

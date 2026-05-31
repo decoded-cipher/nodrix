@@ -331,8 +331,8 @@ async function save() {
             </template>
 
             <template v-else-if="a.type === 'call_integration'">
-              <Dropdown v-model="a.integration_id" :options="integrationOptions" placeholder="Connection" size="sm" class="min-w-0 flex-1" />
-              <RouterLink v-if="integrationOptions.length === 0" :to="`/p/${project.currentProjectId}/automations/connections`" class="text-xs text-accent-600 hover:underline dark:text-accent-400">Add a connection</RouterLink>
+              <Dropdown v-model="a.integration_id" :options="integrationOptions" placeholder="Integration" size="sm" class="min-w-0 flex-1" />
+              <RouterLink v-if="integrationOptions.length === 0" :to="`/p/${project.currentProjectId}/automations/integrations`" class="text-xs text-accent-600 hover:underline dark:text-accent-400">Add an integration</RouterLink>
             </template>
 
             <template v-else-if="a.type === 'emit_event'">

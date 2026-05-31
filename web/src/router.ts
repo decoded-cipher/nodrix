@@ -43,19 +43,21 @@ const routes: RouteRecordRaw[] = [
               { path: 'tokens', name: 'variable-tokens', component: () => import('./pages/project/variables/ConnectionTokens.vue'), meta: { title: 'Connection tokens' } },
             ],
           },
-          // Automations + Connections live under one hub with two tabs.
+          // Automations + Integrations live under one hub with two tabs.
           {
             path: 'automations',
             component: () => import('./pages/project/automations/AutomationsHub.vue'),
             children: [
               { path: '', name: 'automations', component: () => import('./pages/project/automations/AutomationsList.vue'), meta: { title: 'Automations' } },
-              { path: 'connections', name: 'connections', component: () => import('./pages/project/automations/Connections.vue'), meta: { title: 'Connections' } },
+              { path: 'integrations', name: 'integrations', component: () => import('./pages/project/automations/Connections.vue'), meta: { title: 'Integrations' } },
+              // Back-compat for the old Connections tab URL.
+              { path: 'connections', redirect: (to) => `/p/${to.params['proj'] as string}/automations/integrations` },
             ],
           },
           // Full-width editor, a sibling of the hub so it isn't constrained by the tab shell.
           { path: 'automations/editor/:id?', name: 'automation-editor', component: () => import('./pages/project/automations/AutomationEditor.vue'), meta: { title: 'Automation editor' } },
           // Back-compat for the old standalone Integrations route/bookmarks.
-          { path: 'integrations', redirect: (to) => `/p/${to.params['proj'] as string}/automations/connections` },
+          { path: 'integrations', redirect: (to) => `/p/${to.params['proj'] as string}/automations/integrations` },
         ],
       },
     ],

@@ -338,7 +338,7 @@ export const useProjectStore = defineStore('project', () => {
     integrations.value = integrations.value.filter((i) => i.id !== id);
   }
 
-  // Fires a connection once with a synthetic context. Returns the delivery
+  // Fires an integration once with a synthetic context. Returns the delivery
   // result and refreshes the row's last-run status from the response.
   async function testIntegration(id: string): Promise<IntegrationTestResult> {
     const pid = requireProjectId();

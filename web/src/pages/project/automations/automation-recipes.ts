@@ -26,7 +26,7 @@ export const RECIPES: readonly Recipe[] = [
   {
     id: 'threshold-alert',
     title: 'Threshold alert',
-    description: 'Notify a connection when a reading crosses a limit.',
+    description: 'Notify an integration when a reading crosses a limit.',
     icon: ICON.alert,
     trigger_type: 'variable',
     name: 'Threshold alert',
@@ -56,7 +56,7 @@ export const RECIPES: readonly Recipe[] = [
   {
     id: 'event-notify',
     title: 'Event notifier',
-    description: 'Call a connection when hardware posts an event.',
+    description: 'Call an integration when hardware posts an event.',
     icon: ICON.bell,
     trigger_type: 'event',
     name: 'Event notifier',
