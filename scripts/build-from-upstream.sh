@@ -77,7 +77,12 @@ cp -Rf "${UPSTREAM_DIR}"/. .
 #     any source file upstream no longer has. We remove individual FILES only,
 #     never a directory, so the worker/ CWD inode the parent process holds stays
 #     valid.
-for dir in web worker promo scripts; do
+#
+#     `internal/` is deliberately NOT in this list: it's a git submodule
+#     (promo + test-clients + dev docs) that the --depth=1 upstream clone does
+#     not recurse, so it never carries deploy-relevant source. The worker+web
+#     build chain doesn't touch it.
+for dir in web worker scripts; do
   [ -d "$dir" ] || continue
   find "$dir" -type f \
     -not -path '*/node_modules/*' -not -path '*/dist/*' \

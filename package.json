@@ -1,24 +1,23 @@
 {
   "name": "nodrix",
   "private": true,
-  "version": "0.2.8",
+  "version": "0.2.9",
   "type": "module",
   "workspaces": [
     "worker",
     "web",
-    "promo",
     "shared/*"
   ],
   "scripts": {
     "dev": "bun run --filter @nodrix/worker dev",
     "dev:web": "bun run --filter @nodrix/web dev",
-    "dev:promo": "bun run --filter @nodrix/promo dev",
+    "dev:promo": "cd internal/promo && bun install && bun run dev",
     "build:version": "bun scripts/gen-version.ts",
     "build:migrations": "bun scripts/gen-migrations.ts",
     "build": "bun run build:version && bun run build:migrations && bun run --filter @nodrix/web build && bun run --filter @nodrix/worker build",
-    "build:promo": "bun run --filter @nodrix/promo build",
+    "build:promo": "cd internal/promo && bun install && bun run build",
     "deploy:platform": "bun run build && bun run --filter @nodrix/worker deploy",
-    "deploy:promo": "bun run --filter @nodrix/promo deploy",
+    "deploy:promo": "cd internal/promo && bun install && bun run deploy",
     "typecheck": "bun run --filter '*' typecheck",
     "smoke": "bun run worker/test/smoke.ts",
     "postinstall": "bun run build:version"

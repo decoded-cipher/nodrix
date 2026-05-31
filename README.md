@@ -34,7 +34,7 @@
 
 - **Worker** ([worker/](worker/)) — single Hono app, three Durable Object classes (Project, Dashboard, Scheduler), one Workflow (provisioning), D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
 - **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder. Built and served as Worker static assets.
-- **Promo site** ([promo/](promo/)) — Astro static site. Deploys independently to Cloudflare Pages.
+- **Promo site** — Astro static site. Deploys independently to Cloudflare Pages.
 
 ## 💾 Storage allocation
 

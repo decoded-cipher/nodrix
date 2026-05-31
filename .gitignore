@@ -8,11 +8,9 @@ dist/
 .env.*.local
 *.log
 .DS_Store
-.astro/
 worker/worker-configuration.d.ts
 worker/src/version.gen.ts
 web/dist/
-marketing/dist/
 bun.lockb
 bun.lock
 scripts/ph-gallery
