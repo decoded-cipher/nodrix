@@ -42,7 +42,14 @@ const globalTop = computed<NavItem[]>(() => [
 const projectScoped = computed<NavItem[]>(() => {
   const id = projId.value;
   return [
-    { label: 'Variables', to: `/p/${id}/variables`, icon: 'variable', disabled: !hasProject.value },
+    {
+      label: 'Variables',
+      to: `/p/${id}/variables`,
+      icon: 'variable',
+      disabled: !hasProject.value,
+      // Stay highlighted across the Connection tokens tab too.
+      matchPath: (path) => path.startsWith(`/p/${id}/variables`),
+    },
     {
       label: 'Dashboards',
       to: `/p/${id}/dashboards`,

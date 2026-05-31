@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
-import { useProjectStore } from '../../stores/project';
-import RevealOnce from '../../components/RevealOnce.vue';
-import Combobox from '../../components/Combobox.vue';
-import { confirm } from '../../lib/confirm';
-import { toast } from '../../lib/toast';
-import { relativeTime, formatAbsolute } from '../../lib/time';
-import type { ProjectTokenWithSecret, Variable } from '../../types';
+import { computed, nextTick, ref } from 'vue';
+import { useProjectStore } from '../../../stores/project';
+import Combobox from '../../../components/Combobox.vue';
+import { confirm } from '../../../lib/confirm';
+import { toast } from '../../../lib/toast';
+import { relativeTime, formatAbsolute } from '../../../lib/time';
+import type { Variable } from '../../../types';
 
 // Common telemetry units suggested in the unit combobox; any custom value works.
 const UNIT_OPTIONS = [
@@ -17,16 +16,33 @@ const UNIT_OPTIONS = [
 ];
 
 const project = useProjectStore();
+
+// ── Search / filter ───────────────────────────────────────────────────────────
+const search = ref('');
+const filtered = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return project.variables;
+  return project.variables.filter((v) => v.key.toLowerCase().includes(q));
+});
+
+// ── Add a variable (toggled inline row) ───────────────────────────────────────
+const adding = ref(false);
 const newKey = ref('');
 const newUnit = ref('');
 const creating = ref(false);
-const justCreatedToken = ref<ProjectTokenWithSecret | null>(null);
-const creatingToken = ref(false);
+const newKeyEl = ref<HTMLInputElement | null>(null);
 
-onMounted(() => {
-  project.loadVariables();
-  project.loadProjectTokens();
-});
+async function openAdd() {
+  adding.value = true;
+  await nextTick();
+  newKeyEl.value?.focus();
+}
+
+function cancelAdd() {
+  adding.value = false;
+  newKey.value = '';
+  newUnit.value = '';
+}
 
 async function createVariable() {
   const key = newKey.value.trim();
@@ -36,6 +52,8 @@ async function createVariable() {
     await project.createVariable({ key, unit: newUnit.value.trim() || null });
     newKey.value = '';
     newUnit.value = '';
+    await nextTick();
+    newKeyEl.value?.focus();
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
@@ -43,8 +61,9 @@ async function createVariable() {
   }
 }
 
-// Inline unit editing, toggled by the per-row edit (pencil) button. Only one
-// row edits at a time; Enter saves, Esc cancels.
+// ── Inline unit editing ───────────────────────────────────────────────────────
+// Toggled by the per-row edit (pencil) button. Only one row edits at a time;
+// Enter saves, Esc cancels.
 const editingId = ref<string | null>(null);
 const editValue = ref('');
 const comboRef = ref<{ focus: () => void } | null>(null);
@@ -108,87 +127,81 @@ const DOT: Record<Liveness, string> = {
   stale: 'bg-neutral-300 dark:bg-neutral-600',
   never: 'border border-neutral-300 dark:border-neutral-600',
 };
-
-async function createToken() {
-  creatingToken.value = true;
-  try {
-    justCreatedToken.value = await project.createProjectToken(null);
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    creatingToken.value = false;
-  }
-}
-
-async function revokeToken(id: string) {
-  const ok = await confirm({
-    title: 'Revoke this connection token?',
-    message: 'Any hardware using it will stop being able to post telemetry immediately.',
-    confirmLabel: 'Revoke token',
-  });
-  if (!ok) return;
-  try {
-    await project.revokeProjectToken(id);
-  } catch (e) {
-    toast.error((e as Error).message);
-  }
-}
-
-function fmt(ts: number | null | undefined): string {
-  return ts ? new Date(ts * 1000).toLocaleString() : '—';
-}
-
-const variableCount = computed(() => project.variables.length);
 </script>
 
 <template>
-  <main class="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-    <h2 class="text-xl font-semibold tracking-tight">Variables</h2>
-    <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-      Project-scoped data points. New keys appear automatically the first time hardware posts to them.
-    </p>
+  <div>
+    <!-- Toolbar: search + add -->
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="relative sm:w-72">
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search variables…"
+          class="w-full rounded-md border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        />
+      </div>
+      <button
+        v-if="!adding"
+        type="button"
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-accent-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-accent-700"
+        @click="openAdd"
+      >
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add variable
+      </button>
+    </div>
 
-    <!-- Add a variable -->
-    <form class="mt-6 flex flex-col gap-2 sm:flex-row" @submit.prevent="createVariable">
+    <!-- Inline add row -->
+    <form
+      v-if="adding"
+      class="mt-3 flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 sm:flex-row dark:border-neutral-800 dark:bg-neutral-900"
+      @submit.prevent="createVariable"
+    >
       <input
+        ref="newKeyEl"
         v-model="newKey"
         type="text"
         placeholder="New variable key (e.g. pm25)"
         class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        @keydown.esc="cancelAdd"
       />
       <input
         v-model="newUnit"
         type="text"
         placeholder="Unit (optional)"
         class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:w-36 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        @keydown.esc="cancelAdd"
       />
-      <button
-        type="submit"
-        :disabled="creating || !newKey.trim()"
-        class="shrink-0 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
-      >Add variable</button>
+      <div class="flex gap-2">
+        <button
+          type="submit"
+          :disabled="creating || !newKey.trim()"
+          class="shrink-0 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+        >Add</button>
+        <button
+          type="button"
+          class="shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          @click="cancelAdd"
+        >Cancel</button>
+      </div>
     </form>
 
     <!-- Variables table -->
-    <div class="mt-6 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-neutral-800">
-        <span class="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-          {{ variableCount }} {{ variableCount === 1 ? 'variable' : 'variables' }}
-        </span>
-      </div>
-      <div v-if="project.variables.length > 0" class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
+    <div class="mt-4 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <table v-if="filtered.length > 0" class="w-full text-left text-sm">
         <thead class="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
           <tr>
-            <th class="px-3 py-2 font-medium sm:px-4">Key</th>
-            <th class="px-3 py-2 font-medium sm:px-4">Unit</th>
-            <th class="hidden px-3 py-2 font-medium sm:table-cell sm:px-4">Last seen</th>
-            <th class="px-3 py-2 sm:px-4"><span class="sr-only">Actions</span></th>
+            <th class="px-4 py-2.5 font-medium">Key</th>
+            <th class="px-4 py-2.5 font-medium">Unit</th>
+            <th class="hidden px-4 py-2.5 font-medium sm:table-cell">Last seen</th>
+            <th class="px-4 py-2.5"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
-          <tr v-for="v in project.variables" :key="v.id" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-            <td class="px-3 py-2.5 sm:px-4">
+          <tr v-for="v in filtered" :key="v.id" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+            <td class="px-4 py-2.5">
               <div class="flex items-center gap-2.5">
                 <span
                   class="h-2 w-2 shrink-0 rounded-full"
@@ -198,7 +211,7 @@ const variableCount = computed(() => project.variables.length);
                 <span class="font-mono text-sm font-medium">{{ v.key }}</span>
               </div>
             </td>
-            <td class="px-3 py-2.5 sm:px-4">
+            <td class="px-4 py-2.5">
               <Combobox
                 v-if="editingId === v.id"
                 ref="comboRef"
@@ -212,11 +225,11 @@ const variableCount = computed(() => project.variables.length);
                 {{ v.unit || '—' }}
               </span>
             </td>
-            <td class="hidden px-3 py-2.5 text-xs text-neutral-500 sm:table-cell sm:px-4 dark:text-neutral-400">
+            <td class="hidden px-4 py-2.5 text-xs text-neutral-500 sm:table-cell dark:text-neutral-400">
               <span v-if="v.last_seen" :title="formatAbsolute(v.last_seen)">{{ relativeTime(v.last_seen) }}</span>
               <span v-else class="italic text-neutral-400 dark:text-neutral-600">Never</span>
             </td>
-            <td class="px-3 py-2.5 sm:px-4">
+            <td class="px-4 py-2.5">
               <div class="flex items-center justify-end gap-1">
                 <template v-if="editingId === v.id">
                   <button
@@ -263,54 +276,28 @@ const variableCount = computed(() => project.variables.length);
           </tr>
         </tbody>
       </table>
+
+      <!-- No search match -->
+      <div v-else-if="project.variables.length > 0" class="px-4 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
+        No variables match “{{ search }}”.
       </div>
-      <div v-if="project.variables.length === 0" class="px-4 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
-        No variables yet. Post telemetry or add one above.
+
+      <!-- Empty state -->
+      <div v-else class="px-4 py-12 text-center">
+        <p class="text-sm font-medium text-neutral-700 dark:text-neutral-300">No variables yet</p>
+        <p class="mx-auto mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
+          Keys appear automatically the first time hardware posts to them — or add one now.
+        </p>
+        <button
+          v-if="!adding"
+          type="button"
+          class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-accent-700"
+          @click="openAdd"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add variable
+        </button>
       </div>
     </div>
-
-    <!-- Connection tokens -->
-    <h3 class="mt-10 text-lg font-semibold tracking-tight">Connection tokens</h3>
-    <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-      Hardware authenticates with a project token to post telemetry and poll for control writes.
-    </p>
-
-    <RevealOnce
-      v-if="justCreatedToken"
-      :value="justCreatedToken.token"
-      label="Project connection token"
-      class="mt-4"
-    />
-
-    <div class="mt-4">
-      <button
-        type="button"
-        :disabled="creatingToken"
-        class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
-        @click="createToken"
-      >Create token</button>
-    </div>
-
-    <ul class="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
-      <li v-for="t in project.projectTokens" :key="t.id" class="flex items-center justify-between gap-4 px-4 py-3">
-        <div class="min-w-0 flex-1">
-          <div class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ t.id }}</div>
-          <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-            created {{ fmt(t.created_at) }} · last used {{ fmt(t.last_used_at) }}
-          </div>
-        </div>
-        <div class="flex items-center gap-3 text-xs">
-          <span v-if="t.revoked_at" class="rounded-full bg-neutral-200 px-2 py-0.5 uppercase tracking-wide text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">revoked</span>
-          <button
-            v-else
-            class="rounded-md border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-            @click="revokeToken(t.id)"
-          >Revoke</button>
-        </div>
-      </li>
-      <li v-if="project.projectTokens.length === 0" class="px-4 py-6 text-sm text-neutral-500 dark:text-neutral-400">
-        No connection tokens yet.
-      </li>
-    </ul>
-  </main>
+  </div>
 </template>

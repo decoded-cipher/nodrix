@@ -34,7 +34,15 @@ const routes: RouteRecordRaw[] = [
           { path: 'dashboards', name: 'dashboards', component: () => import('./pages/project/Dashboards.vue'), meta: { title: 'Dashboards' } },
           { path: 'd/:dash', name: 'dashboard-view', component: () => import('./pages/project/DashboardView.vue'), meta: { title: 'Dashboard' } },
           { path: 'd/:dash/edit', name: 'dashboard-edit', component: () => import('./pages/project/DashboardEdit.vue'), meta: { title: 'Edit dashboard' } },
-          { path: 'variables', name: 'variables', component: () => import('./pages/project/Variables.vue'), meta: { title: 'Variables' } },
+          // Variables + Connection tokens live under one hub with two tabs.
+          {
+            path: 'variables',
+            component: () => import('./pages/project/variables/VariablesHub.vue'),
+            children: [
+              { path: '', name: 'variables', component: () => import('./pages/project/variables/VariablesList.vue'), meta: { title: 'Variables' } },
+              { path: 'tokens', name: 'variable-tokens', component: () => import('./pages/project/variables/ConnectionTokens.vue'), meta: { title: 'Connection tokens' } },
+            ],
+          },
           // Automations + Connections live under one hub with two tabs.
           {
             path: 'automations',
