@@ -13,6 +13,7 @@
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@nodrix/integrations-shared": "*",
     "@nodrix/widgets-shared": "*",
     "agents": "^0.13.2",
     "better-auth": "^1.6.11",

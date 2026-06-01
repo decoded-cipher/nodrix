@@ -7,7 +7,7 @@ import Icon from '../../../components/Icon.vue';
 import Dropdown from '../../../components/Dropdown.vue';
 import Spinner from '../../../components/Spinner.vue';
 import { TRIGGERS, triggerSpec, OPERATORS, ACTION_TYPES } from './automation-catalog';
-import { connSpec } from './connection-catalog';
+import { connSpec } from '@nodrix/integrations-shared';
 import { recipeById } from './automation-recipes';
 import type { AutomationTriggerType, Automation } from '../../../types';
 

@@ -1,0 +1,52 @@
+{
+  "kind": "email",
+  "label": "Email",
+  "description": "Send an email via Resend.",
+  "icon": "M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75",
+  "executable": true,
+  "fields": [
+    {
+      "key": "api_key",
+      "label": "Resend API key",
+      "type": "text",
+      "required": true,
+      "mono": true,
+      "placeholder": "re_…",
+      "hint": "Create one at resend.com → API Keys. Stored server-side and redacted from AI clients."
+    },
+    {
+      "key": "from",
+      "label": "From",
+      "type": "text",
+      "required": true,
+      "placeholder": "Alerts <alerts@yourdomain.com>",
+      "hint": "Must use a domain you've verified in Resend."
+    },
+    {
+      "key": "to",
+      "label": "To",
+      "type": "text",
+      "required": true,
+      "placeholder": "ops@example.com",
+      "hint": "One address, or several separated by commas."
+    },
+    {
+      "key": "subject",
+      "label": "Subject",
+      "type": "text",
+      "placeholder": "{{variable}} alert"
+    },
+    {
+      "key": "body",
+      "label": "Body",
+      "type": "textarea",
+      "placeholder": "{{variable}} is now {{value}}",
+      "hint": "Plain text. {{variable}}, {{value}}, {{event}} are interpolated."
+    }
+  ],
+  "summary": {
+    "template": "to {{to}}",
+    "requires": "to",
+    "fallback": "Not configured"
+  }
+}

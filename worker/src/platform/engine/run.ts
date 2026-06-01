@@ -75,7 +75,7 @@ async function runAction(
     case 'call_integration': {
       const integration = await loadIntegration(env, automation.project_id, action.integration_id);
       if (!integration) throw new Error(`integration ${action.integration_id} not found`);
-      const res = await executeIntegration(env, integration, ctx, action.payload);
+      const res = await executeIntegration(integration, ctx, action.payload);
       await recordIntegrationRun(env, integration.id, res).catch(() => {});
       if (res.status === 'error') throw new Error(`integration "${integration.name}": ${res.detail}`);
       return;

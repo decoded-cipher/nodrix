@@ -15,6 +15,7 @@ import { createVariable, updateVariable, setVariableControl } from '../domains/v
 import { createDashboard, updateDashboard, getDashboard } from '../domains/dashboards/service';
 import { newId } from '../platform/lib/ids';
 import { WIDGET_IDS, type WidgetType } from '@nodrix/widgets-shared';
+import { INTEGRATION_KINDS } from '@nodrix/integrations-shared';
 import { createAutomation, updateAutomation, runAutomationNow } from '../domains/automations/service';
 import { createIntegration, updateIntegration, testIntegration } from '../domains/integrations/service';
 
@@ -261,11 +262,11 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
   server.registerTool(
     'create_integration',
     {
-      description: 'Create an integration. kind ∈ webhook|code_block|slack|email|mqtt|http_service.',
+      description: `Create an integration. kind ∈ ${INTEGRATION_KINDS.join('|')}.`,
       inputSchema: {
         project,
         name: z.string(),
-        kind: z.enum(['webhook', 'code_block', 'slack', 'email', 'mqtt', 'http_service']),
+        kind: z.enum(INTEGRATION_KINDS),
         config: z.any().optional(),
         enabled: z.boolean().optional(),
       },

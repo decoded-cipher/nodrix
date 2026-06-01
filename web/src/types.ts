@@ -219,33 +219,9 @@ export type Automation = {
   last_error: string | null;
 };
 
-export type IntegrationKind =
-  | 'webhook'
-  | 'code_block'
-  | 'slack'
-  | 'email'
-  | 'mqtt'
-  | 'http_service';
-
-export type Integration = {
-  id: string;
-  project_id: string;
-  name: string;
-  kind: IntegrationKind;
-  config: unknown;                    // JSON; shape depends on kind
-  enabled: boolean;
-  created_at: number;
-  updated_at: number;
-  archived_at: number | null;
-  last_run_at: number | null;
-  last_run_status: 'ok' | 'error' | 'skipped' | null;
-  last_error: string | null;
-};
-
-export type IntegrationTestResult = {
-  status: 'ok' | 'error' | 'skipped';
-  detail?: string;
-};
+// Sourced from the shared package; re-exported so '../types' imports keep working.
+export type { IntegrationKind, Integration } from '@nodrix/integrations-shared';
+export type { IntegrationResult as IntegrationTestResult } from '@nodrix/integrations-shared';
 
 export type AuditLogEntry = {
   id: number;

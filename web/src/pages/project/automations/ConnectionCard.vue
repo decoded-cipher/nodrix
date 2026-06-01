@@ -6,7 +6,7 @@ import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
 import Toggle from '../../../components/Toggle.vue';
 import StatusPill from '../../../components/StatusPill.vue';
-import { connSpec } from './connection-catalog';
+import { connSpec, summarize } from '@nodrix/integrations-shared';
 import type { Integration, Automation } from '../../../types';
 
 const props = defineProps<{
@@ -18,7 +18,7 @@ const emit = defineEmits<{ edit: [Integration] }>();
 const project = useProjectStore();
 const spec = computed(() => connSpec(props.integration.kind));
 const config = computed(() => (props.integration.config as Record<string, unknown>) ?? {});
-const subtitle = computed(() => spec.value.summary(config.value));
+const subtitle = computed(() => summarize(spec.value, config.value));
 
 const menuOpen = ref(false);
 const testing = ref(false);

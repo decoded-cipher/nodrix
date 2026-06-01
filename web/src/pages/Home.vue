@@ -61,7 +61,7 @@ const projectQuickLinks = computed(() => {
     { label: 'New dashboard', desc: 'Drag widgets to visualize variable data', to: `/p/${id}/dashboards`, color: 'orange' },
     { label: 'Add variable', desc: 'Declare a data point or get a connection token', to: `/p/${id}/variables`, color: 'sky' },
     { label: 'Create automation', desc: 'Trigger actions on schedule, state, or event', to: `/p/${id}/automations`, color: 'emerald' },
-    { label: 'Add integration', desc: 'Webhooks, code blocks, Slack — reusable connectors', to: `/p/${id}/integrations`, color: 'violet' },
+    { label: 'Add integration', desc: 'Webhooks, email, HTTP services — reusable connectors', to: `/p/${id}/integrations`, color: 'violet' },
   ];
 });
 

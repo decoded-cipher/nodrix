@@ -3,12 +3,10 @@ import { newId } from '../../platform/lib/ids';
 import { recordAudit } from '../../platform/lib/audit';
 import { executeIntegration, recordIntegrationRun } from '../../platform/engine/integrations';
 import type { AutomationContext, IntegrationRow as EngineIntegrationRow } from '../../platform/engine/types';
+import { VALID_KINDS } from '@nodrix/integrations-shared';
 import { safeParse, buildUpdate } from '../../platform/lib/sql';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
-
-const KINDS = ['webhook', 'code_block', 'slack', 'email', 'mqtt', 'http_service'] as const;
-type Kind = (typeof KINDS)[number];
 
 // Full D1 row = the engine's column projection plus the admin-facing metadata.
 type IntegrationRow = EngineIntegrationRow & {
@@ -65,7 +63,7 @@ export async function createIntegration(
   await assertProjectAccess(env, actor, projectId);
   const name = (input.name ?? '').trim();
   if (!name) throw new ServiceError('bad_request', 'name is required', 'missing_name');
-  if (!KINDS.includes(input.kind as Kind)) {
+  if (!VALID_KINDS.has(input.kind as never)) {
     throw new ServiceError('bad_request', 'invalid kind', 'invalid_kind');
   }
 
@@ -160,7 +158,7 @@ export async function testIntegration(
     event: 'test',
     depth: 0,
   };
-  const result = await executeIntegration(env, { ...row, enabled: 1 }, ctx, { test: true });
+  const result = await executeIntegration({ ...row, enabled: 1 }, ctx, { test: true });
   await recordIntegrationRun(env, id, result).catch(() => {});
 
   await recordAudit(env, {

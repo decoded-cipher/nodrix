@@ -4,7 +4,7 @@ import { useProjectStore } from '../../../stores/project';
 import Icon from '../../../components/Icon.vue';
 import ConnectionCard from './ConnectionCard.vue';
 import ConnectionForm from './ConnectionForm.vue';
-import { EXECUTABLE_CONNECTIONS, COMING_SOON_CONNECTIONS } from './connection-catalog';
+import { EXECUTABLE_CONNECTIONS, COMING_SOON_CONNECTIONS } from '@nodrix/integrations-shared';
 import type { Automation, Integration, IntegrationKind } from '../../../types';
 
 const project = useProjectStore();
@@ -96,27 +96,29 @@ function closeForm() {
       </div>
 
       <!-- Coming soon -->
-      <h3 class="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Coming soon</h3>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <button
-          v-for="c in COMING_SOON_CONNECTIONS"
-          :key="c.kind"
-          type="button"
-          class="flex items-start gap-3 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-4 text-left transition hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:border-neutral-700"
-          :title="`${c.label} can be configured now and will run once its connector lands`"
-          @click="openCreate(c.kind)"
-        >
-          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-            <Icon :path="c.icon" class="h-5 w-5" />
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ c.label }}</span>
+      <template v-if="COMING_SOON_CONNECTIONS.length">
+        <h3 class="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Coming soon</h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <button
+            v-for="c in COMING_SOON_CONNECTIONS"
+            :key="c.kind"
+            type="button"
+            class="flex items-start gap-3 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-4 text-left transition hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:border-neutral-700"
+            :title="`${c.label} can be configured now and will run once its connector lands`"
+            @click="openCreate(c.kind)"
+          >
+            <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+              <Icon :path="c.icon" class="h-5 w-5" />
             </div>
-            <div class="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">{{ c.description }}</div>
-          </div>
-        </button>
-      </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ c.label }}</span>
+              </div>
+              <div class="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">{{ c.description }}</div>
+            </div>
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 </template>

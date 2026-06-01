@@ -188,13 +188,14 @@ CREATE INDEX IF NOT EXISTS idx_automations_enabled ON automations(enabled) WHERE
 CREATE INDEX IF NOT EXISTS idx_automations_project_enabled_type
   ON automations(project_id, enabled, trigger_type);
 
--- Integrations: reusable connectors (webhook, Slack, HTTP service, ...).
+-- Integrations: reusable connectors (webhook, HTTP service, email, ...).
+-- `kind` is validated against the shared catalog (VALID_KINDS), not a DB enum,
+-- so adding/removing a connector never needs a schema migration.
 CREATE TABLE IF NOT EXISTS integrations (
   id          TEXT PRIMARY KEY,
   project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
-  kind        TEXT NOT NULL CHECK (kind IN
-                ('webhook','code_block','slack','email','mqtt','http_service')),
+  kind        TEXT NOT NULL,
   config      TEXT NOT NULL,                                   -- JSON, kind-specific
   enabled     INTEGER NOT NULL DEFAULT 1,
   created_by  TEXT REFERENCES users(id),

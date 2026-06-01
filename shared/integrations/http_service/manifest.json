@@ -1,0 +1,40 @@
+{
+  "kind": "http_service",
+  "label": "HTTP service",
+  "description": "Generic outbound HTTP request with a templated body.",
+  "icon": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m-9 9h18",
+  "executable": true,
+  "fields": [
+    {
+      "key": "method",
+      "label": "Method",
+      "type": "select",
+      "options": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+      "default": "POST"
+    },
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "url",
+      "required": true,
+      "mono": true,
+      "placeholder": "https://api.example.com/…"
+    },
+    {
+      "key": "headers",
+      "label": "Headers (JSON, optional)",
+      "type": "json",
+      "mono": true,
+      "placeholder": "{ \"authorization\": \"Bearer …\" }"
+    },
+    {
+      "key": "body_template",
+      "label": "Body template (optional)",
+      "type": "textarea",
+      "mono": true,
+      "placeholder": "{ \"content\": \"{{value}}\" }",
+      "hint": "Sent for non-GET requests. {{variable}}, {{value}}, {{event}} are interpolated."
+    }
+  ],
+  "summary": { "template": "{{method:POST}} {{url:—}}" }
+}

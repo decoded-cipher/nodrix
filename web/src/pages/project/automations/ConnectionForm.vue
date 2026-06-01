@@ -3,7 +3,7 @@ import { reactive, ref, computed, onMounted } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import Dropdown from '../../../components/Dropdown.vue';
 import { toast } from '../../../lib/toast';
-import { connSpec } from './connection-catalog';
+import { connSpec } from '@nodrix/integrations-shared';
 import type { Integration, IntegrationKind } from '../../../types';
 
 const props = defineProps<{

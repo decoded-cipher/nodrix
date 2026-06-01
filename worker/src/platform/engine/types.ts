@@ -69,11 +69,6 @@ export type AutomationRow = {
   last_run_at: number | null;
 };
 
-export type IntegrationRow = {
-  id: string;
-  project_id: string;
-  name: string;
-  kind: string;
-  config: string;                      // JSON
-  enabled: number;
-};
+// Minimal column projection the engine reads from D1 — defined in the shared
+// integrations package alongside the runtime that consumes it.
+export type { IntegrationRow } from '@nodrix/integrations-shared';
