@@ -8,9 +8,7 @@ import { projectStub } from '../../platform/durable-objects/stubs';
 import { safeParse, buildUpdate } from '../../platform/lib/sql';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
-
-const TRIGGER_TYPES = ['variable', 'scene', 'schedule', 'sunset_sunrise', 'event'] as const;
-type TriggerType = (typeof TRIGGER_TYPES)[number];
+import { VALID_TRIGGER_KINDS } from '@nodrix/blocks-shared';
 
 export function isScheduled(t: string | undefined): boolean {
   return t === 'schedule' || t === 'sunset_sunrise';
@@ -93,7 +91,7 @@ export async function createAutomation(
   await assertProjectAccess(env, actor, projectId);
   const name = (input.name ?? '').trim();
   if (!name) throw new ServiceError('bad_request', 'name is required', 'missing_name');
-  if (!TRIGGER_TYPES.includes(input.trigger_type as TriggerType)) {
+  if (!VALID_TRIGGER_KINDS.has(input.trigger_type)) {
     throw new ServiceError('bad_request', 'invalid trigger_type', 'invalid_trigger_type');
   }
 
