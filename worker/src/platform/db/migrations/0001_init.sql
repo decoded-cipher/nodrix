@@ -171,10 +171,11 @@ CREATE TABLE IF NOT EXISTS automations (
   description     TEXT,
   enabled         INTEGER NOT NULL DEFAULT 1,                  -- 0/1
   trigger_type    TEXT NOT NULL CHECK (trigger_type IN
-                    ('variable','scene','schedule','sunset_sunrise','event')),
-  trigger_config  TEXT NOT NULL,                               -- JSON
-  actions         TEXT NOT NULL,                               -- JSON ordered list
+                    ('variable','manual','schedule','sunset_sunrise','event')),
+  trigger_config  TEXT NOT NULL,                               -- JSON (legacy primary trigger)
+  actions         TEXT NOT NULL,                               -- JSON ordered list (legacy)
   trigger_kinds   TEXT NOT NULL DEFAULT '',                    -- ",kind,kind," for multi-trigger lookups
+  graph           TEXT,                                        -- JSON AutomationGraph; source of truth
   created_by      TEXT REFERENCES users(id),
   created_at      INTEGER NOT NULL,
   updated_at      INTEGER NOT NULL,

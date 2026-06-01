@@ -42,15 +42,17 @@ automations.post('/', async (c) => {
     trigger_type?: string;
     trigger_config?: unknown;
     actions?: unknown[];
+    graph?: unknown;
     enabled?: boolean;
   }>();
   try {
     const a = await createAutomation(c.env, actorFromSession(c.get('user')), project.id, {
       name: body.name ?? '',
       description: body.description ?? null,
-      trigger_type: body.trigger_type ?? '',
+      trigger_type: body.trigger_type,
       trigger_config: body.trigger_config,
       actions: body.actions,
+      graph: body.graph,
       enabled: body.enabled,
     });
     return c.json(a, 201);
@@ -59,8 +61,8 @@ automations.post('/', async (c) => {
   }
 });
 
-// Manual run — drives "scene" automations and doubles as a test harness for any
-// automation. Runs synchronously so the UI gets the outcome.
+// Manual run — drives manual-trigger automations and doubles as a test harness
+// for any automation. Runs synchronously so the UI gets the outcome.
 automations.post('/:id/run', async (c) => {
   const project = c.get('project');
   const id = c.req.param('id');
@@ -80,16 +82,20 @@ automations.patch('/:id', async (c) => {
     name?: string;
     description?: string | null;
     enabled?: boolean;
+    trigger_type?: string;
     trigger_config?: unknown;
     actions?: unknown[];
+    graph?: unknown;
   }>();
   try {
     const a = await updateAutomation(c.env, actorFromSession(c.get('user')), project.id, id, {
       name: body.name,
       ...('description' in body ? { description: body.description ?? null } : {}),
       enabled: body.enabled,
+      ...('trigger_type' in body ? { trigger_type: body.trigger_type } : {}),
       ...('trigger_config' in body ? { trigger_config: body.trigger_config } : {}),
       ...('actions' in body ? { actions: body.actions } : {}),
+      ...('graph' in body ? { graph: body.graph } : {}),
     });
     return c.json(a);
   } catch (e) {

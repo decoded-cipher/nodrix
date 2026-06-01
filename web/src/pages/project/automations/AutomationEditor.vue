@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { VueFlow, useVueFlow, type Connection, type Edge } from '@vue-flow/core';
+import '@vue-flow/core/dist/style.css';
+import { TRIGGER_CATALOG, ACTION_CATALOG, graphError } from '@nodrix/blocks-shared';
 import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
-import Dropdown from '../../../components/Dropdown.vue';
 import Spinner from '../../../components/Spinner.vue';
-import FlowChip from '../../../components/FlowChip.vue';
-import { TRIGGERS, triggerSpec, OPERATORS, ACTION_TYPES, triggerChipLabel, actionChips } from './automation-catalog';
-import { connSpec } from '@nodrix/integrations-shared';
+import BlockNode from './BlockNode.vue';
+import NodeInspector from './NodeInspector.vue';
 import { recipeById } from './automation-recipes';
-import type { AutomationTriggerType, Automation } from '../../../types';
+import {
+  automationToFlow, graphToFlow, flowToGraph, defaultConfig, newNodeId, wouldCycle, blockOf,
+  type FlowNode,
+} from './graph-edit';
+import { buildLinearGraph } from '@nodrix/blocks-shared';
 
 const project = useProjectStore();
 const route = useRoute();
@@ -19,78 +24,56 @@ const router = useRouter();
 const editId = computed(() => (route.params['id'] as string | undefined) || null);
 const recipeId = (route.query['recipe'] as string | undefined) || null;
 
-type Draft = {
-  id: string | null;
-  trigger_type: AutomationTriggerType;
-  name: string;
-  description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  trigger_config: Record<string, any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  actions: any[];
-};
+const {
+  onConnect, addEdges, addNodes, removeNodes, onNodeClick, onPaneClick,
+  toObject, findNode, setNodes, setEdges, getEdges,
+} = useVueFlow();
 
-const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-const WEEKDAYS = [
-  { n: 1, label: 'Mon' }, { n: 2, label: 'Tue' }, { n: 3, label: 'Wed' },
-  { n: 4, label: 'Thu' }, { n: 5, label: 'Fri' }, { n: 6, label: 'Sat' }, { n: 0, label: 'Sun' },
-];
-
-function defaultConfig(t: AutomationTriggerType): Record<string, unknown> {
-  switch (t) {
-    case 'variable':       return { variable: project.variables[0]?.key ?? '', operator: '>', value: '', mode: 'edge' };
-    case 'schedule':       return { time: '08:00', days: [], tz: browserTz };
-    case 'sunset_sunrise': return { event: 'sunset', lat: 0, lng: 0, offset_minutes: 0 };
-    case 'event':          return { event: '' };
-    case 'scene':
-    default:               return {};
-  }
-}
-function blankDraft(t: AutomationTriggerType): Draft {
-  return { id: null, trigger_type: t, name: '', description: '', trigger_config: defaultConfig(t), actions: [] };
-}
-
-const draft = reactive<Draft>(blankDraft('variable'));
-const mode = ref<'picker' | 'form'>(editId.value || recipeId ? 'form' : 'picker');
+const name = ref('');
+const description = ref('');
 const loading = ref(!!editId.value);
 const saving = ref(false);
 const notFound = ref(false);
+const selectedId = ref<string | null>(null);
+let placed = 0;
 
-// Seed from a recipe synchronously so the right trigger UI shows immediately
-// (no flash of the default trigger while project data loads).
-if (recipeId) {
-  const r = recipeById(recipeId);
-  if (r) {
-    Object.assign(draft, blankDraft(r.trigger_type));
-    draft.name = r.name;
-    draft.trigger_config = { ...defaultConfig(r.trigger_type), ...r.trigger_config };
-    draft.actions = r.actions.map((a) => ({ ...a }));
+const selectedNode = computed(() => (selectedId.value ? findNode(selectedId.value) : undefined));
+
+onNodeClick(({ node }) => { selectedId.value = node.id; });
+onPaneClick(() => { selectedId.value = null; });
+
+onConnect((c: Connection) => {
+  if (!c.source || !c.target || c.source === c.target) return;
+  if (wouldCycle(getEdges.value, c.source, c.target)) {
+    toast.error('That connection would create a loop.');
+    return;
   }
+  addEdges([{ ...c, id: `e_${c.source}_${c.target}_${c.sourceHandle ?? 'out'}` }]);
+});
+
+const isValidConnection = (c: Connection): boolean =>
+  !!c.source && !!c.target && c.source !== c.target && !wouldCycle(getEdges.value, c.source, c.target);
+
+function addBlock(kind: string) {
+  const manifest = blockOf(kind);
+  if (!manifest) return;
+  const id = newNodeId();
+  addNodes([{
+    id,
+    type: 'block',
+    position: { x: 140 + (placed % 3) * 40, y: 40 + placed * 96 },
+    data: { kind, config: defaultConfig(manifest) },
+  }]);
+  placed++;
+  selectedId.value = id;
 }
 
-// Dropdown option lists.
-const variableOptions = computed(() => project.variables.map((v) => ({ value: v.key, label: v.key })));
-const integrationOptions = computed(() =>
-  project.integrations.map((i) => ({ value: i.id, label: i.name, hint: connSpec(i.kind).label }))
-);
-const operatorOptions = OPERATORS.map((o) => ({ value: o.value, label: o.label }));
-const solarEventOptions = [{ value: 'sunrise', label: 'Sunrise' }, { value: 'sunset', label: 'Sunset' }];
-const actionTypeOptions = ACTION_TYPES.map((a) => ({ value: a.value, label: a.label }));
+function deleteSelected() {
+  if (!selectedId.value) return;
+  removeNodes([selectedId.value]); // Vue Flow also drops connected edges
+  selectedId.value = null;
+}
 
-const spec = computed(() => triggerSpec(draft.trigger_type));
-
-// Live rule-flow preview of the draft (trigger → actions), shown atop the form.
-const previewResolvers = computed(() => ({
-  variableLabel: (k: string) => k,
-  integration: (id: string) => {
-    const i = project.integrations.find((x) => x.id === id);
-    return i ? { name: i.name, icon: connSpec(i.kind).icon } : undefined;
-  },
-}));
-const previewTrigger = computed(() => triggerChipLabel(draft.trigger_type, draft.trigger_config, previewResolvers.value));
-const previewChips = computed(() => actionChips(draft.actions, previewResolvers.value));
-
-// Init once the project is resolved (route may set it after this mounts).
 watch(() => project.currentProjectId, init, { immediate: true });
 
 async function init() {
@@ -100,107 +83,62 @@ async function init() {
     project.loadIntegrations(),
   ]);
 
+  if (recipeId) {
+    const r = recipeById(recipeId);
+    if (r) {
+      name.value = r.name;
+      const { nodes, edges } = graphToFlow(buildLinearGraph(r.trigger_type, r.trigger_config ?? {}, r.actions ?? []));
+      setNodes(nodes);
+      setEdges(edges);
+      placed = nodes.length;
+    }
+    return;
+  }
+
   if (editId.value) {
     let a = project.automations.find((x) => x.id === editId.value);
     if (!a) { await project.loadAutomations(); a = project.automations.find((x) => x.id === editId.value); }
-    if (a) populateFromAutomation(a);
-    else notFound.value = true;
+    if (a) {
+      name.value = a.name;
+      description.value = a.description ?? '';
+      const { nodes, edges } = automationToFlow(a);
+      setNodes(nodes);
+      setEdges(edges);
+      placed = nodes.length;
+    } else {
+      notFound.value = true;
+    }
     loading.value = false;
   }
 }
 
-function populateFromAutomation(a: Automation) {
-  draft.id = a.id;
-  draft.trigger_type = a.trigger_type;
-  draft.name = a.name;
-  draft.description = a.description ?? '';
-  draft.trigger_config = { ...defaultConfig(a.trigger_type), ...((a.trigger_config as Record<string, unknown>) ?? {}) };
-  draft.actions = Array.isArray(a.actions) ? JSON.parse(JSON.stringify(a.actions)) : [];
-}
-
-function pick(key: AutomationTriggerType) {
-  Object.assign(draft, blankDraft(key));
-  mode.value = 'form';
-}
-
-// Coerce strings to number/boolean where unambiguous, so comparisons and
-// control writes carry the right type.
+// Coerce string config `value`s to number/boolean where unambiguous, matching how
+// the engine compares and writes them.
 function coerce(v: unknown): unknown {
   if (typeof v !== 'string') return v;
   const s = v.trim();
-  if (s === '') return '';
-  if (s === 'true') return true;
-  if (s === 'false') return false;
-  if (!Number.isNaN(Number(s))) return Number(s);
-  return s;
-}
-
-function buildConfig(): Record<string, unknown> {
-  const cfg = { ...draft.trigger_config };
-  if (draft.trigger_type === 'variable') {
-    if (cfg.operator === 'changed') delete cfg.value;
-    else cfg.value = coerce(cfg.value);
-  }
-  return cfg;
-}
-function buildActions(): unknown[] {
-  return draft.actions.map((a) => {
-    if (a.type === 'set_variable') return { type: 'set_variable', variable: a.variable, value: coerce(a.value) };
-    if (a.type === 'call_integration') return { type: 'call_integration', integration_id: a.integration_id };
-    if (a.type === 'emit_event') return { type: 'emit_event', event: a.event };
-    return a;
-  });
-}
-
-function addAction() {
-  draft.actions.push({ type: 'set_variable', variable: project.variables[0]?.key ?? '', value: '' });
-}
-function removeAction(i: number) { draft.actions.splice(i, 1); }
-function moveAction(i: number, dir: -1 | 1) {
-  const j = i + dir;
-  if (j < 0 || j >= draft.actions.length) return;
-  const [item] = draft.actions.splice(i, 1);
-  draft.actions.splice(j, 0, item);
-}
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function onActionTypeChange(a: any) {
-  if (a.type === 'set_variable') { a.variable = project.variables[0]?.key ?? ''; a.value = ''; }
-  else if (a.type === 'call_integration') { a.integration_id = project.integrations[0]?.id ?? ''; }
-  else if (a.type === 'emit_event') { a.event = ''; }
-}
-function toggleDay(n: number) {
-  const days: number[] = draft.trigger_config.days ?? (draft.trigger_config.days = []);
-  const idx = days.indexOf(n);
-  if (idx >= 0) days.splice(idx, 1);
-  else days.push(n);
-}
-
-function backToList() {
-  router.push({ name: 'automations' });
+  if (s === '' || s === 'true' || s === 'false') return s === 'true' ? true : s === 'false' ? false : '';
+  return Number.isNaN(Number(s)) ? s : Number(s);
 }
 
 async function save() {
-  const name = draft.name.trim();
-  if (!name) return;
+  const n = name.value.trim();
+  if (!n) return;
+  const obj = toObject();
+  const graph = flowToGraph(obj.nodes as FlowNode[], obj.edges as Edge[]);
+  for (const node of graph.nodes) if ('value' in node.config) node.config['value'] = coerce(node.config['value']);
+
+  const err = graphError(graph);
+  if (err) { toast.error(err); return; }
+
   saving.value = true;
   try {
-    if (draft.id) {
-      await project.updateAutomation(draft.id, {
-        name,
-        description: draft.description.trim() || null,
-        trigger_config: buildConfig(),
-        actions: buildActions(),
-      });
+    if (editId.value) {
+      await project.updateAutomation(editId.value, { name: n, description: description.value.trim() || null, graph });
     } else {
-      await project.createAutomation({
-        name,
-        description: draft.description.trim() || null,
-        trigger_type: draft.trigger_type,
-        trigger_config: buildConfig(),
-        actions: buildActions(),
-      });
+      await project.createAutomation({ name: n, description: description.value.trim() || null, graph });
     }
-    backToList();
+    router.push({ name: 'automations' });
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
@@ -210,192 +148,66 @@ async function save() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-    <button type="button" class="mb-4 inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100" @click="backToList">
+  <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+    <button type="button" class="mb-4 inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100" @click="router.push({ name: 'automations' })">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5"><path d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
       Automations
     </button>
 
     <div v-if="loading" class="rounded-xl border border-neutral-200 bg-white p-10 dark:border-neutral-800 dark:bg-neutral-900"><Spinner block /></div>
-
     <div v-else-if="notFound" class="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
       Automation not found.
     </div>
 
-    <!-- Trigger picker -->
-    <section v-else-if="mode === 'picker'">
-      <h1 class="text-lg font-semibold tracking-tight">New automation</h1>
-      <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Choose what should trigger it.</p>
-      <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <button
-          v-for="t in TRIGGERS"
-          :key="t.key"
-          type="button"
-          class="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-300 hover:shadow-sm sm:p-5 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
-          @click="pick(t.key)"
-        >
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
-            <Icon :path="t.icon" class="h-5 w-5" />
-          </div>
-          <div class="min-w-0">
-            <div class="text-base font-semibold text-neutral-900 dark:text-neutral-100">{{ t.title }}</div>
-            <div class="mt-1 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{{ t.desc }}</div>
-          </div>
-        </button>
-      </div>
-    </section>
-
-    <!-- Editor form -->
-    <form v-else @submit.prevent="save">
-      <div class="mb-5 flex items-center gap-3">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
-          <Icon :path="spec.icon" class="h-5 w-5" />
-        </div>
-        <div>
-          <h1 class="text-lg font-semibold tracking-tight">{{ draft.id ? 'Edit automation' : 'New automation' }}</h1>
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ spec.title }} · {{ spec.desc }}</p>
-        </div>
+    <template v-else>
+      <!-- Header -->
+      <div class="mb-4 grid gap-3 sm:grid-cols-2">
+        <input v-model="name" type="text" required placeholder="Automation name" class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
+        <input v-model="description" type="text" placeholder="Description (optional)" class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
       </div>
 
-      <!-- Live rule-flow preview -->
-      <div class="mb-4 flex flex-wrap items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
-        <FlowChip tone="trigger" :icon="spec.icon" :label="previewTrigger || 'Set a trigger'" />
-        <template v-if="previewChips.length">
-          <template v-for="(c, i) in previewChips" :key="i">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 shrink-0 text-neutral-300 dark:text-neutral-600"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-            <FlowChip tone="action" :icon="c.icon" :label="c.label" />
+      <!-- Editor: palette | canvas | inspector -->
+      <div class="grid h-[64vh] grid-cols-[180px_1fr_260px] gap-3">
+        <!-- Palette -->
+        <div class="overflow-y-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <h3 class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Triggers</h3>
+          <button v-for="t in TRIGGER_CATALOG" :key="t.kind" type="button" class="mb-1.5 flex w-full items-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-left text-xs hover:border-accent-300 dark:border-neutral-700 dark:hover:border-accent-700" @click="addBlock(t.kind)">
+            <Icon :path="t.icon" class="h-4 w-4 text-accent-600 dark:text-accent-400" /> {{ t.label }}
+          </button>
+          <h3 class="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Actions</h3>
+          <button v-for="a in ACTION_CATALOG" :key="a.kind" type="button" class="mb-1.5 flex w-full items-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-left text-xs hover:border-accent-300 dark:border-neutral-700 dark:hover:border-accent-700" @click="addBlock(a.kind)">
+            <Icon :path="a.icon" class="h-4 w-4 text-neutral-500" /> {{ a.label }}
+          </button>
+        </div>
+
+        <!-- Canvas -->
+        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950/40">
+          <VueFlow :is-valid-connection="isValidConnection" :default-edge-options="{ animated: true }" fit-view-on-init class="h-full w-full">
+            <template #node-block="props">
+              <BlockNode v-bind="props" />
+            </template>
+          </VueFlow>
+        </div>
+
+        <!-- Inspector -->
+        <div class="overflow-y-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <template v-if="selectedNode">
+            <NodeInspector :node="selectedNode.data" />
+            <button type="button" class="mt-4 w-full rounded-md border border-red-200 px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/40" @click="deleteSelected">Remove block</button>
           </template>
-        </template>
-        <template v-else>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 shrink-0 text-neutral-300 dark:text-neutral-600"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-          <span class="text-xs italic text-neutral-400 dark:text-neutral-500">Add an action</span>
-        </template>
-      </div>
-
-      <!-- Details -->
-      <div class="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
-        <label class="block">
-          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name</span>
-          <input v-model="draft.name" type="text" required class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" placeholder="e.g. Fan on when hot" />
-        </label>
-        <label class="mt-3 block">
-          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Description (optional)</span>
-          <textarea v-model="draft.description" rows="2" class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
-        </label>
-      </div>
-
-      <!-- When -->
-      <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
-        <div class="mb-3 flex items-center gap-2">
-          <span class="grid h-5 w-5 place-items-center rounded-full bg-accent-100 text-[10px] font-bold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">1</span>
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">When this happens</h3>
+          <p v-else class="text-xs text-neutral-400 dark:text-neutral-500">
+            Add blocks from the left, drag to connect them, and click a block to configure it.
+          </p>
         </div>
-
-        <div v-if="draft.trigger_type === 'variable'" class="flex flex-wrap items-center gap-2">
-          <Dropdown v-model="draft.trigger_config.variable" :options="variableOptions" placeholder="Variable" size="sm" class="w-44" />
-          <Dropdown v-model="draft.trigger_config.operator" :options="operatorOptions" size="sm" class="w-48" />
-          <input v-if="draft.trigger_config.operator !== 'changed'" v-model="draft.trigger_config.value" type="text" class="w-32 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="value" />
-          <label class="ml-auto inline-flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
-            <input v-model="draft.trigger_config.mode" type="checkbox" true-value="always" false-value="edge" class="rounded" />
-            Fire on every reading
-          </label>
-        </div>
-
-        <p v-else-if="draft.trigger_type === 'scene'" class="rounded-lg border border-dashed border-neutral-300 p-3 text-xs text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-          No condition — run this automation manually with the Run button.
-        </p>
-
-        <div v-else-if="draft.trigger_type === 'schedule'" class="space-y-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <input v-model="draft.trigger_config.time" type="time" class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" />
-            <input v-model="draft.trigger_config.tz" type="text" class="w-56 max-w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950" placeholder="IANA timezone" />
-          </div>
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              v-for="d in WEEKDAYS"
-              :key="d.n"
-              type="button"
-              class="rounded-md border px-2.5 py-1 text-xs"
-              :class="(draft.trigger_config.days ?? []).includes(d.n)
-                ? 'border-accent-500 bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'
-                : 'border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300'"
-              @click="toggleDay(d.n)"
-            >{{ d.label }}</button>
-          </div>
-          <p class="text-[11px] text-neutral-500 dark:text-neutral-400">No days selected = every day.</p>
-        </div>
-
-        <div v-else-if="draft.trigger_type === 'sunset_sunrise'" class="flex flex-wrap items-center gap-2">
-          <Dropdown v-model="draft.trigger_config.event" :options="solarEventOptions" size="sm" class="w-32" />
-          <input v-model.number="draft.trigger_config.lat" type="number" step="any" class="w-28 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="lat" />
-          <input v-model.number="draft.trigger_config.lng" type="number" step="any" class="w-28 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="lng" />
-          <label class="inline-flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
-            offset
-            <input v-model.number="draft.trigger_config.offset_minutes" type="number" class="w-20 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" />
-            min
-          </label>
-        </div>
-
-        <div v-else-if="draft.trigger_type === 'event'">
-          <input v-model="draft.trigger_config.event" type="text" class="w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="event name, e.g. button_pressed" />
-          <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">Matched against <code>POST /v1/events</code> <code>{ "event": "…" }</code>.</p>
-        </div>
-      </div>
-
-      <!-- Connector -->
-      <div class="flex justify-center py-1.5" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-neutral-300 dark:text-neutral-600"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m0 0 6.75-6.75M12 19.5l-6.75-6.75" /></svg>
-      </div>
-
-      <!-- Then -->
-      <div class="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
-        <div class="mb-3 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="grid h-5 w-5 place-items-center rounded-full bg-accent-100 text-[10px] font-bold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">2</span>
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Then do this</h3>
-          </div>
-          <button type="button" class="rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="addAction">Add action</button>
-        </div>
-
-        <ul v-if="draft.actions.length > 0" class="space-y-2">
-          <li v-for="(a, i) in draft.actions" :key="i" class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-            <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-neutral-100 text-[11px] font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">{{ i + 1 }}</span>
-            <Dropdown :model-value="a.type" :options="actionTypeOptions" size="sm" class="w-44" @update:model-value="(v) => { a.type = v; onActionTypeChange(a); }" />
-
-            <template v-if="a.type === 'set_variable'">
-              <Dropdown v-model="a.variable" :options="variableOptions" placeholder="Variable" size="sm" class="w-40" />
-              <span class="text-xs text-neutral-500">to</span>
-              <input v-model="a.value" type="text" class="w-28 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="value" />
-            </template>
-
-            <template v-else-if="a.type === 'call_integration'">
-              <Dropdown v-model="a.integration_id" :options="integrationOptions" placeholder="Integration" size="sm" class="min-w-0 flex-1" />
-              <RouterLink v-if="integrationOptions.length === 0" :to="`/p/${project.currentProjectId}/automations/integrations`" class="text-xs text-accent-600 hover:underline dark:text-accent-400">Add an integration</RouterLink>
-            </template>
-
-            <template v-else-if="a.type === 'emit_event'">
-              <input v-model="a.event" type="text" class="w-48 rounded-md border border-neutral-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-neutral-700 dark:bg-neutral-950" placeholder="event name" />
-            </template>
-
-            <div class="ml-auto flex items-center gap-1">
-              <button type="button" class="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800" title="Move up" @click="moveAction(i, -1)">↑</button>
-              <button type="button" class="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800" title="Move down" @click="moveAction(i, 1)">↓</button>
-              <button type="button" class="rounded p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40" title="Remove" @click="removeAction(i)">✕</button>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="rounded-lg border border-dashed border-neutral-300 p-3 text-xs text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-          No actions yet. Add at least one for this automation to do something.
-        </p>
       </div>
 
       <!-- Save bar -->
-      <div class="sticky bottom-0 mt-4 flex items-center justify-end gap-2 rounded-xl border border-neutral-200 bg-white/90 p-3 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/90">
-        <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="backToList">Cancel</button>
-        <button type="submit" :disabled="saving || !draft.name.trim()" class="rounded-md bg-accent-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50">
-          {{ saving ? 'Saving…' : draft.id ? 'Save changes' : 'Create automation' }}
+      <div class="mt-4 flex items-center justify-end gap-2">
+        <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="router.push({ name: 'automations' })">Cancel</button>
+        <button type="button" :disabled="saving || !name.trim()" class="rounded-md bg-accent-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50" @click="save">
+          {{ saving ? 'Saving…' : editId ? 'Save changes' : 'Create automation' }}
         </button>
       </div>
-    </form>
+    </template>
   </div>
 </template>

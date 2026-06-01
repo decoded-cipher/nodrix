@@ -5,6 +5,7 @@ import { GRID_COLUMNS } from '../builder/grid';
 import type {
   Automation,
   AutomationTriggerType,
+  AutomationGraph,
   Dashboard,
   DashboardMeta,
   Variable,
@@ -249,10 +250,11 @@ export const useProjectStore = defineStore('project', () => {
 
   async function createAutomation(input: {
     name: string;
-    trigger_type: AutomationTriggerType;
+    trigger_type?: AutomationTriggerType;
     description?: string | null;
     trigger_config?: unknown;
     actions?: unknown[];
+    graph?: AutomationGraph;
   }): Promise<Automation> {
     const pid = requireProjectId();
     const a = await api.post<Automation>(
@@ -265,7 +267,7 @@ export const useProjectStore = defineStore('project', () => {
 
   async function updateAutomation(
     id: string,
-    patch: Partial<Pick<Automation, 'name' | 'description' | 'enabled' | 'trigger_config' | 'actions'>>
+    patch: Partial<Pick<Automation, 'name' | 'description' | 'enabled' | 'trigger_config' | 'actions' | 'graph'>>
   ): Promise<Automation> {
     const pid = requireProjectId();
     const a = await api.patch<Automation>(

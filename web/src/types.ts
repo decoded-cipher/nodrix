@@ -1,5 +1,8 @@
 // Shared types used across stores, pages, and widgets.
 
+import type { AutomationGraph, GraphNode, GraphEdge } from '@nodrix/blocks-shared';
+export type { AutomationGraph, GraphNode, GraphEdge };
+
 export type InstanceRole = 'owner' | 'admin' | 'member';
 
 // A project the user has access to. owner/admin see all; members see only the
@@ -163,7 +166,7 @@ export type ShareState = {
 
 export type AutomationTriggerType =
   | 'variable'
-  | 'scene'
+  | 'manual'
   | 'schedule'
   | 'sunset_sunrise'
   | 'event';
@@ -210,8 +213,9 @@ export type Automation = {
   description: string | null;
   enabled: boolean;
   trigger_type: AutomationTriggerType;
-  trigger_config: unknown;            // JSON; shape depends on trigger_type
-  actions: unknown[];                 // JSON ordered list of action descriptors
+  trigger_config: unknown;            // JSON; legacy primary trigger
+  actions: unknown[];                 // JSON ordered list (legacy)
+  graph: AutomationGraph | null;      // flow graph; source of truth
   created_at: number;
   updated_at: number;
   last_run_at: number | null;
@@ -219,7 +223,8 @@ export type Automation = {
   last_error: string | null;
 };
 
-// Sourced from the shared package; re-exported so '../types' imports keep working.
+// Sourced from the shared packages; re-exported so '../types' imports keep working.
+// (GraphNode/GraphEdge/AutomationGraph are imported + re-exported at the top.)
 export type { IntegrationKind, Integration } from '@nodrix/integrations-shared';
 export type { IntegrationResult as IntegrationTestResult } from '@nodrix/integrations-shared';
 

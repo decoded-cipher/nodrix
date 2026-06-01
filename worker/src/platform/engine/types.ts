@@ -35,24 +35,9 @@ export type Action =
   | { type: 'call_integration'; integration_id: string; payload?: Record<string, unknown> }
   | { type: 'emit_event'; event: string; payload?: Record<string, unknown> };
 
-// ─── Flow graph (executable shape) ───────────────────────────────────────────
-// An automation runs as a directed acyclic graph: trigger node(s) as entrypoints,
-// action nodes executed in edge order, condition nodes (later) gating named ports.
-// Phase 2 builds this on-read from the legacy trigger_config/actions columns.
-
-export type GraphNode = {
-  id: string;
-  kind: string;                        // trigger/action kind from the block catalog
-  config: Record<string, unknown>;
-};
-
-export type GraphEdge = {
-  from: string;                        // source node id
-  to: string;                          // target node id
-  port?: string;                       // source output port; default 'out'
-};
-
-export type AutomationGraph = { nodes: GraphNode[]; edges: GraphEdge[] };
+// Flow-graph model lives in the shared catalog (used by web + worker); re-exported
+// so engine imports keep resolving from './types'.
+export type { GraphNode, GraphEdge, AutomationGraph } from '@nodrix/blocks-shared';
 
 export type TriggerSource = 'variable' | 'manual' | 'event' | 'schedule' | 'sunset_sunrise';
 
@@ -87,6 +72,7 @@ export type AutomationRow = {
   trigger_type: string;
   trigger_config: string;              // JSON
   actions: string;                     // JSON
+  graph?: string | null;               // JSON AutomationGraph; preferred when present
   last_run_at: number | null;
 };
 

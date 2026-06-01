@@ -8,6 +8,7 @@ import { ACTION_CATALOG } from './actions';
 
 export { TRIGGER_CATALOG } from './triggers';
 export { ACTION_CATALOG } from './actions';
+export * from './graph';
 
 // ─── Manifest types ─────────────────────────────────────────────────────────
 
@@ -88,4 +89,9 @@ export function actionSpec(kind: string): BlockManifest {
 export function blockSpec(category: BlockCategory, kind: string): BlockManifest | undefined {
   const catalog = category === 'trigger' ? TRIGGER_CATALOG : category === 'action' ? ACTION_CATALOG : [];
   return catalog.find((b) => b.kind === kind);
+}
+
+// Find a block by kind across catalogs (the editor only knows a node's kind).
+export function findBlock(kind: string): BlockManifest | undefined {
+  return TRIGGER_CATALOG.find((b) => b.kind === kind) ?? ACTION_CATALOG.find((b) => b.kind === kind);
 }

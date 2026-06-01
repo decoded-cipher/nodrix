@@ -69,7 +69,7 @@ export function triggerSummary(
       if (cfg.operator === 'changed') return `When ${v} changes`;
       return `When ${v} ${op?.label ?? cfg.operator} ${fmtVal(cfg.value)}`;
     }
-    case 'scene':
+    case 'manual':
       return 'Run manually';
     case 'schedule': {
       const days = Array.isArray(cfg.days) ? (cfg.days as number[]) : [];
@@ -116,7 +116,7 @@ export function triggerChipLabel(
       const op = OPERATORS.find((o) => o.value === cfg.operator);
       return `${v} ${op?.short ?? cfg.operator} ${fmtVal(cfg.value)}`;
     }
-    case 'scene':
+    case 'manual':
       return 'Manual';
     case 'schedule': {
       const days = Array.isArray(cfg.days) ? (cfg.days as number[]) : [];

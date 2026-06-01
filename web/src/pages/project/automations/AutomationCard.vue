@@ -62,13 +62,17 @@ async function run() {
 async function duplicate() {
   menuOpen.value = false;
   try {
-    await project.createAutomation({
-      name: `${props.automation.name} (copy)`,
-      description: props.automation.description,
-      trigger_type: props.automation.trigger_type,
-      trigger_config: props.automation.trigger_config,
-      actions: props.automation.actions,
-    });
+    await project.createAutomation(
+      props.automation.graph
+        ? { name: `${props.automation.name} (copy)`, description: props.automation.description, graph: props.automation.graph }
+        : {
+            name: `${props.automation.name} (copy)`,
+            description: props.automation.description,
+            trigger_type: props.automation.trigger_type,
+            trigger_config: props.automation.trigger_config,
+            actions: props.automation.actions,
+          }
+    );
   } catch (e) {
     toast.error((e as Error).message);
   }

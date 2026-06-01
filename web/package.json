@@ -13,6 +13,7 @@
     "@nodrix/blocks-shared": "*",
     "@nodrix/integrations-shared": "*",
     "@nodrix/widgets-shared": "*",
+    "@vue-flow/core": "^1.48.2",
     "better-auth": "^1.6.11",
     "grid-layout-plus": "^1.1.1",
     "pinia": "^2.3.0",
