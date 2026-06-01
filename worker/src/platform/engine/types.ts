@@ -10,6 +10,7 @@ export type VariableTriggerConfig = {
   operator: VariableOperator;
   value?: number | string | boolean;   // omitted for 'changed'
   mode?: 'edge' | 'always';            // edge (default): fire once on entry
+  cooldown_seconds?: number;           // min seconds between runs; suppresses re-fires
 };
 
 export type ScheduleTriggerConfig = {
@@ -33,6 +34,25 @@ export type Action =
   | { type: 'set_variable'; variable: string; value: number | string | boolean }
   | { type: 'call_integration'; integration_id: string; payload?: Record<string, unknown> }
   | { type: 'emit_event'; event: string; payload?: Record<string, unknown> };
+
+// ─── Flow graph (executable shape) ───────────────────────────────────────────
+// An automation runs as a directed acyclic graph: trigger node(s) as entrypoints,
+// action nodes executed in edge order, condition nodes (later) gating named ports.
+// Phase 2 builds this on-read from the legacy trigger_config/actions columns.
+
+export type GraphNode = {
+  id: string;
+  kind: string;                        // trigger/action kind from the block catalog
+  config: Record<string, unknown>;
+};
+
+export type GraphEdge = {
+  from: string;                        // source node id
+  to: string;                          // target node id
+  port?: string;                       // source output port; default 'out'
+};
+
+export type AutomationGraph = { nodes: GraphNode[]; edges: GraphEdge[] };
 
 export type TriggerSource = 'variable' | 'manual' | 'event' | 'schedule' | 'sunset_sunrise';
 
