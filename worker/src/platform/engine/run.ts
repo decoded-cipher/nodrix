@@ -1,7 +1,6 @@
-// Automation orchestrator. Builds the automation's flow graph, walks it from the
-// trigger node running each action via the kind→handler registry, and records the
-// outcome on the row + audit log. DAG traversal: each node runs once, condition
-// ports gate which edges are followed, and a step cap bounds runaway graphs.
+// Automation orchestrator. Builds the flow graph, walks it from the trigger node
+// running each action via the kind→handler registry, and records the outcome on
+// the row + audit log. DAG traversal: each node runs once; a step cap bounds it.
 //
 // Callable from anywhere: the ProjectDO hot path, the cron scheduled handler, the
 // manual-run endpoint, and /v1/events. `set_variable` differs by caller (DO binds
@@ -65,8 +64,7 @@ export async function runAutomation(
     const node = byId.get(id);
     if (!node) return;
 
-    // Action nodes execute; trigger nodes are pass-through entrypoints. Condition
-    // nodes will additionally gate which output ports are followed.
+    // Action nodes execute; trigger nodes are pass-through entrypoints.
     if (VALID_ACTION_KINDS.has(node.kind)) {
       await runActionNode(node.kind, { env, automation, ctx, config: node.config, deps: actionDeps });
       actionsRun++;

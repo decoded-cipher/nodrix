@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { VueFlow, useVueFlow, type Connection, type Edge } from '@vue-flow/core';
 import '@vue-flow/core/dist/style.css';
-import { TRIGGER_CATALOG, ACTION_CATALOG, graphError } from '@nodrix/blocks-shared';
+import { TRIGGER_CATALOG, ACTION_CATALOG, graphError, buildLinearGraph } from '@nodrix/blocks-shared';
 import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
@@ -15,7 +15,6 @@ import {
   automationToFlow, graphToFlow, flowToGraph, defaultConfig, newNodeId, wouldCycle, blockOf,
   type FlowNode,
 } from './graph-edit';
-import { buildLinearGraph } from '@nodrix/blocks-shared';
 
 const project = useProjectStore();
 const route = useRoute();
@@ -38,6 +37,7 @@ const selectedId = ref<string | null>(null);
 let placed = 0;
 
 const selectedNode = computed(() => (selectedId.value ? findNode(selectedId.value) : undefined));
+const canSave = computed(() => !!name.value.trim() && !saving.value);
 
 onNodeClick(({ node }) => { selectedId.value = node.id; });
 onPaneClick(() => { selectedId.value = null; });
@@ -61,7 +61,7 @@ function addBlock(kind: string) {
   addNodes([{
     id,
     type: 'block',
-    position: { x: 140 + (placed % 3) * 40, y: 40 + placed * 96 },
+    position: { x: 160 + (placed % 3) * 48, y: 48 + placed * 104 },
     data: { kind, config: defaultConfig(manifest) },
   }]);
   placed++;
@@ -121,6 +121,10 @@ function coerce(v: unknown): unknown {
   return Number.isNaN(Number(s)) ? s : Number(s);
 }
 
+function backToList() {
+  router.push({ name: 'automations' });
+}
+
 async function save() {
   const n = name.value.trim();
   if (!n) return;
@@ -138,7 +142,7 @@ async function save() {
     } else {
       await project.createAutomation({ name: n, description: description.value.trim() || null, graph });
     }
-    router.push({ name: 'automations' });
+    backToList();
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
@@ -148,66 +152,93 @@ async function save() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-    <button type="button" class="mb-4 inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100" @click="router.push({ name: 'automations' })">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5"><path d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
-      Automations
-    </button>
+  <main class="flex h-full">
+    <!-- Topbar actions: name + Done/Save, teleported into the shell topbar. -->
+    <Teleport to="#topbar-actions" defer>
+      <input
+        v-model="name"
+        type="text"
+        placeholder="Automation name"
+        class="w-40 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 sm:w-52"
+      />
+      <input
+        v-model="description"
+        type="text"
+        placeholder="Description"
+        class="hidden w-56 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm md:block dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+      />
+      <button
+        class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        @click="backToList"
+      >Done</button>
+      <button
+        class="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+        :disabled="!canSave"
+        @click="save"
+      >{{ saving ? 'Saving…' : editId ? 'Save' : 'Create' }}</button>
+    </Teleport>
 
-    <div v-if="loading" class="rounded-xl border border-neutral-200 bg-white p-10 dark:border-neutral-800 dark:bg-neutral-900"><Spinner block /></div>
-    <div v-else-if="notFound" class="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
-      Automation not found.
-    </div>
-
-    <template v-else>
-      <!-- Header -->
-      <div class="mb-4 grid gap-3 sm:grid-cols-2">
-        <input v-model="name" type="text" required placeholder="Automation name" class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
-        <input v-model="description" type="text" placeholder="Description (optional)" class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" />
+    <!-- Palette -->
+    <aside class="flex w-60 shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="border-b border-neutral-200 px-3 py-2.5 dark:border-neutral-800">
+        <span class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Blocks</span>
       </div>
-
-      <!-- Editor: palette | canvas | inspector -->
-      <div class="grid h-[64vh] grid-cols-[180px_1fr_260px] gap-3">
-        <!-- Palette -->
-        <div class="overflow-y-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <h3 class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Triggers</h3>
-          <button v-for="t in TRIGGER_CATALOG" :key="t.kind" type="button" class="mb-1.5 flex w-full items-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-left text-xs hover:border-accent-300 dark:border-neutral-700 dark:hover:border-accent-700" @click="addBlock(t.kind)">
-            <Icon :path="t.icon" class="h-4 w-4 text-accent-600 dark:text-accent-400" /> {{ t.label }}
-          </button>
-          <h3 class="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Actions</h3>
-          <button v-for="a in ACTION_CATALOG" :key="a.kind" type="button" class="mb-1.5 flex w-full items-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-left text-xs hover:border-accent-300 dark:border-neutral-700 dark:hover:border-accent-700" @click="addBlock(a.kind)">
-            <Icon :path="a.icon" class="h-4 w-4 text-neutral-500" /> {{ a.label }}
-          </button>
-        </div>
-
-        <!-- Canvas -->
-        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950/40">
-          <VueFlow :is-valid-connection="isValidConnection" :default-edge-options="{ animated: true }" fit-view-on-init class="h-full w-full">
-            <template #node-block="props">
-              <BlockNode v-bind="props" />
-            </template>
-          </VueFlow>
-        </div>
-
-        <!-- Inspector -->
-        <div class="overflow-y-auto rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <template v-if="selectedNode">
-            <NodeInspector :node="selectedNode.data" />
-            <button type="button" class="mt-4 w-full rounded-md border border-red-200 px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/40" @click="deleteSelected">Remove block</button>
-          </template>
-          <p v-else class="text-xs text-neutral-400 dark:text-neutral-500">
-            Add blocks from the left, drag to connect them, and click a block to configure it.
-          </p>
-        </div>
-      </div>
-
-      <!-- Save bar -->
-      <div class="mt-4 flex items-center justify-end gap-2">
-        <button type="button" class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="router.push({ name: 'automations' })">Cancel</button>
-        <button type="button" :disabled="saving || !name.trim()" class="rounded-md bg-accent-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50" @click="save">
-          {{ saving ? 'Saving…' : editId ? 'Save changes' : 'Create automation' }}
+      <div class="flex-1 overflow-y-auto p-3">
+        <h3 class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Triggers</h3>
+        <button v-for="t in TRIGGER_CATALOG" :key="t.kind" type="button" class="mb-1.5 flex w-full items-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-left text-xs hover:border-accent-300 dark:border-neutral-700 dark:hover:border-accent-700" @click="addBlock(t.kind)">
+          <Icon :path="t.icon" class="h-4 w-4 text-accent-600 dark:text-accent-400" /> {{ t.label }}
+        </button>
+        <h3 class="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Actions</h3>
+        <button v-for="a in ACTION_CATALOG" :key="a.kind" type="button" class="mb-1.5 flex w-full items-center gap-2 rounded-md border border-neutral-200 px-2 py-1.5 text-left text-xs hover:border-accent-300 dark:border-neutral-700 dark:hover:border-accent-700" @click="addBlock(a.kind)">
+          <Icon :path="a.icon" class="h-4 w-4 text-neutral-500" /> {{ a.label }}
         </button>
       </div>
-    </template>
-  </div>
+    </aside>
+
+    <!-- Canvas + floating inspector -->
+    <div class="relative flex-1">
+      <div v-if="loading" class="grid h-full place-items-center"><Spinner /></div>
+      <div v-else-if="notFound" class="grid h-full place-items-center text-sm text-neutral-500 dark:text-neutral-400">Automation not found.</div>
+
+      <div v-else class="canvas-dots h-full w-full">
+        <VueFlow :is-valid-connection="isValidConnection" :default-edge-options="{ animated: true }" fit-view-on-init class="h-full w-full">
+          <template #node-block="props">
+            <BlockNode v-bind="props" />
+          </template>
+        </VueFlow>
+      </div>
+
+      <aside
+        v-if="selectedNode && !loading"
+        class="absolute right-4 top-4 bottom-4 z-30 flex w-[calc(100%-2rem)] max-w-[20rem] flex-col rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Block settings</span>
+          <div class="flex items-center gap-1">
+            <button type="button" title="Remove block" class="rounded-md p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-red-950/40 dark:hover:text-red-400" @click="deleteSelected">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
+            </button>
+            <button type="button" title="Close" class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100" @click="selectedId = null">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4">
+          <NodeInspector :node="selectedNode.data" />
+        </div>
+      </aside>
+
+      <p v-if="!loading && !notFound" class="pointer-events-none absolute bottom-4 left-4 z-10 max-w-xs text-xs text-neutral-400 dark:text-neutral-500">
+        Add blocks from the left, drag between handles to connect, and click a block to configure it.
+      </p>
+    </div>
+  </main>
 </template>
+
+<style scoped>
+.canvas-dots {
+  background-color: var(--canvas-bg);
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+</style>

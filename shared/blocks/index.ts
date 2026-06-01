@@ -71,24 +71,12 @@ export const ACTION_KINDS = ACTION_CATALOG.map((a) => a.kind) as [ActionKind, ..
 export const VALID_TRIGGER_KINDS: ReadonlySet<string> = new Set(TRIGGER_KINDS);
 export const VALID_ACTION_KINDS: ReadonlySet<string> = new Set(ACTION_KINDS);
 
-export const EXECUTABLE_ACTIONS = ACTION_CATALOG.filter((a) => a.executable);
-export const COMING_SOON_ACTIONS = ACTION_CATALOG.filter((a) => !a.executable);
-export const EXECUTABLE_TRIGGERS = TRIGGER_CATALOG.filter((t) => t.executable);
-export const COMING_SOON_TRIGGERS = TRIGGER_CATALOG.filter((t) => !t.executable);
-
-// ─── Lookups ──────────────────────────────────────────────────────────────────
-
 export function triggerSpec(kind: string): BlockManifest {
   return TRIGGER_CATALOG.find((t) => t.kind === kind) ?? TRIGGER_CATALOG[0];
 }
 
 export function actionSpec(kind: string): BlockManifest {
   return ACTION_CATALOG.find((a) => a.kind === kind) ?? ACTION_CATALOG[0];
-}
-
-export function blockSpec(category: BlockCategory, kind: string): BlockManifest | undefined {
-  const catalog = category === 'trigger' ? TRIGGER_CATALOG : category === 'action' ? ACTION_CATALOG : [];
-  return catalog.find((b) => b.kind === kind);
 }
 
 // Find a block by kind across catalogs (the editor only knows a node's kind).

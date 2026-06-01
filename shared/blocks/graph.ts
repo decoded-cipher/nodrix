@@ -109,17 +109,18 @@ function hasCycle(graph: AutomationGraph): boolean {
   const adj = new Map<string, string[]>();
   for (const e of graph.edges) (adj.get(e.from) ?? adj.set(e.from, []).get(e.from)!).push(e.to);
 
-  const state = new Map<string, 0 | 1 | 2>(); // 0=visiting, 2=done
+  const visiting = new Set<string>();
+  const done = new Set<string>();
   const dfs = (id: string): boolean => {
-    state.set(id, 0);
+    visiting.add(id);
     for (const to of adj.get(id) ?? []) {
-      const s = state.get(to);
-      if (s === 0) return true;          // back-edge → cycle
-      if (s === undefined && dfs(to)) return true;
+      if (visiting.has(to)) return true;          // back-edge → cycle
+      if (!done.has(to) && dfs(to)) return true;
     }
-    state.set(id, 2);
+    visiting.delete(id);
+    done.add(id);
     return false;
   };
-  for (const n of graph.nodes) if (state.get(n.id) === undefined && dfs(n.id)) return true;
+  for (const n of graph.nodes) if (!done.has(n.id) && dfs(n.id)) return true;
   return false;
 }

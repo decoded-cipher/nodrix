@@ -21,27 +21,27 @@ const subtitle = computed(() => {
 
 <template>
   <div
-    class="min-w-[150px] rounded-lg border bg-white px-3 py-2 shadow-sm transition dark:bg-neutral-900"
+    class="min-w-[112px] max-w-[180px] rounded-md border bg-white px-2 py-1.5 shadow-sm transition dark:bg-neutral-900"
     :class="[
       selected ? 'border-accent-500 ring-1 ring-accent-400' : 'border-neutral-200 dark:border-neutral-700',
     ]"
   >
     <Handle v-if="hasIn" type="target" :position="Position.Top" />
 
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5">
       <div
-        class="grid h-7 w-7 shrink-0 place-items-center rounded-md"
+        class="grid h-5 w-5 shrink-0 place-items-center rounded"
         :class="isTrigger
           ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'
           : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'"
       >
-        <Icon :path="manifest?.icon ?? ''" class="h-4 w-4" />
+        <Icon :path="manifest?.icon ?? ''" class="h-3.5 w-3.5" />
       </div>
       <div class="min-w-0">
-        <div class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+        <div class="truncate text-xs font-semibold leading-tight text-neutral-900 dark:text-neutral-100">
           {{ manifest?.label ?? data.kind }}
         </div>
-        <div v-if="subtitle" class="truncate text-[11px] text-neutral-500 dark:text-neutral-400">{{ subtitle }}</div>
+        <div v-if="subtitle" class="truncate text-[10px] leading-tight text-neutral-500 dark:text-neutral-400">{{ subtitle }}</div>
       </div>
     </div>
 

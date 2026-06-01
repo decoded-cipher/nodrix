@@ -15,7 +15,8 @@ const route = useRoute();
 const router = useRouter();
 
 const routeProjId = computed(() => (route.params['proj'] as string | undefined) ?? null);
-const isDashboardEditor = computed(() => route.name === 'dashboard-edit');
+// Full-page editors (dashboard + automation) collapse the sidebar for room.
+const isFullEditor = computed(() => route.name === 'dashboard-edit' || route.name === 'automation-editor');
 
 onMounted(async () => {
   if (!session.user) await session.load();
@@ -56,9 +57,9 @@ watch(
   () => ui.ensureValidProject()
 );
 
-// Collapse the sidebar while the dashboard editor is open, restore on exit.
+// Collapse the sidebar while a full-page editor is open, restore on exit.
 watch(
-  isDashboardEditor,
+  isFullEditor,
   (editing) => {
     if (editing) ui.autoCollapseForEditor();
     else ui.restoreSidebarFromEditor();
