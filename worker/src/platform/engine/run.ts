@@ -6,12 +6,13 @@
 // manual-run endpoint, and /v1/events. `set_variable` differs by caller (DO binds
 // addControl; the worker routes to the PROJECT_DO stub), so it's injectable via deps.
 
-import { VALID_ACTION_KINDS } from '@nodrix/blocks-shared';
+import { VALID_ACTION_KINDS, VALID_CONDITION_KINDS } from '@nodrix/blocks-shared';
 import type { Env } from '../../env';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { projectStub } from '../durable-objects/stubs';
 import { runActionNode, type ActionDeps } from './actions';
+import { evalCondition } from './conditions';
 import { toGraph, entryNode, nodesById, outgoingEdges, countActionNodes, triggerNodes } from './graph';
 import type { AutomationContext, AutomationRow, RunResult, RunStatus } from './types';
 
@@ -22,6 +23,8 @@ export type RunDeps = {
   setVariable?: ActionDeps['setVariable'];
   // Re-entry for emit_event. Defaults to dispatchEvent over D1.
   emitEvent?: ActionDeps['emitEvent'];
+  // Read a variable's latest value (for condition nodes). Defaults to the DO stub.
+  getVariable?: (variable: string) => Promise<unknown>;
 };
 
 export async function runAutomation(
@@ -48,6 +51,7 @@ export async function runAutomation(
     setVariable: deps.setVariable ?? defaultSetVariable(env, automation.project_id),
     emitEvent: deps.emitEvent ?? defaultEmitEvent(env),
   };
+  const getVariable = deps.getVariable ?? defaultGetVariable(env, automation.project_id);
 
   let actionsRun = 0;
   let status: RunStatus = countActionNodes(graph) === 0 ? 'skipped' : 'ok';
@@ -64,13 +68,18 @@ export async function runAutomation(
     const node = byId.get(id);
     if (!node) return;
 
-    // Action nodes execute; trigger nodes are pass-through entrypoints.
+    // Action nodes execute; condition nodes pick a branch port; trigger nodes are
+    // pass-through entrypoints.
+    let branch: string | null = null;
     if (VALID_ACTION_KINDS.has(node.kind)) {
       await runActionNode(node.kind, { env, automation, ctx, config: node.config, deps: actionDeps });
       actionsRun++;
+    } else if (VALID_CONDITION_KINDS.has(node.kind)) {
+      branch = (await evalCondition(node.kind, { ctx, config: node.config, deps: { getVariable } })) ? 'true' : 'false';
     }
 
     for (const e of outgoingEdges(graph, id)) {
+      if (branch !== null && (e.port ?? 'out') !== branch) continue;
       await visit(e.to);
     }
   };
@@ -143,6 +152,13 @@ function defaultSetVariable(env: Env, projectId: string): ActionDeps['setVariabl
 function defaultEmitEvent(env: Env): ActionDeps['emitEvent'] {
   return async (event, payload, ctx) => {
     await dispatchEvent(env, ctx.projectId, event, payload, ctx.depth);
+  };
+}
+
+function defaultGetVariable(env: Env, projectId: string): (variable: string) => Promise<unknown> {
+  return async (variable) => {
+    const rows = await projectStub(env, projectId).getLatestState();
+    return rows.find((r) => r.variable === variable)?.value;
   };
 }
 

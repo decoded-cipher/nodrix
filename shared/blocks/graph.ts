@@ -1,7 +1,7 @@
 // The automation flow-graph model + pure helpers, shared by the worker engine
 // (executor, scheduler, hot path) and the web editor (canvas, validation, save).
 
-import { VALID_TRIGGER_KINDS, VALID_ACTION_KINDS } from './index';
+import { VALID_TRIGGER_KINDS, VALID_ACTION_KINDS, VALID_CONDITION_KINDS } from './index';
 
 export type GraphNode = {
   id: string;
@@ -93,7 +93,7 @@ export function serializeTriggerKinds(graph: AutomationGraph): string {
 export function graphError(graph: AutomationGraph): string | null {
   const ids = new Set(graph.nodes.map((n) => n.id));
   for (const n of graph.nodes) {
-    if (!VALID_TRIGGER_KINDS.has(n.kind) && !VALID_ACTION_KINDS.has(n.kind)) {
+    if (!VALID_TRIGGER_KINDS.has(n.kind) && !VALID_ACTION_KINDS.has(n.kind) && !VALID_CONDITION_KINDS.has(n.kind)) {
       return `Unknown block kind: ${n.kind}`;
     }
   }

@@ -146,6 +146,9 @@ export class ProjectDO extends DurableObject<Env> {
 
           const setVariable = (variable: string, value: unknown): Promise<void> =>
             this.addControl(newId('control'), variable, value);
+          // Condition nodes read live values; serve them from this DO's own state.
+          const getVariable = async (variable: string): Promise<unknown> =>
+            (await this.getLatestState()).find((r) => r.variable === variable)?.value;
 
           for (const a of autos) {
             for (const node of triggerNodes(toGraph(a))) {
@@ -165,7 +168,7 @@ export class ProjectDO extends DurableObject<Env> {
                 depth: 0,
                 entryNodeId: node.id,
               };
-              await runAutomation(this.env, a, ctx, { setVariable });
+              await runAutomation(this.env, a, ctx, { setVariable, getVariable });
             }
           }
         } catch (e) {

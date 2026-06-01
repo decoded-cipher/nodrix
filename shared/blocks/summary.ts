@@ -47,6 +47,16 @@ export function blockLines(kind: string, config: Record<string, unknown>, r: Sum
       break;
     case 'event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
     case 'manual': break;
+    case 'if_variable':
+      out.push(`${vl(s(c['variable'])) || '?'} ${OP[s(c['operator'])] ?? s(c['operator'])} ${s(c['value'])}`.trim());
+      break;
+    case 'time_window':
+      out.push(`${s(c['from']) || '00:00'}–${s(c['to']) || '23:59'}`);
+      {
+        const days = Array.isArray(c['days']) ? (c['days'] as number[]) : [];
+        if (days.length) out.push(days.slice().sort().map((d) => DAY[d]).join(' '));
+      }
+      break;
     case 'set_variable': out.push(`${vl(s(c['variable'])) || '?'} = ${s(c['value']) || '—'}`); break;
     case 'emit_event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
     case 'call_integration': {

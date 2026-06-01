@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { TRIGGER_CATALOG, ACTION_CATALOG, type BlockManifest } from '@nodrix/blocks-shared';
+import { TRIGGER_CATALOG, CONDITION_CATALOG, ACTION_CATALOG, type BlockManifest } from '@nodrix/blocks-shared';
 import Icon from '../../../components/Icon.vue';
 
 defineEmits<{ add: [kind: string] }>();
 
 const groups = [
   { label: 'Triggers', items: TRIGGER_CATALOG },
+  { label: 'Conditions', items: CONDITION_CATALOG },
   { label: 'Actions', items: ACTION_CATALOG },
 ];
 
