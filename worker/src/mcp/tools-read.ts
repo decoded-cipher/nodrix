@@ -15,6 +15,8 @@ import { listAutomations } from '../domains/automations/service';
 import { listIntegrations } from '../domains/integrations/service';
 import { redactIntegration } from './redact';
 import { CATALOG as WIDGET_CATALOG } from '@nodrix/widgets-shared';
+import { TRIGGER_CATALOG, CONDITION_CATALOG, ACTION_CATALOG, type BlockManifest } from '@nodrix/blocks-shared';
+import { CATALOG as INTEGRATION_CATALOG } from '@nodrix/integrations-shared';
 
 // Public MCP shape — mirrors what the old worker/src/mcp/widget-specs.ts exposed.
 const WIDGET_SPECS = WIDGET_CATALOG.map((m) => ({
@@ -23,6 +25,16 @@ const WIDGET_SPECS = WIDGET_CATALOG.map((m) => ({
   defaultProps: m.defaultProps,
   propTypes: m.mcp.propTypes,
 }));
+
+// Automation block → the shape an agent needs to build a graph node { id, kind, config }.
+const blockSpec = (b: BlockManifest) => ({
+  kind: b.kind,
+  category: b.category,
+  label: b.label,
+  description: b.description,
+  ports: b.ports,
+  fields: b.fields,
+});
 
 const READ_ONLY = { readOnlyHint: true } as const;
 const project = z.string().describe('Project id. Optional for a project-scoped token; required for an all-projects token.');
@@ -159,9 +171,49 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
   );
 
   server.registerTool(
+    'list_block_types',
+    {
+      description:
+        'List automation block kinds — triggers, conditions, actions — with their config fields and ports. ' +
+        'Call before create_automation/update_automation: an automation is a flow graph of nodes ' +
+        '{ id, kind, config } joined by edges { from, to, port }, where `kind` is one of these and `config` ' +
+        'keys are each block’s field `key`s. Condition nodes branch via "true"/"false" output ports.',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    () =>
+      run(async () => ({
+        triggers: TRIGGER_CATALOG.map(blockSpec),
+        conditions: CONDITION_CATALOG.map(blockSpec),
+        actions: ACTION_CATALOG.map(blockSpec),
+      }))
+  );
+
+  server.registerTool(
+    'list_integration_kinds',
+    {
+      description:
+        'List integration kinds and the config fields each expects. Call before create_integration so ' +
+        '`config` carries the right field keys (e.g. webhook → url; email → api_key, from, to).',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    () =>
+      run(async () => ({
+        integration_kinds: INTEGRATION_CATALOG.map((c) => ({
+          kind: c.kind,
+          label: c.label,
+          description: c.description,
+          executable: c.executable,
+          fields: c.fields,
+        })),
+      }))
+  );
+
+  server.registerTool(
     'list_automations',
     {
-      description: 'List automations (triggers + actions, last run status) in a project.',
+      description: 'List automations (flow graph + last run status) in a project.',
       inputSchema: { project: project.optional() },
       annotations: READ_ONLY,
     },

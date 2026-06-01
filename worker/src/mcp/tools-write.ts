@@ -18,6 +18,7 @@ import { WIDGET_IDS, type WidgetType } from '@nodrix/widgets-shared';
 import { INTEGRATION_KINDS } from '@nodrix/integrations-shared';
 import { createAutomation, updateAutomation, runAutomationNow } from '../domains/automations/service';
 import { createIntegration, updateIntegration, testIntegration } from '../domains/integrations/service';
+import { dispatchEvent } from '../platform/engine/run';
 
 const project = z
   .string()
@@ -200,12 +201,17 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
   server.registerTool(
     'create_automation',
     {
-      description: 'Create an automation. trigger_type ∈ variable|manual|schedule|sunset_sunrise|event.',
+      description:
+        'Create an automation. Prefer `graph` (a {nodes,edges} flow — multi-trigger, conditions/branching) ' +
+        'for anything beyond a single trigger → linear actions; call list_block_types first for the node ' +
+        'kinds and their config shapes. The legacy trigger_type+trigger_config+actions still works for a ' +
+        'simple linear automation (trigger_type ∈ variable|manual|schedule|sunset_sunrise|event).',
       inputSchema: {
         project,
         name: z.string(),
         description: z.string().nullable().optional(),
-        trigger_type: z.enum(['variable', 'manual', 'schedule', 'sunset_sunrise', 'event']),
+        graph: z.any().optional().describe('Flow graph { nodes: [{id,kind,config}], edges: [{from,to,port?}] }. Wins over the legacy fields.'),
+        trigger_type: z.enum(['variable', 'manual', 'schedule', 'sunset_sunrise', 'event']).optional(),
         trigger_config: z.any().optional(),
         actions: z.array(z.any()).optional(),
         enabled: z.boolean().optional(),
@@ -216,6 +222,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         createAutomation(env, actor(), scopeProjectId(props, args.project), {
           name: args.name,
           description: args.description,
+          graph: args.graph,
           trigger_type: args.trigger_type,
           trigger_config: args.trigger_config,
           actions: args.actions,
@@ -227,13 +234,16 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
   server.registerTool(
     'update_automation',
     {
-      description: 'Update an automation (name, enabled, trigger_config, actions).',
+      description: 'Update an automation. Pass `graph` to replace the whole flow (see list_block_types); ' +
+        'or name/enabled/trigger_config/actions for the legacy linear shape.',
       inputSchema: {
         project,
         automation_id: z.string(),
         name: z.string().optional(),
         description: z.string().nullable().optional(),
         enabled: z.boolean().optional(),
+        graph: z.any().optional().describe('Flow graph { nodes, edges }. Replaces the existing flow.'),
+        trigger_type: z.enum(['variable', 'manual', 'schedule', 'sunset_sunrise', 'event']).optional(),
         trigger_config: z.any().optional(),
         actions: z.array(z.any()).optional(),
       },
@@ -244,6 +254,8 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
           name: args.name,
           description: args.description,
           enabled: args.enabled,
+          graph: args.graph,
+          trigger_type: args.trigger_type,
           trigger_config: args.trigger_config,
           actions: args.actions,
         })
@@ -257,6 +269,24 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       inputSchema: { project, automation_id: z.string() },
     },
     (args) => run(() => runAutomationNow(env, actor(), scopeProjectId(props, args.project), args.automation_id))
+  );
+
+  server.registerTool(
+    'emit_event',
+    {
+      description: 'Fire a named event, running any enabled event-triggered automations that match it. Also a test harness for the `event` trigger.',
+      inputSchema: {
+        project,
+        event: z.string().describe('Event name, matched against event-trigger automations.'),
+        payload: z.record(z.string(), z.unknown()).optional(),
+      },
+    },
+    (args) =>
+      run(async () => {
+        const pid = scopeProjectId(props, args.project);
+        const automations_run = await dispatchEvent(env, pid, args.event, args.payload);
+        return { project: pid, event: args.event, automations_run };
+      })
   );
 
   server.registerTool(
