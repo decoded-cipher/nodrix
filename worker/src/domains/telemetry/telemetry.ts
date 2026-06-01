@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { newId } from '../../platform/lib/ids';
+import { chunk, MAX_BOUND_PARAMS } from '../../platform/lib/sql';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import type { IngestPoint } from '../../platform/durable-objects/project-do';
 
@@ -9,13 +10,18 @@ const telemetry = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }
 
 telemetry.use('*', requireProjectToken);
 
-// A valid project token authorizes a device, but the payload is still untrusted:
-// these caps stop a buggy/compromised device exploding variable cardinality,
-// storing oversized values, or polluting the time series.
+// A valid project token authorizes a device, but the payload is still untrusted.
+// These per-request caps stop a buggy/compromised device exploding the time
+// series, storing oversized values, or flooding keys in a single POST.
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_POINTS = 200;
 const MAX_KEY_LEN = 64;
 const MAX_STRING_VALUE = 512;
+
+// Per-request caps only bound a single POST; a device sending fresh keys across
+// many requests could still grow project_variables without bound. Cap the total
+// distinct auto-created variables per project (enforced in upsertVariables).
+const MAX_VARIABLES_PER_PROJECT = 250;
 
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
@@ -119,7 +125,8 @@ function dueForLastSeen(projectId: string, key: string, nowMs: number): boolean 
 
 // Permissive ingest: ensure a project_variables row exists for each key (created
 // on first sight) and refresh last_seen. UNIQUE(project_id, key) makes the
-// INSERT idempotent; the UPDATE keeps last_seen current for existing rows.
+// INSERT idempotent; the UPDATE keeps last_seen current for existing rows. New
+// keys are created only under MAX_VARIABLES_PER_PROJECT; existing keys always refresh.
 async function upsertVariables(
   env: Env,
   projectId: string,
@@ -127,13 +134,38 @@ async function upsertVariables(
   now: number
 ): Promise<void> {
   const nowMs = Date.now();
-  // Only write keys whose last_seen is actually due — and only generate an id for
-  // those (the ON CONFLICT path discards it, so it was wasted for existing rows).
+  // Only touch keys whose last_seen is actually due (throttled per isolate).
   const due = [...new Set(keys)].filter((key) => dueForLastSeen(projectId, key, nowMs));
   if (due.length === 0) return;
   try {
+    // Existing rows only need last_seen refreshed; new keys count against the cap.
+    // Chunk the IN(...) lookup under the 100 bound-param limit (project_id takes one).
+    const existing = new Set<string>();
+    for (const part of chunk(due, MAX_BOUND_PARAMS - 1)) {
+      const placeholders = part.map(() => '?').join(',');
+      const rows = await env.DB
+        .prepare(`SELECT key FROM project_variables WHERE project_id = ? AND key IN (${placeholders})`)
+        .bind(projectId, ...part)
+        .all<{ key: string }>();
+      for (const r of rows.results) existing.add(r.key);
+    }
+
+    let toCreate = due.filter((key) => !existing.has(key));
+    if (toCreate.length > 0) {
+      const countRow = await env.DB
+        .prepare(`SELECT COUNT(*) AS n FROM project_variables WHERE project_id = ?`)
+        .bind(projectId)
+        .first<{ n: number }>();
+      const remaining = Math.max(0, MAX_VARIABLES_PER_PROJECT - (countRow?.n ?? 0));
+      // Best-effort guardrail: a small overshoot under concurrency is acceptable
+      // since the cap bounds growth rather than enforcing an exact invariant.
+      toCreate = toCreate.slice(0, remaining);
+    }
+
+    const keysToWrite = [...existing, ...toCreate];
+    if (keysToWrite.length === 0) return;
     await env.DB.batch(
-      due.map((key) =>
+      keysToWrite.map((key) =>
         env.DB
           .prepare(
             `INSERT INTO project_variables (id, project_id, key, created_at, updated_at, last_seen)
@@ -144,9 +176,9 @@ async function upsertVariables(
       )
     );
   } catch {
-    // last_seen is best-effort; never fail telemetry on it. Clear the throttle
-    // stamps so a failed write retries on the next POST instead of waiting out
-    // the window.
+    // last_seen + auto-create are best-effort; never fail telemetry on them.
+    // Clear the throttle stamps so a failed write retries on the next POST
+    // instead of waiting out the window.
     for (const key of due) lastSeenWrites.delete(`${projectId}:${key}`);
   }
 }

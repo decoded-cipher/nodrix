@@ -7,12 +7,15 @@ import { matchVariableCondition } from '../engine/triggers';
 import { toGraph, triggerNodes } from '../engine/graph';
 import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '../engine/types';
 import { toCompactSeries, type CompactSeries } from '../lib/series';
+import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
 // state, recent ring buffer, pending control writes, and the R2 flush cursor.
 
 const RING_BUFFER_MAX_ROWS = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
+// Multi-row inserts bind 3 columns/row; this keeps a chunk under MAX_BOUND_PARAMS.
+const ROWS_PER_3COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 3);
 // Eviction (age + overflow DELETE + COUNT) runs at most this often instead of on
 // every ingest — a single cheap last_evict_at lookup gates the actual work.
 const EVICT_INTERVAL_SECONDS = 30;
@@ -77,30 +80,30 @@ export class ProjectDO extends DurableObject<Env> {
     );
 
     // Snapshot prior values before the upsert so edge-triggered automations see
-    // the transition. One IN query; variables with no prior row map to undefined.
+    // the transition; variables with no prior row map to undefined. Chunk the
+    // IN(...) under the 100 bound-param limit, else a full batch 500s.
     const uniqueVars = [...new Set(points.map((p) => p.variable))];
     const prev = new Map<string, unknown>();
     for (const v of uniqueVars) prev.set(v, undefined);
-    if (uniqueVars.length > 0) {
-      const placeholders = uniqueVars.map(() => '?').join(',');
+    for (const part of chunk(uniqueVars, MAX_BOUND_PARAMS)) {
+      const placeholders = part.map(() => '?').join(',');
       const rows = this.sql
         .exec<{ variable: string; value: string }>(
           `SELECT variable, value FROM latest_state WHERE variable IN (${placeholders})`,
-          ...uniqueVars
+          ...part
         )
         .toArray();
       for (const r of rows) prev.set(r.variable, safeParse(r.value));
     }
 
-    // latest_state: one multi-row UPSERT, deduped by variable (a multi-row UPSERT
+    // latest_state: multi-row UPSERT, deduped by variable (a multi-row UPSERT
     // can't have two VALUES rows hit the same conflict target).
     const latestByVar = new Map<string, unknown>();
     for (const p of points) latestByVar.set(p.variable, p.value);
-    const latestEntries = [...latestByVar];
-    if (latestEntries.length > 0) {
-      const rows = latestEntries.map(() => '(?, ?, ?)').join(', ');
+    for (const part of chunk([...latestByVar], ROWS_PER_3COL_INSERT)) {
+      const rows = part.map(() => '(?, ?, ?)').join(', ');
       const binds: unknown[] = [];
-      for (const [variable, value] of latestEntries) {
+      for (const [variable, value] of part) {
         binds.push(variable, JSON.stringify(value), receivedAt);
       }
       this.sql.exec(
@@ -111,11 +114,11 @@ export class ProjectDO extends DurableObject<Env> {
       );
     }
 
-    // ring_buffer: append every point in a single multi-row INSERT.
-    if (points.length > 0) {
-      const rows = points.map(() => '(?, ?, ?)').join(', ');
+    // ring_buffer: append every point.
+    for (const part of chunk(points, ROWS_PER_3COL_INSERT)) {
+      const rows = part.map(() => '(?, ?, ?)').join(', ');
       const binds: unknown[] = [];
-      for (const p of points) {
+      for (const p of part) {
         binds.push(receivedAt, p.variable, JSON.stringify(p.value));
       }
       this.sql.exec(`INSERT INTO ring_buffer (ts, variable, value) VALUES ${rows}`, ...binds);

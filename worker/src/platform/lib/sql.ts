@@ -1,5 +1,17 @@
 // Small helpers for working with D1 rows.
 
+// D1 and DO SQLite both cap a query at 100 bound parameters. Any statement that
+// builds an IN (...) list or a multi-row VALUES from runtime input must chunk its
+// inputs to stay under this, or large-but-valid batches fail at the SQLite layer.
+export const MAX_BOUND_PARAMS = 100;
+
+// Split `items` into consecutive chunks of at most `size`.
+export function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 // Parse JSON from a text column we wrote ourselves, tolerating corruption by
 // returning null rather than throwing.
 export function safeParse(s: string): unknown {
