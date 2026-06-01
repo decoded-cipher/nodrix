@@ -101,14 +101,15 @@ export async function createAutomation(
     .prepare(
       `INSERT INTO automations
          (id, project_id, name, description, enabled, trigger_type,
-          trigger_config, actions, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          trigger_config, actions, trigger_kinds, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id, projectId, name, input.description ?? null,
       input.enabled === false ? 0 : 1, input.trigger_type,
       JSON.stringify(input.trigger_config ?? {}),
       JSON.stringify(Array.isArray(input.actions) ? input.actions : []),
+      `,${input.trigger_type},`,
       actor.userId, now, now
     )
     .run();

@@ -4,6 +4,7 @@ import { newId } from '../lib/ids';
 import { dashboardStub } from './stubs';
 import { runAutomation } from '../engine/run';
 import { matchVariableCondition } from '../engine/triggers';
+import { toGraph, triggerNodes } from '../engine/graph';
 import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '../engine/types';
 import { toCompactSeries, type CompactSeries } from '../lib/series';
 
@@ -147,22 +148,25 @@ export class ProjectDO extends DurableObject<Env> {
             this.addControl(newId('control'), variable, value);
 
           for (const a of autos) {
-            let cfg: VariableTriggerConfig;
-            try { cfg = JSON.parse(a.trigger_config); } catch { continue; }
+            for (const node of triggerNodes(toGraph(a))) {
+              if (node.kind !== 'variable') continue;
+              const cfg = node.config as VariableTriggerConfig;
 
-            const point = points.find((p) => p.variable === cfg.variable);
-            if (!point) continue;
-            if (!matchVariableCondition(cfg, point.value, prev.get(cfg.variable))) continue;
+              const point = points.find((p) => p.variable === cfg.variable);
+              if (!point) continue;
+              if (!matchVariableCondition(cfg, point.value, prev.get(cfg.variable))) continue;
 
-            const ctx: AutomationContext = {
-              source: 'variable',
-              projectId,
-              ts,
-              variable: cfg.variable,
-              value: point.value,
-              depth: 0,
-            };
-            await runAutomation(this.env, a, ctx, { setVariable });
+              const ctx: AutomationContext = {
+                source: 'variable',
+                projectId,
+                ts,
+                variable: cfg.variable,
+                value: point.value,
+                depth: 0,
+                entryNodeId: node.id,
+              };
+              await runAutomation(this.env, a, ctx, { setVariable });
+            }
           }
         } catch (e) {
           console.error('variable-trigger eval failed', e);
@@ -193,7 +197,7 @@ export class ProjectDO extends DurableObject<Env> {
       .prepare(
         `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
            FROM automations
-          WHERE project_id = ? AND enabled = 1 AND trigger_type = 'variable'`
+          WHERE project_id = ? AND enabled = 1 AND trigger_kinds LIKE '%,variable,%'`
       )
       .bind(projectId)
       .all<AutomationRow>();

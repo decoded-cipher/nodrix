@@ -5,6 +5,12 @@
 import { VALID_TRIGGER_KINDS, VALID_ACTION_KINDS } from '@nodrix/blocks-shared';
 import type { AutomationGraph, GraphEdge, GraphNode, AutomationRow } from './types';
 
+// Trigger entrypoint nodes (≥1 ⇒ multi-trigger). The hot path / scheduler / event
+// dispatch iterate these and enter the executor at the matched node.
+export function triggerNodes(graph: AutomationGraph): GraphNode[] {
+  return graph.nodes.filter((n) => VALID_TRIGGER_KINDS.has(n.kind));
+}
+
 const TRIGGER_NODE_ID = 'trigger';
 
 export function toGraph(row: AutomationRow): AutomationGraph {

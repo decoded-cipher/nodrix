@@ -2,8 +2,8 @@
 // sunset/sunrise automations, and run a planned set when due.
 //
 // The DO alarm fires at `computeNextScheduled().fireAt`, then runs exactly the
-// `dueIds` planned for that instant — so it's robust to wake-up drift (we fire
-// the ids that were due at the planned time, not whatever the clock says).
+// `due` (automation, node) pairs planned for that instant — so it's robust to
+// wake-up drift (we fire what was due at the planned time, not the clock).
 
 import type { Env } from '../../env';
 import type {
@@ -14,49 +14,52 @@ import type {
 } from './types';
 import { sunTimes } from './solar';
 import { runAutomation } from './run';
+import { toGraph, triggerNodes, nodesById } from './graph';
 
-export type SchedulePlan = { fireAt: number | null; dueIds: string[] };
+// A due fire is a specific schedule/solar trigger node within an automation.
+export type ScheduleDue = { id: string; nodeId: string };
+export type SchedulePlan = { fireAt: number | null; due: ScheduleDue[] };
 
-// Soonest upcoming fire across all enabled schedule/solar automations, plus the
-// ids that share that instant.
+// Soonest upcoming fire across every schedule/solar trigger node of all enabled
+// automations, plus the (automation, node) pairs that share that instant.
 export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
   const rows = await env.DB
     .prepare(
       `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
          FROM automations
-        WHERE enabled = 1 AND trigger_type IN ('schedule', 'sunset_sunrise')`
+        WHERE enabled = 1 AND (trigger_kinds LIKE '%,schedule,%' OR trigger_kinds LIKE '%,sunset_sunrise,%')`
     )
     .all<AutomationRow>();
 
   const now = Date.now();
   let best: number | null = null;
-  const fireAtById = new Map<string, number>();
+  const entries: { id: string; nodeId: string; fireAt: number }[] = [];
 
   for (const a of rows.results) {
-    let next: number | null = null;
-    try {
-      next = a.trigger_type === 'schedule'
-        ? nextScheduleFireAt(JSON.parse(a.trigger_config) as ScheduleTriggerConfig, now)
-        : nextSolarFireAt(JSON.parse(a.trigger_config) as SolarTriggerConfig, now);
-    } catch {
-      next = null;
+    for (const node of triggerNodes(toGraph(a))) {
+      let next: number | null = null;
+      try {
+        if (node.kind === 'schedule') next = nextScheduleFireAt(node.config as ScheduleTriggerConfig, now);
+        else if (node.kind === 'sunset_sunrise') next = nextSolarFireAt(node.config as SolarTriggerConfig, now);
+      } catch {
+        next = null;
+      }
+      if (next == null) continue;
+      entries.push({ id: a.id, nodeId: node.id, fireAt: next });
+      if (best == null || next < best) best = next;
     }
-    if (next == null) continue;
-    fireAtById.set(a.id, next);
-    if (best == null || next < best) best = next;
   }
 
-  if (best == null) return { fireAt: null, dueIds: [] };
-  const dueIds: string[] = [];
-  for (const [id, t] of fireAtById) if (t - best < 1000) dueIds.push(id);
-  return { fireAt: best, dueIds };
+  if (best == null) return { fireAt: null, due: [] };
+  const due = entries.filter((e) => e.fireAt - best! < 1000).map(({ id, nodeId }) => ({ id, nodeId }));
+  return { fireAt: best, due };
 }
 
-// Run the planned automations. `fireAtSec` dedups against last_run_at so a
-// duplicate scheduler instance (or replay) can't double-fire the same instant.
-export async function runScheduledByIds(env: Env, ids: string[], fireAtSec: number): Promise<number> {
+// Run the planned fires. `fireAtSec` dedups against last_run_at so a duplicate
+// scheduler instance (or replay) can't double-fire the same instant.
+export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: number): Promise<number> {
   let ran = 0;
-  for (const id of ids) {
+  for (const { id, nodeId } of due) {
     const a = await env.DB
       .prepare(
         `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
@@ -67,11 +70,13 @@ export async function runScheduledByIds(env: Env, ids: string[], fireAtSec: numb
     if (!a) continue;
     if (a.last_run_at != null && a.last_run_at >= fireAtSec) continue; // already fired this instant
 
+    const node = nodesById(toGraph(a)).get(nodeId);
     const ctx: AutomationContext = {
-      source: a.trigger_type === 'schedule' ? 'schedule' : 'sunset_sunrise',
+      source: node?.kind === 'sunset_sunrise' ? 'sunset_sunrise' : 'schedule',
       projectId: a.project_id,
       ts: Math.floor(Date.now() / 1000),
       depth: 0,
+      entryNodeId: nodeId,
     };
     try {
       await runAutomation(env, a, ctx);

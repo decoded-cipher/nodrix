@@ -67,6 +67,7 @@ export type AutomationContext = {
   event?: string;
   payload?: Record<string, unknown>;
   depth: number;                       // emit_event recursion depth
+  entryNodeId?: string;                // trigger node that fired; defaults to the graph entry
 };
 
 export type RunStatus = 'ok' | 'error' | 'skipped';

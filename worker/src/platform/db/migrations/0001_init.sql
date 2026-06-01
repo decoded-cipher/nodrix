@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS automations (
                     ('variable','scene','schedule','sunset_sunrise','event')),
   trigger_config  TEXT NOT NULL,                               -- JSON
   actions         TEXT NOT NULL,                               -- JSON ordered list
+  trigger_kinds   TEXT NOT NULL DEFAULT '',                    -- ",kind,kind," for multi-trigger lookups
   created_by      TEXT REFERENCES users(id),
   created_at      INTEGER NOT NULL,
   updated_at      INTEGER NOT NULL,
