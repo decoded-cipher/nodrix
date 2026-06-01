@@ -1,25 +1,28 @@
-// Automation orchestrator. Runs an automation's ordered action list, records the
-// outcome on the row + audit log, and supports event chaining with a depth guard.
+// Automation orchestrator. Builds the automation's flow graph, walks it from the
+// trigger node running each action via the kind→handler registry, and records the
+// outcome on the row + audit log. DAG traversal: each node runs once, condition
+// ports gate which edges are followed, and a step cap bounds runaway graphs.
 //
 // Callable from anywhere: the ProjectDO hot path, the cron scheduled handler, the
-// manual-run endpoint, and the /v1/events endpoint. `set_variable` differs by
-// caller (DO binds addControl; the worker routes to the PROJECT_DO stub), so it's
-// injectable via deps.
+// manual-run endpoint, and /v1/events. `set_variable` differs by caller (DO binds
+// addControl; the worker routes to the PROJECT_DO stub), so it's injectable via deps.
 
+import { VALID_ACTION_KINDS } from '@nodrix/blocks-shared';
 import type { Env } from '../../env';
 import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { projectStub } from '../durable-objects/stubs';
-import { executeIntegration, recordIntegrationRun } from './integrations';
-import type { Action, AutomationContext, AutomationRow, IntegrationRow, RunResult } from './types';
+import { runActionNode, type ActionDeps } from './actions';
+import { toGraph, entryNode, nodesById, outgoingEdges, countActionNodes } from './graph';
+import type { AutomationContext, AutomationRow, RunResult, RunStatus } from './types';
 
-const MAX_DEPTH = 5;
+const MAX_STEPS = 100;
 
 export type RunDeps = {
   // Enqueue a control write. Defaults to the PROJECT_DO stub path.
-  setVariable?: (variable: string, value: unknown) => Promise<void>;
+  setVariable?: ActionDeps['setVariable'];
   // Re-entry for emit_event. Defaults to dispatchEvent over D1.
-  emitEvent?: (event: string, payload: Record<string, unknown> | undefined, ctx: AutomationContext) => Promise<void>;
+  emitEvent?: ActionDeps['emitEvent'];
 };
 
 export async function runAutomation(
@@ -28,19 +31,53 @@ export async function runAutomation(
   ctx: AutomationContext,
   deps: RunDeps = {}
 ): Promise<RunResult> {
-  const actions = parseActions(automation.actions);
-  const setVariable = deps.setVariable ?? defaultSetVariable(env, automation.project_id);
-  const emitEvent = deps.emitEvent ?? defaultEmitEvent(env);
+  const graph = toGraph(automation);
+  const entry = entryNode(graph);
+
+  // Trigger cooldown: suppress re-fires within the window, measured from the last
+  // real run. Skipped silently (no last_run_at write) so the window isn't reset,
+  // and never applied to manual runs.
+  const cooldown = Number((entry?.config as { cooldown_seconds?: unknown })?.cooldown_seconds ?? 0);
+  if (ctx.source !== 'manual' && cooldown > 0 && automation.last_run_at != null
+      && ctx.ts - automation.last_run_at < cooldown) {
+    return { status: 'skipped', actionsRun: 0 };
+  }
+
+  const actionDeps: ActionDeps = {
+    setVariable: deps.setVariable ?? defaultSetVariable(env, automation.project_id),
+    emitEvent: deps.emitEvent ?? defaultEmitEvent(env),
+  };
+  const byId = nodesById(graph);
 
   let actionsRun = 0;
-  let status: RunResult['status'] = actions.length === 0 ? 'skipped' : 'ok';
+  let status: RunStatus = countActionNodes(graph) === 0 ? 'skipped' : 'ok';
   let error: string | undefined;
 
-  try {
-    for (const action of actions) {
-      await runAction(env, automation, ctx, action, setVariable, emitEvent);
+  const visited = new Set<string>();
+  let steps = 0;
+
+  const visit = async (id: string): Promise<void> => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    if (++steps > MAX_STEPS) throw new Error('graph step limit exceeded');
+
+    const node = byId.get(id);
+    if (!node) return;
+
+    // Action nodes execute; trigger nodes are pass-through entrypoints. Condition
+    // nodes will additionally gate which output ports are followed.
+    if (VALID_ACTION_KINDS.has(node.kind)) {
+      await runActionNode(node.kind, { env, automation, ctx, config: node.config, deps: actionDeps });
       actionsRun++;
     }
+
+    for (const e of outgoingEdges(graph, id)) {
+      await visit(e.to);
+    }
+  };
+
+  try {
+    if (entry) await visit(entry.id);
   } catch (e) {
     status = 'error';
     error = (e as Error).message;
@@ -57,36 +94,6 @@ export async function runAutomation(
   });
 
   return { status, error, actionsRun };
-}
-
-async function runAction(
-  env: Env,
-  automation: AutomationRow,
-  ctx: AutomationContext,
-  action: Action,
-  setVariable: NonNullable<RunDeps['setVariable']>,
-  emitEvent: NonNullable<RunDeps['emitEvent']>
-): Promise<void> {
-  switch (action.type) {
-    case 'set_variable':
-      await setVariable(action.variable, action.value);
-      return;
-
-    case 'call_integration': {
-      const integration = await loadIntegration(env, automation.project_id, action.integration_id);
-      if (!integration) throw new Error(`integration ${action.integration_id} not found`);
-      const res = await executeIntegration(integration, ctx, action.payload);
-      await recordIntegrationRun(env, integration.id, res).catch(() => {});
-      if (res.status === 'error') throw new Error(`integration "${integration.name}": ${res.detail}`);
-      return;
-    }
-
-    case 'emit_event': {
-      if (ctx.depth >= MAX_DEPTH) throw new Error('max event depth exceeded');
-      await emitEvent(action.event, action.payload, { ...ctx, depth: ctx.depth + 1 });
-      return;
-    }
-  }
 }
 
 // Loads enabled `event` automations matching `eventName` and runs each. Returns
@@ -127,41 +134,22 @@ export async function dispatchEvent(
   return ran;
 }
 
-function defaultSetVariable(env: Env, projectId: string) {
-  return async (variable: string, value: unknown): Promise<void> => {
+function defaultSetVariable(env: Env, projectId: string): ActionDeps['setVariable'] {
+  return async (variable, value) => {
     await projectStub(env, projectId).addControl(newId('control'), variable, value);
   };
 }
 
-function defaultEmitEvent(env: Env) {
-  return async (
-    event: string,
-    payload: Record<string, unknown> | undefined,
-    ctx: AutomationContext
-  ): Promise<void> => {
+function defaultEmitEvent(env: Env): ActionDeps['emitEvent'] {
+  return async (event, payload, ctx) => {
     await dispatchEvent(env, ctx.projectId, event, payload, ctx.depth);
   };
-}
-
-async function loadIntegration(
-  env: Env,
-  projectId: string,
-  id: string
-): Promise<IntegrationRow | null> {
-  return env.DB
-    .prepare(
-      `SELECT id, project_id, name, kind, config, enabled
-         FROM integrations
-        WHERE id = ? AND project_id = ? AND archived_at IS NULL`
-    )
-    .bind(id, projectId)
-    .first<IntegrationRow>();
 }
 
 async function recordRun(
   env: Env,
   id: string,
-  status: RunResult['status'],
+  status: RunStatus,
   error: string | undefined
 ): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
@@ -169,17 +157,4 @@ async function recordRun(
     .prepare(`UPDATE automations SET last_run_at = ?, last_run_status = ?, last_error = ? WHERE id = ?`)
     .bind(now, status, error ?? null, id)
     .run();
-}
-
-function parseActions(raw: string): Action[] {
-  let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return []; }
-  if (!Array.isArray(parsed)) return [];
-  return parsed.filter(isAction);
-}
-
-function isAction(a: unknown): a is Action {
-  if (!a || typeof a !== 'object') return false;
-  const t = (a as { type?: unknown }).type;
-  return t === 'set_variable' || t === 'call_integration' || t === 'emit_event';
 }
