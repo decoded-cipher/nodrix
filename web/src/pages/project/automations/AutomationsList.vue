@@ -87,13 +87,15 @@ async function startRecipe(id: string) {
 
 <template>
   <div>
-    <div v-if="hasAny" class="mb-4 flex items-center justify-between">
-      <p class="text-xs text-neutral-500 dark:text-neutral-400">
-        {{ project.automations.length }} automation{{ project.automations.length === 1 ? '' : 's' }}
+    <!-- Action row -->
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <p class="text-sm text-neutral-500 dark:text-neutral-400">
+        <template v-if="hasAny">{{ project.automations.length }} automation{{ project.automations.length === 1 ? '' : 's' }}</template>
+        <template v-else>Trigger actions from device data, schedules, sun times, or events.</template>
       </p>
       <button
         type="button"
-        class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700"
+        class="shrink-0 rounded-md bg-accent-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-accent-700"
         @click="openCreate"
       >New automation</button>
     </div>
@@ -110,39 +112,26 @@ async function startRecipe(id: string) {
       />
     </div>
 
-    <!-- Empty: quick-start with recipes -->
-    <div v-else>
-      <div class="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center dark:border-neutral-700 dark:bg-neutral-900">
-        <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No automations yet</h2>
-        <p class="mx-auto mt-1 max-w-md text-xs text-neutral-500 dark:text-neutral-400">
-          Start from a template below, or build one from scratch.
-        </p>
+    <!-- Empty: jump-start from a template -->
+    <div v-else class="rounded-xl border border-dashed border-neutral-300 bg-white p-5 dark:border-neutral-700 dark:bg-neutral-900 sm:p-6">
+      <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Start from a template</h3>
+      <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Pick a starting point and tweak it — or use “New automation” for a blank canvas.</p>
+      <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <button
+          v-for="r in RECIPES"
+          :key="r.id"
           type="button"
-          class="mt-4 rounded-md bg-accent-600 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-700"
-          @click="openCreate"
-        >New automation</button>
-      </div>
-
-      <div class="mt-6">
-        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Start from a template</h3>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <button
-            v-for="r in RECIPES"
-            :key="r.id"
-            type="button"
-            class="group flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
-            @click="startRecipe(r.id)"
-          >
-            <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
-              <Icon :path="r.icon" class="h-5 w-5" />
-            </div>
-            <div class="min-w-0">
-              <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ r.title }}</div>
-              <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{{ r.description }}</div>
-            </div>
-          </button>
-        </div>
+          class="group flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-400 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-accent-700"
+          @click="startRecipe(r.id)"
+        >
+          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+            <Icon :path="r.icon" class="h-5 w-5" />
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ r.title }}</div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{{ r.description }}</div>
+          </div>
+        </button>
       </div>
     </div>
 

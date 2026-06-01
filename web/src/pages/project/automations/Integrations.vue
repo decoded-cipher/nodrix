@@ -49,6 +49,13 @@ function closeForm() {
 
 <template>
   <div>
+    <p class="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+      <template v-if="project.integrations.length">
+        {{ project.integrations.length }} integration{{ project.integrations.length === 1 ? '' : 's' }} — reusable connectors your automations call.
+      </template>
+      <template v-else>Reusable connectors (webhook, HTTP, email, …) your automations can call.</template>
+    </p>
+
     <!-- Create / edit form -->
     <IntegrationForm
       v-if="formKind"
@@ -60,29 +67,29 @@ function closeForm() {
       @cancel="closeForm"
     />
 
-    <!-- Existing integrations -->
-    <div v-if="project.integrations.length" class="mb-8 space-y-3">
-      <IntegrationCard
-        v-for="i in project.integrations"
-        :key="i.id"
-        :integration="i"
-        :used-by="usedBy(i.id)"
-        @edit="openEdit"
-      />
-    </div>
-    <div v-else class="mb-8 rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
-      No integrations yet. Add one below, then call it from an automation.
-    </div>
+    <!-- Connected -->
+    <section v-if="project.integrations.length" class="mb-8">
+      <h3 class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Connected</h3>
+      <div class="space-y-3">
+        <IntegrationCard
+          v-for="i in project.integrations"
+          :key="i.id"
+          :integration="i"
+          :used-by="usedBy(i.id)"
+          @edit="openEdit"
+        />
+      </div>
+    </section>
 
     <!-- Catalog -->
-    <div>
-      <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Add an integration</h3>
+    <section>
+      <h3 class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Add an integration</h3>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <button
           v-for="c in EXECUTABLE_CONNECTIONS"
           :key="c.kind"
           type="button"
-          class="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
+          class="group flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-accent-400 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
           @click="openCreate(c.kind)"
         >
           <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
@@ -97,7 +104,7 @@ function closeForm() {
 
       <!-- Coming soon -->
       <template v-if="COMING_SOON_CONNECTIONS.length">
-        <h3 class="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Coming soon</h3>
+        <h3 class="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Coming soon</h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <button
             v-for="c in COMING_SOON_CONNECTIONS"
@@ -111,14 +118,12 @@ function closeForm() {
               <Icon :path="c.icon" class="h-5 w-5" />
             </div>
             <div class="min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ c.label }}</span>
-              </div>
+              <span class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ c.label }}</span>
               <div class="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">{{ c.description }}</div>
             </div>
           </button>
         </div>
       </template>
-    </div>
+    </section>
   </div>
 </template>
