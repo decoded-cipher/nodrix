@@ -33,7 +33,7 @@ let ws: DashboardWs | null = null;
 const isPhone = useIsPhone();
 const renderLayout = computed<Layout>(() => {
   const d = dashboard.value;
-  if (!d) return { grid: { columns: 24 }, items: [] };
+  if (!d) return { grid: { columns: 16 }, items: [] };
   return isPhone.value ? effectiveMobileLayout(d.layout) : d.layout;
 });
 // Re-applied after a breakpoint remount so the new grid shows live data at once.

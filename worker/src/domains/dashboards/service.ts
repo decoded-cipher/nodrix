@@ -59,7 +59,7 @@ export async function createDashboard(
   const name = (input.name ?? '').trim();
   if (!name) throw new ServiceError('bad_request', 'name is required', 'missing_name');
 
-  const layout = input.layout ?? { grid: { columns: 24 }, items: [] };
+  const layout = input.layout ?? { grid: { columns: 16 }, items: [] };
   const v = validateLayout(layout);
   if (!v.ok) throw new ServiceError('bad_request', `invalid layout: ${v.reason}`, v.reason);
 

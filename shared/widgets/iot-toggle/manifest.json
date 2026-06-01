@@ -7,7 +7,7 @@
   "whenToUse": "Send an on/off command to a device — relays, switches, actuators. Reflects the latest reported state.",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"2.5\" y=\"7\" width=\"19\" height=\"10\" rx=\"5\"/><circle cx=\"16.5\" cy=\"12\" r=\"2.5\" fill=\"currentColor\" stroke=\"none\"/></svg>",
 
-  "defaultSize": { "w": 6, "h": 4 },
+  "defaultSize": { "w": 4, "h": 3 },
   "defaultProps": {
     "title": "",
     "variable": "",

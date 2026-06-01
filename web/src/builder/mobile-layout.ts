@@ -1,21 +1,17 @@
-// The phone (<768px) layout: a re-layout of the same widgets as desktop, so it
-// reuses the 24-col grid as-is. Small widgets pair two-up (12 cols), others go
-// full width (24). The override is stored positions-only in layout.mobile and
-// merged back onto desktop widgets by id at render time (so props never drift);
-// absent means auto-derive.
+// Phone (<768px) layout: re-lays the same widgets on the grid. Paired widgets go
+// two-up (HALF), others full width. Stored positions-only in layout.mobile and
+// merged onto desktop widgets by id at render time; absent means auto-derive.
 
 import { GRID_COLUMNS } from './grid';
 import type { Layout, MobilePlacement, WidgetInstance } from '../types';
 import { manifestFor, type WidgetType } from '@nodrix/widgets-shared';
 
-const HALF = GRID_COLUMNS / 2; // 12 cols — a paired "small" widget
+const HALF = GRID_COLUMNS / 2;
 
-// Driven by each widget's manifest.quirks.mobile.paired.
 function isPaired(type: string): boolean {
   return manifestFor(type as WidgetType).quirks?.mobile?.paired === true;
 }
 
-// Top-to-bottom, then left-to-right (matches the viewer's compaction).
 function readingOrder(items: readonly WidgetInstance[]): WidgetInstance[] {
   return [...items].sort((a, b) => a.y - b.y || a.x - b.x);
 }

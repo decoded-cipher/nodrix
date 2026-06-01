@@ -164,7 +164,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
         return {
           dashboard_id: d.id,
           updated_at: d.updated_at,
-          grid: layout?.grid ?? { columns: 24 },
+          grid: layout?.grid ?? { columns: 16 },
           widgets: Array.isArray(layout?.items) ? layout!.items : [],
         };
       })

@@ -135,7 +135,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       run(async () => {
         const pid = scopeProjectId(props, args.project);
         const dash = await getDashboard(env, pid, args.dashboard_id);
-        const layout = (dash.layout ?? { grid: { columns: 24 }, items: [] }) as DashboardLayout;
+        const layout = (dash.layout ?? { grid: { columns: 16 }, items: [] }) as DashboardLayout;
         const widget: WidgetItem = {
           id: args.widget_id ?? newId('widget'),
           type: args.type,
@@ -172,7 +172,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       run(async () => {
         const pid = scopeProjectId(props, args.project);
         const dash = await getDashboard(env, pid, args.dashboard_id);
-        const layout = (dash.layout ?? { grid: { columns: 24 }, items: [] }) as DashboardLayout;
+        const layout = (dash.layout ?? { grid: { columns: 16 }, items: [] }) as DashboardLayout;
         const items = layout.items ?? [];
         const idx = items.findIndex((w) => w.id === args.widget_id);
         if (idx === -1) {
