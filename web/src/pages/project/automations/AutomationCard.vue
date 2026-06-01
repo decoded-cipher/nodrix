@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useProjectStore } from '../../../stores/project';
 import { confirm } from '../../../lib/confirm';
 import { toast } from '../../../lib/toast';
+import Icon from '../../../components/Icon.vue';
 import Toggle from '../../../components/Toggle.vue';
 import StatusPill from '../../../components/StatusPill.vue';
 import FlowChip from '../../../components/FlowChip.vue';
@@ -107,9 +108,13 @@ async function remove() {
     @click="edit()"
   >
     <!-- Header -->
-    <div class="flex items-start justify-between gap-3">
-      <div class="min-w-0">
-        <div class="flex items-center gap-2">
+    <div class="flex items-start gap-3">
+      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+        <Icon :path="spec.icon" class="h-5 w-5" />
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2">
           <h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ automation.name }}</h3>
           <span class="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">{{ spec.title }}</span>
         </div>
