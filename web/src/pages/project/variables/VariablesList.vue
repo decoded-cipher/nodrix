@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import Combobox from '../../../components/Combobox.vue';
 import { confirm } from '../../../lib/confirm';
@@ -17,32 +17,11 @@ const UNIT_OPTIONS = [
 
 const project = useProjectStore();
 
-// ── Search / filter ───────────────────────────────────────────────────────────
-const search = ref('');
-const filtered = computed(() => {
-  const q = search.value.trim().toLowerCase();
-  if (!q) return project.variables;
-  return project.variables.filter((v) => v.key.toLowerCase().includes(q));
-});
-
-// ── Add a variable (toggled inline row) ───────────────────────────────────────
-const adding = ref(false);
+// ── Add a variable (persistent create row) ────────────────────────────────────
 const newKey = ref('');
 const newUnit = ref('');
 const creating = ref(false);
 const newKeyEl = ref<HTMLInputElement | null>(null);
-
-async function openAdd() {
-  adding.value = true;
-  await nextTick();
-  newKeyEl.value?.focus();
-}
-
-function cancelAdd() {
-  adding.value = false;
-  newKey.value = '';
-  newUnit.value = '';
-}
 
 async function createVariable() {
   const key = newKey.value.trim();
@@ -131,32 +110,9 @@ const DOT: Record<Liveness, string> = {
 
 <template>
   <div>
-    <!-- Toolbar: search + add -->
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div class="relative sm:w-72">
-        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input
-          v-model="search"
-          type="text"
-          placeholder="Search variables…"
-          class="w-full rounded-md border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-        />
-      </div>
-      <button
-        v-if="!adding"
-        type="button"
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-accent-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-accent-700"
-        @click="openAdd"
-      >
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        Add variable
-      </button>
-    </div>
-
-    <!-- Inline add row -->
+    <!-- Create a variable -->
     <form
-      v-if="adding"
-      class="mt-3 flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 sm:flex-row dark:border-neutral-800 dark:bg-neutral-900"
+      class="mb-6 flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 sm:flex-row dark:border-neutral-800 dark:bg-neutral-900"
       @submit.prevent="createVariable"
     >
       <input
@@ -164,33 +120,24 @@ const DOT: Record<Liveness, string> = {
         v-model="newKey"
         type="text"
         placeholder="New variable key (e.g. pm25)"
-        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-        @keydown.esc="cancelAdd"
+        class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm focus:border-accent-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
       />
       <input
         v-model="newUnit"
         type="text"
         placeholder="Unit (optional)"
-        class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:w-36 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-        @keydown.esc="cancelAdd"
+        class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-accent-500 focus:outline-none sm:w-40 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
       />
-      <div class="flex gap-2">
-        <button
-          type="submit"
-          :disabled="creating || !newKey.trim()"
-          class="shrink-0 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
-        >Add</button>
-        <button
-          type="button"
-          class="shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          @click="cancelAdd"
-        >Cancel</button>
-      </div>
+      <button
+        type="submit"
+        :disabled="creating || !newKey.trim()"
+        class="shrink-0 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+      >Add variable</button>
     </form>
 
     <!-- Variables table -->
-    <div class="mt-4 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <table v-if="filtered.length > 0" class="w-full text-left text-sm">
+    <div class="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <table v-if="project.variables.length > 0" class="w-full text-left text-sm">
         <thead class="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
           <tr>
             <th class="px-4 py-2.5 font-medium">Key</th>
@@ -200,7 +147,7 @@ const DOT: Record<Liveness, string> = {
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
-          <tr v-for="v in filtered" :key="v.id" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+          <tr v-for="v in project.variables" :key="v.id" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
             <td class="px-4 py-2.5">
               <div class="flex items-center gap-2.5">
                 <span
@@ -277,26 +224,12 @@ const DOT: Record<Liveness, string> = {
         </tbody>
       </table>
 
-      <!-- No search match -->
-      <div v-else-if="project.variables.length > 0" class="px-4 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
-        No variables match “{{ search }}”.
-      </div>
-
       <!-- Empty state -->
       <div v-else class="px-4 py-12 text-center">
         <p class="text-sm font-medium text-neutral-700 dark:text-neutral-300">No variables yet</p>
         <p class="mx-auto mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-          Keys appear automatically the first time hardware posts to them — or add one now.
+          Keys appear automatically the first time hardware posts to them — or add one above.
         </p>
-        <button
-          v-if="!adding"
-          type="button"
-          class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-accent-700"
-          @click="openAdd"
-        >
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-          Add variable
-        </button>
       </div>
     </div>
   </div>

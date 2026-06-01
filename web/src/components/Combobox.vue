@@ -19,7 +19,16 @@ const emit = defineEmits<{
 const open = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
+const menuEl = ref<HTMLElement | null>(null);
 const activeIdx = ref(-1);
+
+// The menu is teleported to <body> (fixed) so an ancestor's overflow:hidden
+// (e.g. the variables table card) can't clip it. Anchored to the input's rect.
+const menuStyle = ref<{ top: string; left: string; width: string }>({ top: '0', left: '0', width: '0' });
+function position() {
+  const r = rootEl.value?.getBoundingClientRect();
+  if (r) menuStyle.value = { top: `${r.bottom + 4}px`, left: `${r.left}px`, width: `${r.width}px` };
+}
 
 const query = computed(() => props.modelValue.trim());
 
@@ -38,14 +47,22 @@ function openMenu() {
   if (open.value) return;
   open.value = true;
   activeIdx.value = -1;
-  nextTick(() => document.addEventListener('mousedown', onDocMouseDown, true));
+  nextTick(() => {
+    position();
+    document.addEventListener('mousedown', onDocMouseDown, true);
+    window.addEventListener('scroll', position, true);
+    window.addEventListener('resize', position);
+  });
 }
 function close() {
   open.value = false;
   document.removeEventListener('mousedown', onDocMouseDown, true);
+  window.removeEventListener('scroll', position, true);
+  window.removeEventListener('resize', position);
 }
 function onDocMouseDown(e: MouseEvent) {
-  if (!rootEl.value?.contains(e.target as Node)) close();
+  const t = e.target as Node;
+  if (!rootEl.value?.contains(t) && !menuEl.value?.contains(t)) close();
 }
 
 function onInput(e: Event) {
@@ -89,7 +106,11 @@ function focus() {
 }
 defineExpose({ focus });
 
-onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, true));
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocMouseDown, true);
+  window.removeEventListener('scroll', position, true);
+  window.removeEventListener('resize', position);
+});
 </script>
 
 <template>
@@ -117,6 +138,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
       </button>
     </div>
 
+    <Teleport to="body">
     <Transition
       enter-active-class="transition duration-100 ease-out"
       enter-from-class="opacity-0 -translate-y-1"
@@ -127,7 +149,9 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
     >
       <ul
         v-if="open && (filtered.length > 0 || showCustom)"
-        class="absolute z-50 mt-1 max-h-52 w-full min-w-[8rem] overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+        ref="menuEl"
+        :style="menuStyle"
+        class="fixed z-50 max-h-52 min-w-[8rem] overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
       >
         <li v-for="(o, idx) in filtered" :key="o">
           <button
@@ -157,5 +181,6 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocMouseDown, 
         </li>
       </ul>
     </Transition>
+    </Teleport>
   </div>
 </template>
