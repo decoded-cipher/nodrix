@@ -5,6 +5,7 @@ import { useProjectStore } from '../../../stores/project';
 import Icon from '../../../components/Icon.vue';
 import AutomationCard from './AutomationCard.vue';
 import { RECIPES } from './automation-recipes';
+import { connSpec } from '@nodrix/integrations-shared';
 
 const project = useProjectStore();
 const router = useRouter();
@@ -13,9 +14,9 @@ const variableLabel = (key: string): string => {
   const v = project.variables.find((x) => x.key === key);
   return v?.key || key || '—';
 };
-const integrationLabel = (id: string): string => {
+const integration = (id: string) => {
   const i = project.integrations.find((x) => x.id === id);
-  return i?.name ?? 'an integration';
+  return i ? { name: i.name, icon: connSpec(i.kind).icon } : undefined;
 };
 
 const hasAny = computed(() => project.automations.length > 0);
@@ -42,13 +43,13 @@ function startRecipe(id: string) {
     </div>
 
     <!-- List -->
-    <div v-if="hasAny" class="divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
+    <div v-if="hasAny" class="space-y-3">
       <AutomationCard
         v-for="a in project.automations"
         :key="a.id"
         :automation="a"
         :variable-label="variableLabel"
-        :integration-label="integrationLabel"
+        :integration="integration"
       />
     </div>
 

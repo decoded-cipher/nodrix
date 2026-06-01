@@ -2,6 +2,7 @@
 import { reactive, ref, computed, onMounted } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import Dropdown from '../../../components/Dropdown.vue';
+import Icon from '../../../components/Icon.vue';
 import { toast } from '../../../lib/toast';
 import { connSpec } from '@nodrix/integrations-shared';
 import type { Integration, IntegrationKind } from '../../../types';
@@ -80,7 +81,15 @@ async function submit() {
 
 <template>
   <form class="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900" @submit.prevent="submit">
-    <div class="mb-3 text-sm font-semibold">{{ integration ? 'Edit' : 'New' }} {{ spec.label }}</div>
+    <div class="mb-4 flex items-center gap-3">
+      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+        <Icon :path="spec.icon" class="h-5 w-5" />
+      </div>
+      <div class="min-w-0">
+        <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ integration ? 'Edit' : 'New' }} {{ spec.label }}</div>
+        <div class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ spec.description }}</div>
+      </div>
+    </div>
 
     <div v-if="!spec.executable" class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
       {{ spec.label }} isn't executed by the runtime yet — it's saved for when its connector lands.

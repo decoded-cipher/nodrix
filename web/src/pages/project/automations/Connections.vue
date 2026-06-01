@@ -61,7 +61,7 @@ function closeForm() {
     />
 
     <!-- Existing integrations -->
-    <div v-if="project.integrations.length" class="mb-8 divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
+    <div v-if="project.integrations.length" class="mb-8 space-y-3">
       <ConnectionCard
         v-for="i in project.integrations"
         :key="i.id"

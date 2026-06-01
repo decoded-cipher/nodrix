@@ -6,7 +6,8 @@ import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
 import Dropdown from '../../../components/Dropdown.vue';
 import Spinner from '../../../components/Spinner.vue';
-import { TRIGGERS, triggerSpec, OPERATORS, ACTION_TYPES } from './automation-catalog';
+import FlowChip from '../../../components/FlowChip.vue';
+import { TRIGGERS, triggerSpec, OPERATORS, ACTION_TYPES, triggerChipLabel, actionChips } from './automation-catalog';
 import { connSpec } from '@nodrix/integrations-shared';
 import { recipeById } from './automation-recipes';
 import type { AutomationTriggerType, Automation } from '../../../types';
@@ -77,6 +78,17 @@ const solarEventOptions = [{ value: 'sunrise', label: 'Sunrise' }, { value: 'sun
 const actionTypeOptions = ACTION_TYPES.map((a) => ({ value: a.value, label: a.label }));
 
 const spec = computed(() => triggerSpec(draft.trigger_type));
+
+// Live rule-flow preview of the draft (trigger → actions), shown atop the form.
+const previewResolvers = computed(() => ({
+  variableLabel: (k: string) => k,
+  integration: (id: string) => {
+    const i = project.integrations.find((x) => x.id === id);
+    return i ? { name: i.name, icon: connSpec(i.kind).icon } : undefined;
+  },
+}));
+const previewTrigger = computed(() => triggerChipLabel(draft.trigger_type, draft.trigger_config, previewResolvers.value));
+const previewChips = computed(() => actionChips(draft.actions, previewResolvers.value));
 
 // Init once the project is resolved (route may set it after this mounts).
 watch(() => project.currentProjectId, init, { immediate: true });
@@ -245,6 +257,21 @@ async function save() {
         </div>
       </div>
 
+      <!-- Live rule-flow preview -->
+      <div class="mb-4 flex flex-wrap items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
+        <FlowChip tone="trigger" :icon="spec.icon" :label="previewTrigger || 'Set a trigger'" />
+        <template v-if="previewChips.length">
+          <template v-for="(c, i) in previewChips" :key="i">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 shrink-0 text-neutral-300 dark:text-neutral-600"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+            <FlowChip tone="action" :icon="c.icon" :label="c.label" />
+          </template>
+        </template>
+        <template v-else>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 shrink-0 text-neutral-300 dark:text-neutral-600"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+          <span class="text-xs italic text-neutral-400 dark:text-neutral-500">Add an action</span>
+        </template>
+      </div>
+
       <!-- Details -->
       <div class="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
         <label class="block">
@@ -259,7 +286,10 @@ async function save() {
 
       <!-- When -->
       <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
-        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">When</h3>
+        <div class="mb-3 flex items-center gap-2">
+          <span class="grid h-5 w-5 place-items-center rounded-full bg-accent-100 text-[10px] font-bold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">1</span>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">When this happens</h3>
+        </div>
 
         <div v-if="draft.trigger_type === 'variable'" class="flex flex-wrap items-center gap-2">
           <Dropdown v-model="draft.trigger_config.variable" :options="variableOptions" placeholder="Variable" size="sm" class="w-44" />
@@ -312,10 +342,18 @@ async function save() {
         </div>
       </div>
 
+      <!-- Connector -->
+      <div class="flex justify-center py-1.5" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-neutral-300 dark:text-neutral-600"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m0 0 6.75-6.75M12 19.5l-6.75-6.75" /></svg>
+      </div>
+
       <!-- Then -->
-      <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
         <div class="mb-3 flex items-center justify-between">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Then do</h3>
+          <div class="flex items-center gap-2">
+            <span class="grid h-5 w-5 place-items-center rounded-full bg-accent-100 text-[10px] font-bold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">2</span>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Then do this</h3>
+          </div>
           <button type="button" class="rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800" @click="addAction">Add action</button>
         </div>
 
