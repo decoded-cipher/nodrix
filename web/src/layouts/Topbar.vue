@@ -58,6 +58,9 @@ const crumbs = computed<Crumb[]>(() => {
         out.push({ label: 'Automations', to: `/p/${projId}/automations` });
         const a = project.automations.find((x) => x.id === autoId);
         out.push({ label: a?.name ?? autoId.slice(0, 8) });
+      } else if (route.name === 'automation-editor') {
+        out.push({ label: 'Automations', to: `/p/${projId}/automations` });
+        out.push({ label: project.pendingAutomation?.name ?? 'New automation' });
       } else {
         out.push({ label: 'Automations' });
       }

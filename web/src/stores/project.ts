@@ -27,6 +27,9 @@ export const useProjectStore = defineStore('project', () => {
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
   const integrations = ref<Integration[]>([]);
+  // Transient draft for a not-yet-saved automation: the create modal sets its
+  // name/description, the editor builds the graph, and nothing persists until Save.
+  const pendingAutomation = ref<{ name: string; description: string | null } | null>(null);
 
   async function switchTo(projectId: string): Promise<void> {
     if (currentProjectId.value === projectId && variables.value.length + dashboards.value.length > 0) {
@@ -364,6 +367,7 @@ export const useProjectStore = defineStore('project', () => {
     tokens,
     automations,
     integrations,
+    pendingAutomation,
     switchTo,
     loadVariables,
     createVariable,

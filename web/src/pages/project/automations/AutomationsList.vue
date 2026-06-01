@@ -7,7 +7,6 @@ import Icon from '../../../components/Icon.vue';
 import AutomationCard from './AutomationCard.vue';
 import { RECIPES, recipeById } from './automation-recipes';
 import { connSpec } from '@nodrix/integrations-shared';
-import { buildLinearGraph } from '@nodrix/blocks-shared';
 import type { Automation } from '../../../types';
 
 const project = useProjectStore();
@@ -23,10 +22,6 @@ const integration = (id: string) => {
 };
 
 const hasAny = computed(() => project.automations.length > 0);
-
-function openEditor(id: string) {
-  router.push({ name: 'automation-editor', params: { id } });
-}
 
 // ─── Create / edit-details modal (name + description live here, not the editor) ──
 const mode = ref<'create' | 'edit' | null>(null);
@@ -49,16 +44,22 @@ function closeModal() { mode.value = null; }
 async function submitModal() {
   const name = form.value.name.trim();
   if (!name) return;
+  const description = form.value.description.trim() || null;
+
+  if (mode.value === 'create') {
+    // Defer persistence: stash the draft and open the editor. Nothing is written
+    // to the DB until the editor's Save button.
+    project.pendingAutomation = { name, description };
+    mode.value = null;
+    router.push({ name: 'automation-editor' });
+    return;
+  }
+
+  if (!editingId.value) return;
   busy.value = true;
   try {
-    if (mode.value === 'create') {
-      const a = await project.createAutomation({ name, description: form.value.description.trim() || null, graph: { nodes: [], edges: [] } });
-      mode.value = null;
-      openEditor(a.id);
-    } else if (editingId.value) {
-      await project.updateAutomation(editingId.value, { name, description: form.value.description.trim() || null });
-      mode.value = null;
-    }
+    await project.updateAutomation(editingId.value, { name, description });
+    mode.value = null;
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
@@ -66,22 +67,12 @@ async function submitModal() {
   }
 }
 
-// A recipe creates a named automation with a starter graph, then opens the editor.
-async function startRecipe(id: string) {
+// A recipe opens the editor pre-seeded with a starter graph (saved only on Save).
+function startRecipe(id: string) {
   const r = recipeById(id);
   if (!r) return;
-  busy.value = true;
-  try {
-    const a = await project.createAutomation({
-      name: r.name,
-      graph: buildLinearGraph(r.trigger_type, r.trigger_config ?? {}, r.actions ?? []),
-    });
-    openEditor(a.id);
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    busy.value = false;
-  }
+  project.pendingAutomation = { name: r.name, description: null };
+  router.push({ name: 'automation-editor', query: { recipe: id } });
 }
 </script>
 
@@ -174,7 +165,7 @@ async function startRecipe(id: string) {
               type="submit"
               :disabled="busy || !form.name.trim()"
               class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
-            >{{ busy ? 'Saving…' : mode === 'create' ? 'Create & edit flow' : 'Save changes' }}</button>
+            >{{ busy ? 'Saving…' : mode === 'create' ? 'Continue' : 'Save changes' }}</button>
           </div>
         </form>
       </div>

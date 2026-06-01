@@ -3,15 +3,16 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { VueFlow, useVueFlow, type Connection, type Edge } from '@vue-flow/core';
 import '@vue-flow/core/dist/style.css';
-import { graphError } from '@nodrix/blocks-shared';
+import { graphError, buildLinearGraph } from '@nodrix/blocks-shared';
 import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
 import Spinner from '../../../components/Spinner.vue';
 import BlockNode from './BlockNode.vue';
 import BlockPalette from './BlockPalette.vue';
 import NodeInspector from './NodeInspector.vue';
+import { recipeById } from './automation-recipes';
 import {
-  automationToFlow, flowToGraph, defaultConfig, newNodeId, wouldCycle, blockOf,
+  automationToFlow, graphToFlow, flowToGraph, defaultConfig, newNodeId, wouldCycle, blockOf,
   type FlowNode,
 } from './graph-edit';
 
@@ -20,6 +21,7 @@ const route = useRoute();
 const router = useRouter();
 
 const editId = computed(() => (route.params['id'] as string | undefined) || null);
+const recipeId = (route.query['recipe'] as string | undefined) || null;
 
 const {
   onConnect, addEdges, addNodes, removeNodes, onNodeClick, onPaneClick,
@@ -91,24 +93,40 @@ function deleteSelected() {
 
 watch(() => project.currentProjectId, init, { immediate: true });
 
-// The editor only edits the flow graph; name/description are created and edited
-// outside (on the Automations list), so it always opens an existing automation.
+// The editor only builds the flow graph; name/description come from the list
+// (modal → pending draft). It opens either an existing automation (editId) or a
+// new, not-yet-saved draft — which persists only on Save.
 async function init() {
-  if (!project.currentProjectId || !editId.value) return;
+  if (!project.currentProjectId) return;
   await Promise.all([
     project.variables.length ? Promise.resolve() : project.loadVariables(),
     project.loadIntegrations(),
   ]);
 
-  let a = project.automations.find((x) => x.id === editId.value);
-  if (!a) { await project.loadAutomations(); a = project.automations.find((x) => x.id === editId.value); }
-  if (a) {
-    const { nodes, edges } = automationToFlow(a);
+  if (editId.value) {
+    let a = project.automations.find((x) => x.id === editId.value);
+    if (!a) { await project.loadAutomations(); a = project.automations.find((x) => x.id === editId.value); }
+    if (a) {
+      const { nodes, edges } = automationToFlow(a);
+      setNodes(nodes);
+      setEdges(edges);
+      placed = nodes.length;
+    } else {
+      notFound.value = true;
+    }
+    loading.value = false;
+    return;
+  }
+
+  // New draft: must come through the create modal (pending draft set). Seed a
+  // recipe graph if requested; otherwise start blank.
+  if (!project.pendingAutomation) { router.replace({ name: 'automations' }); return; }
+  const r = recipeId ? recipeById(recipeId) : null;
+  if (r) {
+    const { nodes, edges } = graphToFlow(buildLinearGraph(r.trigger_type, r.trigger_config ?? {}, r.actions ?? []));
     setNodes(nodes);
     setEdges(edges);
     placed = nodes.length;
-  } else {
-    notFound.value = true;
   }
   loading.value = false;
 }
@@ -123,11 +141,11 @@ function coerce(v: unknown): unknown {
 }
 
 function backToList() {
+  project.pendingAutomation = null; // discard an unsaved draft
   router.push({ name: 'automations' });
 }
 
 async function save() {
-  if (!editId.value) return;
   const obj = toObject();
   const graph = flowToGraph(obj.nodes as FlowNode[], obj.edges as Edge[]);
   for (const node of graph.nodes) if ('value' in node.config) node.config['value'] = coerce(node.config['value']);
@@ -137,8 +155,17 @@ async function save() {
 
   saving.value = true;
   try {
-    await project.updateAutomation(editId.value, { graph });
-    backToList();
+    if (editId.value) {
+      await project.updateAutomation(editId.value, { graph });
+      backToList();
+    } else {
+      // First save of a new draft: create it now, then stay in the editor.
+      const draft = project.pendingAutomation;
+      if (!draft) { backToList(); return; }
+      const a = await project.createAutomation({ name: draft.name, description: draft.description, graph });
+      project.pendingAutomation = null;
+      router.replace({ name: 'automation-editor', params: { id: a.id } });
+    }
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
