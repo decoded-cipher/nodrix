@@ -13,7 +13,7 @@ import { newId } from '../lib/ids';
 import { recordAudit } from '../lib/audit';
 import { projectStub } from '../durable-objects/stubs';
 import { runActionNode, type ActionDeps } from './actions';
-import { toGraph, entryNode, nodesById, outgoingEdges, countActionNodes } from './graph';
+import { toGraph, entryNode, nodesById, outgoingEdges, countActionNodes, triggerNodes } from './graph';
 import type { AutomationContext, AutomationRow, RunResult, RunStatus } from './types';
 
 const MAX_STEPS = 100;
@@ -32,12 +32,14 @@ export async function runAutomation(
   deps: RunDeps = {}
 ): Promise<RunResult> {
   const graph = toGraph(automation);
-  const entry = entryNode(graph);
+  const byId = nodesById(graph);
+  // Enter at the trigger that fired (multi-trigger); fall back to the graph entry.
+  const start = (ctx.entryNodeId ? byId.get(ctx.entryNodeId) : undefined) ?? entryNode(graph);
 
   // Trigger cooldown: suppress re-fires within the window, measured from the last
   // real run. Skipped silently (no last_run_at write) so the window isn't reset,
   // and never applied to manual runs.
-  const cooldown = Number((entry?.config as { cooldown_seconds?: unknown })?.cooldown_seconds ?? 0);
+  const cooldown = Number((start?.config as { cooldown_seconds?: unknown })?.cooldown_seconds ?? 0);
   if (ctx.source !== 'manual' && cooldown > 0 && automation.last_run_at != null
       && ctx.ts - automation.last_run_at < cooldown) {
     return { status: 'skipped', actionsRun: 0 };
@@ -47,7 +49,6 @@ export async function runAutomation(
     setVariable: deps.setVariable ?? defaultSetVariable(env, automation.project_id),
     emitEvent: deps.emitEvent ?? defaultEmitEvent(env),
   };
-  const byId = nodesById(graph);
 
   let actionsRun = 0;
   let status: RunStatus = countActionNodes(graph) === 0 ? 'skipped' : 'ok';
@@ -77,7 +78,7 @@ export async function runAutomation(
   };
 
   try {
-    if (entry) await visit(entry.id);
+    if (start) await visit(start.id);
   } catch (e) {
     status = 'error';
     error = (e as Error).message;
@@ -109,27 +110,28 @@ export async function dispatchEvent(
     .prepare(
       `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
          FROM automations
-        WHERE project_id = ? AND enabled = 1 AND trigger_type = 'event'`
+        WHERE project_id = ? AND enabled = 1 AND trigger_kinds LIKE '%,event,%'`
     )
     .bind(projectId)
     .all<AutomationRow>();
 
   let ran = 0;
   for (const a of rows.results) {
-    let cfg: { event?: string };
-    try { cfg = JSON.parse(a.trigger_config); } catch { cfg = {}; }
-    if (cfg.event !== eventName) continue;
+    for (const node of triggerNodes(toGraph(a))) {
+      if (node.kind !== 'event' || (node.config as { event?: string }).event !== eventName) continue;
 
-    const ctx: AutomationContext = {
-      source: 'event',
-      projectId,
-      ts: Math.floor(Date.now() / 1000),
-      event: eventName,
-      payload,
-      depth,
-    };
-    await runAutomation(env, a, ctx, { emitEvent: defaultEmitEvent(env) });
-    ran++;
+      const ctx: AutomationContext = {
+        source: 'event',
+        projectId,
+        ts: Math.floor(Date.now() / 1000),
+        event: eventName,
+        payload,
+        depth,
+        entryNodeId: node.id,
+      };
+      await runAutomation(env, a, ctx, { emitEvent: defaultEmitEvent(env) });
+      ran++;
+    }
   }
   return ran;
 }

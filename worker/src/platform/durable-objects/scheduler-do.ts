@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../../env';
-import { computeNextScheduled, runScheduledByIds, type SchedulePlan } from '../engine/schedule';
+import { computeNextScheduled, runScheduledDue, type SchedulePlan } from '../engine/schedule';
 
 // Singleton scheduler. Holds ONE alarm set to the next schedule/sunset fire time;
 // on wake it runs the planned automations and re-arms. Replaces the every-minute
@@ -35,7 +35,7 @@ export class SchedulerDO extends DurableObject<Env> {
     const plan = await this.ctx.storage.get<SchedulePlan>('plan');
     if (plan?.fireAt != null) {
       try {
-        await runScheduledByIds(this.env, plan.dueIds, Math.floor(plan.fireAt / 1000));
+        await runScheduledDue(this.env, plan.due, Math.floor(plan.fireAt / 1000));
       } catch (e) {
         console.error('[scheduler] run failed', e);
       }
