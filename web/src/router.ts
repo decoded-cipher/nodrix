@@ -49,7 +49,7 @@ const routes: RouteRecordRaw[] = [
             component: () => import('./pages/project/automations/AutomationsHub.vue'),
             children: [
               { path: '', name: 'automations', component: () => import('./pages/project/automations/AutomationsList.vue'), meta: { title: 'Automations' } },
-              { path: 'integrations', name: 'integrations', component: () => import('./pages/project/automations/Connections.vue'), meta: { title: 'Integrations' } },
+              { path: 'integrations', name: 'integrations', component: () => import('./pages/project/automations/Integrations.vue'), meta: { title: 'Integrations' } },
               // Back-compat for the old Connections tab URL.
               { path: 'connections', redirect: (to) => `/p/${to.params['proj'] as string}/automations/integrations` },
             ],

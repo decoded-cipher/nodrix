@@ -2,8 +2,8 @@
 import { computed, ref } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import Icon from '../../../components/Icon.vue';
-import ConnectionCard from './ConnectionCard.vue';
-import ConnectionForm from './ConnectionForm.vue';
+import IntegrationCard from './IntegrationCard.vue';
+import IntegrationForm from './IntegrationForm.vue';
 import { EXECUTABLE_CONNECTIONS, COMING_SOON_CONNECTIONS } from '@nodrix/integrations-shared';
 import type { Automation, Integration, IntegrationKind } from '../../../types';
 
@@ -50,7 +50,7 @@ function closeForm() {
 <template>
   <div>
     <!-- Create / edit form -->
-    <ConnectionForm
+    <IntegrationForm
       v-if="formKind"
       :key="editing?.id ?? formKind"
       class="mb-6"
@@ -62,7 +62,7 @@ function closeForm() {
 
     <!-- Existing integrations -->
     <div v-if="project.integrations.length" class="mb-8 space-y-3">
-      <ConnectionCard
+      <IntegrationCard
         v-for="i in project.integrations"
         :key="i.id"
         :integration="i"
