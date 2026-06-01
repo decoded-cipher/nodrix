@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git check-ignore *)",
+      "Bash(rm -f bun.lockb)",
+      "Bash(rm -rf node_modules)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(cd \"/Users/arjunkrishna/Developer/My Projects/nodrix\" && rm -f /tmp/kysely-test-bundle.js && echo \"=== .gitignore lock entries ===\" && grep -n \"lock\" .gitignore)",
+      "Bash(curl -s \"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=https://nodrix.live&strategy=mobile&category=performance\")",
+      "WebFetch(domain:pagespeed.web.dev)",
+      "mcp__plugin_cloudflare_cloudflare-docs__search_cloudflare_documentation"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}
