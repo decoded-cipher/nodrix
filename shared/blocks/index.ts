@@ -9,6 +9,7 @@ import { ACTION_CATALOG } from './actions';
 export { TRIGGER_CATALOG } from './triggers';
 export { ACTION_CATALOG } from './actions';
 export * from './graph';
+export * from './summary';
 
 // ─── Manifest types ─────────────────────────────────────────────────────────
 

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { Handle, Position } from '@vue-flow/core';
 import { connSpec } from '@nodrix/integrations-shared';
+import { blockLines } from '@nodrix/blocks-shared';
 import Icon from '../../../components/Icon.vue';
 import { useProjectStore } from '../../../stores/project';
 import { blockOf, type BlockData } from './graph-edit';
@@ -14,49 +15,13 @@ const isTrigger = computed(() => manifest.value?.category === 'trigger');
 const hasIn = computed(() => !!manifest.value?.ports.in?.length);
 const outPorts = computed(() => manifest.value?.ports.out ?? []);
 
-const OP: Record<string, string> = { '>': '>', '<': '<', '>=': '≥', '<=': '≤', '==': '=', '!=': '≠' };
-const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// Up to two short lines summarising the node's config.
-const details = computed<string[]>(() => {
-  const c = (props.data.config ?? {}) as Record<string, unknown>;
-  const s = (v: unknown) => (v === undefined || v === null || v === '' ? '' : String(v));
-  const out: string[] = [];
-
-  switch (props.data.kind) {
-    case 'variable': {
-      out.push(c['operator'] === 'changed'
-        ? `${s(c['variable']) || '?'} changed`
-        : `${s(c['variable']) || '?'} ${OP[s(c['operator'])] ?? s(c['operator'])} ${s(c['value'])}`.trim());
-      const mode = c['mode'] === 'always' ? 'every reading' : 'on entry';
-      const cd = Number(c['cooldown_seconds'] ?? 0);
-      out.push(cd > 0 ? `${mode} · ${cd}s cooldown` : mode);
-      break;
-    }
-    case 'schedule': {
-      out.push(c['time'] ? `at ${s(c['time'])}` : 'no time set');
-      const days = Array.isArray(c['days']) ? (c['days'] as number[]) : [];
-      out.push(days.length === 0 ? 'every day' : days.slice().sort().map((d) => DAY[d]).join(' '));
-      break;
-    }
-    case 'sunset_sunrise': {
-      out.push(s(c['event']) || 'sunset');
-      const off = Number(c['offset_minutes'] ?? 0);
-      if (off) out.push(`${off > 0 ? '+' : ''}${off} min`);
-      break;
-    }
-    case 'event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
-    case 'set_variable': out.push(`${s(c['variable']) || '?'} = ${s(c['value']) || '—'}`); break;
-    case 'emit_event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
-    case 'call_integration': {
-      const i = project.integrations.find((x) => x.id === c['integration_id']);
-      out.push(i?.name ?? 'no integration');
-      if (i) out.push(connSpec(i.kind).label);
-      break;
-    }
-  }
-  return out.filter(Boolean);
-});
+// Per-kind formatting lives in the shared package; resolve web-only data here.
+const details = computed(() => blockLines(props.data.kind, props.data.config, {
+  integration: (id) => {
+    const i = project.integrations.find((x) => x.id === id);
+    return i ? { name: i.name, kindLabel: connSpec(i.kind).label, icon: connSpec(i.kind).icon } : undefined;
+  },
+}));
 </script>
 
 <template>
