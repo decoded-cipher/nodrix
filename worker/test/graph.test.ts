@@ -47,9 +47,9 @@ test('invalid action kinds are dropped', () => {
   expect(g.nodes.map((n) => n.kind)).toEqual(['variable', 'set_variable']);
 });
 
-test('scene trigger with no actions → single trigger node, no edges', () => {
-  const g = toGraph(row({ trigger_type: 'scene', trigger_config: '{}', actions: '[]' }));
-  expect(g.nodes.map((n) => n.kind)).toEqual(['scene']);
+test('manual trigger with no actions → single trigger node, no edges', () => {
+  const g = toGraph(row({ trigger_type: 'manual', trigger_config: '{}', actions: '[]' }));
+  expect(g.nodes.map((n) => n.kind)).toEqual(['manual']);
   expect(g.edges).toEqual([]);
   expect(countActionNodes(g)).toBe(0);
 });

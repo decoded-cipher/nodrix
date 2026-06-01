@@ -8,7 +8,10 @@ import { projectStub } from '../../platform/durable-objects/stubs';
 import { safeParse, buildUpdate } from '../../platform/lib/sql';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
-import { VALID_TRIGGER_KINDS } from '@nodrix/blocks-shared';
+import {
+  buildLinearGraph, isGraph, graphError, graphColumns, hasScheduledTrigger,
+  type AutomationGraph,
+} from './graph-build';
 
 export function isScheduled(t: string | undefined): boolean {
   return t === 'schedule' || t === 'sunset_sunrise';
@@ -53,6 +56,7 @@ function shape(r: AutomationRow) {
     trigger_type: r.trigger_type,
     trigger_config: safeParse(r.trigger_config),
     actions: safeParse(r.actions),
+    graph: r.graph ? safeParse(r.graph) : null,
     created_at: r.created_at,
     updated_at: r.updated_at,
     last_run_at: r.last_run_at,
@@ -66,7 +70,7 @@ export async function listAutomations(env: Env, projectId: string) {
   const rows = await env.DB
     .prepare(
       `SELECT id, project_id, name, description, enabled, trigger_type,
-              trigger_config, actions, created_at, updated_at,
+              trigger_config, actions, graph, created_at, updated_at,
               last_run_at, last_run_status, last_error
          FROM automations WHERE project_id = ? ORDER BY created_at DESC`
     )
@@ -82,18 +86,21 @@ export async function createAutomation(
   input: {
     name: string;
     description?: string | null;
-    trigger_type: string;
+    trigger_type?: string;
     trigger_config?: unknown;
     actions?: unknown[];
+    graph?: unknown;
     enabled?: boolean;
   }
 ) {
   await assertProjectAccess(env, actor, projectId);
   const name = (input.name ?? '').trim();
   if (!name) throw new ServiceError('bad_request', 'name is required', 'missing_name');
-  if (!VALID_TRIGGER_KINDS.has(input.trigger_type)) {
-    throw new ServiceError('bad_request', 'invalid trigger_type', 'invalid_trigger_type');
-  }
+
+  const graph = inputToGraph(input);
+  const err = graphError(graph);
+  if (err) throw new ServiceError('bad_request', err, 'invalid_graph');
+  const cols = graphColumns(graph);
 
   const id = newId('automation');
   const now = Math.floor(Date.now() / 1000);
@@ -101,15 +108,13 @@ export async function createAutomation(
     .prepare(
       `INSERT INTO automations
          (id, project_id, name, description, enabled, trigger_type,
-          trigger_config, actions, trigger_kinds, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          trigger_config, actions, trigger_kinds, graph, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id, projectId, name, input.description ?? null,
-      input.enabled === false ? 0 : 1, input.trigger_type,
-      JSON.stringify(input.trigger_config ?? {}),
-      JSON.stringify(Array.isArray(input.actions) ? input.actions : []),
-      `,${input.trigger_type},`,
+      input.enabled === false ? 0 : 1, cols.trigger_type,
+      cols.trigger_config, cols.actions, cols.trigger_kinds, cols.graph,
       actor.userId, now, now
     )
     .run();
@@ -120,13 +125,29 @@ export async function createAutomation(
     action: 'automation.create',
     targetType: 'automation',
     targetId: id,
-    metadata: { name, trigger_type: input.trigger_type, source: actor.source },
+    metadata: { name, trigger_type: cols.trigger_type, source: actor.source },
   });
   await invalidateProjectDO(env, projectId);
-  if (isScheduled(input.trigger_type)) await safeReschedule(env);
+  if (hasScheduledTrigger(graph)) await safeReschedule(env);
 
   const row = await env.DB.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
   return shape(row!);
+}
+
+// Canonical graph from create/update input: an explicit graph wins; otherwise
+// build the linear trigger → action chain from the legacy fields.
+function inputToGraph(input: {
+  trigger_type?: string;
+  trigger_config?: unknown;
+  actions?: unknown[];
+  graph?: unknown;
+}): AutomationGraph {
+  if (isGraph(input.graph)) return input.graph;
+  return buildLinearGraph(
+    input.trigger_type,
+    (input.trigger_config ?? {}) as Record<string, unknown>,
+    Array.isArray(input.actions) ? input.actions : []
+  );
 }
 
 export async function updateAutomation(
@@ -138,23 +159,42 @@ export async function updateAutomation(
     name?: string;
     description?: string | null;
     enabled?: boolean;
+    trigger_type?: string;
     trigger_config?: unknown;
     actions?: unknown[];
+    graph?: unknown;
   }
 ) {
   await assertProjectAccess(env, actor, projectId);
   const existing = await env.DB
-    .prepare(`SELECT id, trigger_type FROM automations WHERE id = ? AND project_id = ?`)
+    .prepare(`SELECT trigger_type, trigger_config, actions FROM automations WHERE id = ? AND project_id = ?`)
     .bind(id, projectId)
-    .first<{ id: string; trigger_type: string }>();
+    .first<{ trigger_type: string; trigger_config: string; actions: string }>();
   if (!existing) throw new ServiceError('not_found', 'automation not found');
+
+  // Any trigger/action/graph field rebuilds the canonical graph + derived columns.
+  const touchesGraph = 'graph' in input || 'trigger_type' in input
+    || 'trigger_config' in input || 'actions' in input;
+  let graphCols: ReturnType<typeof graphColumns> | undefined;
+  let graph: AutomationGraph | undefined;
+  if (touchesGraph) {
+    graph = isGraph(input.graph)
+      ? input.graph
+      : buildLinearGraph(
+          input.trigger_type ?? existing.trigger_type,
+          ('trigger_config' in input ? input.trigger_config : safeParse(existing.trigger_config)) as Record<string, unknown>,
+          'actions' in input ? (Array.isArray(input.actions) ? input.actions : []) : (safeParse(existing.actions) as unknown[])
+        );
+    const err = graphError(graph);
+    if (err) throw new ServiceError('bad_request', err, 'invalid_graph');
+    graphCols = graphColumns(graph);
+  }
 
   const u = buildUpdate({
     name: typeof input.name === 'string' && input.name.trim() ? input.name.trim() : undefined,
     description: 'description' in input ? (input.description ?? null) : undefined,
     enabled: typeof input.enabled === 'boolean' ? (input.enabled ? 1 : 0) : undefined,
-    trigger_config: 'trigger_config' in input ? JSON.stringify(input.trigger_config ?? {}) : undefined,
-    actions: 'actions' in input ? JSON.stringify(Array.isArray(input.actions) ? input.actions : []) : undefined,
+    ...(graphCols ? graphCols : {}),
   });
   if (!u) throw new ServiceError('bad_request', 'no fields to update', 'no_fields');
 
@@ -164,25 +204,25 @@ export async function updateAutomation(
     .bind(...u.values, now, id, projectId)
     .run();
 
-  const providedCount = Object.values(input).filter((v) => v !== undefined).length;
+  const onlyEnabled = typeof input.enabled === 'boolean'
+    && Object.values(input).filter((v) => v !== undefined).length === 1;
   await recordAudit(env, {
     projectId,
     userId: actor.userId,
-    action: typeof input.enabled === 'boolean' && providedCount === 1
-      ? `automation.${input.enabled ? 'enable' : 'disable'}`
-      : 'automation.update',
+    action: onlyEnabled ? `automation.${input.enabled ? 'enable' : 'disable'}` : 'automation.update',
     targetType: 'automation',
     targetId: id,
     metadata: { source: actor.source },
   });
   await invalidateProjectDO(env, projectId);
-  if (isScheduled(existing.trigger_type)) await safeReschedule(env);
+  // Re-arm if the automation had or now has a scheduled trigger.
+  if (isScheduled(existing.trigger_type) || (graph && hasScheduledTrigger(graph))) await safeReschedule(env);
 
   const row = await env.DB.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
   return shape(row!);
 }
 
-// Manual run — drives "scene" automations and doubles as a test for any
+// Manual run — drives manual-trigger automations and doubles as a test for any
 // automation. Runs synchronously so the caller gets the outcome.
 export async function runAutomationNow(env: Env, actor: Actor, projectId: string, id: string) {
   await assertProjectAccess(env, actor, projectId);

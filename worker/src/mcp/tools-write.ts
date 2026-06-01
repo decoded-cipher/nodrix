@@ -200,12 +200,12 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
   server.registerTool(
     'create_automation',
     {
-      description: 'Create an automation. trigger_type ∈ variable|scene|schedule|sunset_sunrise|event.',
+      description: 'Create an automation. trigger_type ∈ variable|manual|schedule|sunset_sunrise|event.',
       inputSchema: {
         project,
         name: z.string(),
         description: z.string().nullable().optional(),
-        trigger_type: z.enum(['variable', 'scene', 'schedule', 'sunset_sunrise', 'event']),
+        trigger_type: z.enum(['variable', 'manual', 'schedule', 'sunset_sunrise', 'event']),
         trigger_config: z.any().optional(),
         actions: z.array(z.any()).optional(),
         enabled: z.boolean().optional(),
@@ -253,7 +253,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
   server.registerTool(
     'run_automation',
     {
-      description: 'Run an automation now (drives scene automations; also a test harness).',
+      description: 'Run an automation now (drives manual automations; also a test harness).',
       inputSchema: { project, automation_id: z.string() },
     },
     (args) => run(() => runAutomationNow(env, actor(), scopeProjectId(props, args.project), args.automation_id))
