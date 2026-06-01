@@ -1,6 +1,6 @@
 import type { IntegrationResult } from '../index';
 import { interpolate } from '../index';
-import { doFetch, str, strRecord } from '../lib';
+import { doFetch, hmacHex, str, strRecord } from '../lib';
 
 export async function runHttpService(
   config: Record<string, unknown>,
@@ -20,5 +20,12 @@ export async function runHttpService(
       headers['content-type'] = 'application/json';
     }
   }
+
+  // Optional HMAC signing so the receiver can verify the payload came from Nodrix.
+  const secret = str(config.secret);
+  if (secret && typeof init.body === 'string') {
+    headers['x-nodrix-signature'] = await hmacHex(secret, init.body);
+  }
+
   return doFetch(url, init);
 }

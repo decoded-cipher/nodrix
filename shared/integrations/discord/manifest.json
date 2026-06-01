@@ -21,10 +21,25 @@
       "required": true,
       "placeholder": "{{variable}} = {{value}}",
       "hint": "Supports {{variable}}, {{value}}, {{event}}, {{source}}."
+    },
+    {
+      "key": "title",
+      "label": "Title",
+      "type": "text",
+      "placeholder": "{{variable}} alert",
+      "hint": "Embed title. Supports {{variable}}, {{value}}, {{event}}, {{source}}."
+    },
+    {
+      "key": "description",
+      "label": "Description",
+      "type": "textarea",
+      "placeholder": "{{variable}} is now {{value}}",
+      "hint": "Embed body. Supports {{variable}}, {{value}}, {{event}}, {{source}}."
     }
   ],
   "operations": [
-    { "key": "send_message", "label": "Send message", "params": ["message"] }
+    { "key": "send_message", "label": "Send message", "params": ["message"] },
+    { "key": "send_embed", "label": "Send embed", "params": ["title", "description"] }
   ],
   "summary": { "value": "Discord channel", "requires": "webhook_url", "fallback": "No webhook set" }
 }

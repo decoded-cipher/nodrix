@@ -33,7 +33,15 @@
       "type": "textarea",
       "mono": true,
       "placeholder": "{ \"content\": \"{{value}}\" }",
-      "hint": "Sent for non-GET requests. {{variable}}, {{value}}, {{event}} are interpolated."
+      "hint": "Sent for non-GET requests; defaults to the trigger context as JSON. {{variable}}, {{value}}, {{event}} are interpolated."
+    },
+    {
+      "key": "secret",
+      "label": "Signing secret (optional)",
+      "type": "text",
+      "mono": true,
+      "placeholder": "shared secret",
+      "hint": "Adds an X-Nodrix-Signature HMAC-SHA256 header over the request body so the receiver can verify it."
     }
   ],
   "summary": { "template": "{{method:POST}} {{url:—}}" }

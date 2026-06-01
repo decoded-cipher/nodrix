@@ -5,7 +5,6 @@
 
 import type { IntegrationContext, IntegrationResult, IntegrationRow } from './index';
 import { interpolate } from './index';
-import { runWebhook } from './webhook/run';
 import { runHttpService } from './http_service/run';
 import { runEmail } from './email/run';
 import { runTelegram } from './telegram/run';
@@ -43,8 +42,7 @@ export async function executeIntegration(
   const op = inv?.operation;
 
   switch (integration.kind) {
-    // Body-posting connectors: send the whole trigger context, no operations.
-    case 'webhook': return runWebhook(config, body);
+    // Body-posting connector: send the whole trigger context, no operations.
     case 'http_service': return runHttpService(config, body);
     // Operation-based connectors: act on the resolved call-site params.
     case 'email': return runEmail(config, params, op);

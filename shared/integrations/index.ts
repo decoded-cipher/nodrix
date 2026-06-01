@@ -1,7 +1,6 @@
 // Integration catalog, types, and pure helpers. Worker-safe (no fetch/DOM).
 // The behavior (executeIntegration + per-kind handlers) lives in ./runtime.ts.
 
-import webhook from './webhook/manifest.json';
 import httpService from './http_service/manifest.json';
 import email from './email/manifest.json';
 import telegram from './telegram/manifest.json';
@@ -97,7 +96,7 @@ export type IntegrationContext = {
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
-const RAW = [webhook, httpService, email, telegram, slack, discord] as const;
+const RAW = [httpService, email, telegram, slack, discord] as const;
 
 export type IntegrationKind = (typeof RAW)[number]['kind'];
 
