@@ -26,7 +26,6 @@ const {
   toObject, findNode, setNodes, setEdges, getEdges,
 } = useVueFlow();
 
-const name = ref('');
 const loading = ref(true);
 const saving = ref(false);
 const notFound = ref(false);
@@ -54,13 +53,23 @@ function addBlock(kind: string) {
   const manifest = blockOf(kind);
   if (!manifest) return;
   const id = newNodeId();
-  addNodes([{
-    id,
-    type: 'block',
-    position: { x: 160 + (placed % 3) * 48, y: 48 + placed * 104 },
-    data: { kind, config: defaultConfig(manifest) },
-  }]);
+  const prevId = selectedId.value;
+  const prev = prevId ? findNode(prevId) : undefined;
+  // Lay out as a tidy horizontal chain (connected nodes), consistent spacing.
+  const position = prev
+    ? { x: prev.position.x + 240, y: prev.position.y }
+    : { x: 60 + placed * 240, y: 140 };
+
+  addNodes([{ id, type: 'block', position, data: { kind, config: defaultConfig(manifest) } }]);
   placed++;
+
+  // Auto-wire from the selected node to the new block when the ports allow it.
+  if (prev) {
+    const out = blockOf((prev.data as { kind: string }).kind)?.ports.out?.[0];
+    if (out && manifest.ports.in?.length && !wouldCycle(getEdges.value, prevId!, id)) {
+      addEdges([{ id: `e_${prevId}_${id}_${out}`, source: prevId!, target: id, sourceHandle: out }]);
+    }
+  }
   selectedId.value = id;
 }
 
@@ -84,7 +93,6 @@ async function init() {
   let a = project.automations.find((x) => x.id === editId.value);
   if (!a) { await project.loadAutomations(); a = project.automations.find((x) => x.id === editId.value); }
   if (a) {
-    name.value = a.name;
     const { nodes, edges } = automationToFlow(a);
     setNodes(nodes);
     setEdges(edges);
@@ -131,10 +139,9 @@ async function save() {
 
 <template>
   <main class="flex h-full">
-    <!-- Topbar actions: automation name (read-only) + Done/Save, teleported into
-         the shell topbar. Name/description are edited on the Automations list. -->
+    <!-- Topbar actions: Done/Save, teleported into the shell topbar. The name
+         shows in the breadcrumb; name/description are edited on the list. -->
     <Teleport to="#topbar-actions" defer>
-      <span v-if="name" class="mr-1 hidden max-w-[16rem] truncate text-sm font-medium text-neutral-700 sm:inline dark:text-neutral-300">{{ name }}</span>
       <button
         class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
         @click="backToList"
@@ -203,20 +210,17 @@ async function save() {
   background-size: 16px 16px;
 }
 
-/* Connection handles: subtle accent dots by default, prominent on the selected
-   node so clicking a block clearly reveals where to wire from/to. */
+/* Connection handles are hidden until a node is selected, then shown as plain
+   dots (no highlight) so you can wire from/to it. */
 :deep(.vue-flow__handle) {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   background: var(--canvas-bg);
-  border: 2px solid #ea580c;
-  opacity: 0.5;
+  border: 1.5px solid rgb(163 163 163);
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
 :deep(.vue-flow__node.selected .vue-flow__handle) {
-  width: 12px;
-  height: 12px;
-  background: #ea580c;
   opacity: 1;
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.25);
 }
 </style>

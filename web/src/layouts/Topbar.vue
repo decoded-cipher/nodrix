@@ -18,9 +18,9 @@ const themeTitle = computed(() => {
 
 // Pages can teleport context-specific actions into #topbar-actions; when they
 // do, swap out the default theme + GitHub controls rather than stacking both.
-// Both dashboard view (Edit) and dashboard edit (Done/Save) teleport actions.
+// Dashboard view/edit and the automation editor all teleport actions.
 const hasPageActions = computed(
-  () => route.name === 'dashboard-view' || route.name === 'dashboard-edit'
+  () => route.name === 'dashboard-view' || route.name === 'dashboard-edit' || route.name === 'automation-editor'
 );
 
 type Crumb = { label: string; to?: string };
@@ -53,7 +53,14 @@ const crumbs = computed<Crumb[]>(() => {
     } else if (path.includes('/variables')) {
       out.push({ label: 'Variables' });
     } else if (path.includes('/automations')) {
-      out.push({ label: 'Automations' });
+      const autoId = route.params['id'] as string | undefined;
+      if (autoId) {
+        out.push({ label: 'Automations', to: `/p/${projId}/automations` });
+        const a = project.automations.find((x) => x.id === autoId);
+        out.push({ label: a?.name ?? autoId.slice(0, 8) });
+      } else {
+        out.push({ label: 'Automations' });
+      }
     } else if (path.includes('/integrations')) {
       out.push({ label: 'Integrations' });
     } else if (path.includes('/settings')) {
