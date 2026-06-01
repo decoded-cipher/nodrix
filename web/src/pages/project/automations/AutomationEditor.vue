@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { VueFlow, useVueFlow, type Connection, type Edge } from '@vue-flow/core';
 import '@vue-flow/core/dist/style.css';
-import { graphError, buildLinearGraph } from '@nodrix/blocks-shared';
+import { graphError } from '@nodrix/blocks-shared';
 import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
 import Spinner from '../../../components/Spinner.vue';
@@ -123,7 +123,7 @@ async function init() {
   if (!project.pendingAutomation) { router.replace({ name: 'automations' }); return; }
   const r = recipeId ? recipeById(recipeId) : null;
   if (r) {
-    const { nodes, edges } = graphToFlow(buildLinearGraph(r.trigger_type, r.trigger_config ?? {}, r.actions ?? []));
+    const { nodes, edges } = graphToFlow(r.graph);
     setNodes(nodes);
     setEdges(edges);
     placed = nodes.length;
