@@ -44,9 +44,12 @@
       "hint": "Plain text. {{variable}}, {{value}}, {{event}} are interpolated."
     }
   ],
+  "operations": [
+    { "key": "send", "label": "Send email", "params": ["to", "subject", "body"] }
+  ],
   "summary": {
-    "template": "to {{to}}",
-    "requires": "to",
+    "template": "from {{from}}",
+    "requires": "from",
     "fallback": "Not configured"
   }
 }

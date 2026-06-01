@@ -1,22 +1,22 @@
 import type { IntegrationResult } from '../index';
-import { interpolate } from '../index';
 import { doFetch, str } from '../lib';
 
-// Sends via Resend (https://resend.com). The API key, sender, and recipient are
-// connection config; subject/body are interpolated against the trigger payload.
+// Sends via Resend (https://resend.com). The API key and sender are connection
+// config; recipient/subject/body are call-site params (already interpolated).
 export async function runEmail(
   config: Record<string, unknown>,
-  body: Record<string, unknown>
+  params: Record<string, unknown>,
+  _operation?: string
 ): Promise<IntegrationResult> {
   const apiKey = str(config.api_key);
   if (!apiKey) return { status: 'error', detail: 'missing api_key' };
   const from = str(config.from);
   if (!from) return { status: 'error', detail: 'missing from' };
-  const to = str(config.to);
+  const to = str(params.to);
   if (!to) return { status: 'error', detail: 'missing to' };
 
-  const subject = interpolate(str(config.subject), body) || 'Nodrix notification';
-  const text = interpolate(str(config.body), body) || subject;
+  const subject = str(params.subject) || 'Nodrix notification';
+  const text = str(params.body) || subject;
   const recipients = to.includes(',') ? to.split(',').map((s) => s.trim()).filter(Boolean) : to;
 
   return doFetch('https://api.resend.com/emails', {

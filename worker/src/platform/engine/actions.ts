@@ -34,7 +34,10 @@ const HANDLERS: Record<string, ActionHandler> = {
   call_integration: async ({ env, automation, ctx, config }) => {
     const integration = await loadIntegration(env, automation.project_id, String(config.integration_id));
     if (!integration) throw new Error(`integration ${config.integration_id} not found`);
-    const res = await executeIntegration(integration, ctx, config.payload as Record<string, unknown> | undefined);
+    const res = await executeIntegration(integration, ctx, {
+      operation: config.operation as string | undefined,
+      params: config.params as Record<string, unknown> | undefined,
+    });
     await recordIntegrationRun(env, integration.id, res).catch(() => {});
     if (res.status === 'error') throw new Error(`integration "${integration.name}": ${res.detail}`);
   },

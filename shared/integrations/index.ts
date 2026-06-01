@@ -32,13 +32,24 @@ export type SummaryDescriptor = {
   fallback?: string;
 };
 
+// One function an integration can perform. `params` lists the keys of the
+// fields (from `fields`) this operation collects at the call site — a field key
+// shared by several operations is simply listed in each (no separate "common").
+export type ConnOperation = {
+  key: string;
+  label: string;
+  description?: string;
+  params: readonly string[];
+};
+
 export type ConnSpec = {
   kind: IntegrationKind;
   label: string;
   description: string;
   icon: string;                 // 24x24 outline path
   executable: boolean;          // false = "coming soon", not run by the engine yet
-  fields: readonly ConnField[];
+  fields: readonly ConnField[]; // every field: connection-level + every operation's params
+  operations?: readonly ConnOperation[]; // omitted = single implicit operation
   summary: SummaryDescriptor;
 };
 
@@ -94,6 +105,40 @@ export const CATALOG: readonly ConnSpec[] = RAW as unknown as readonly ConnSpec[
 
 export function connSpec(kind: IntegrationKind): ConnSpec {
   return CATALOG.find((c) => c.kind === kind) ?? CATALOG[0]!;
+}
+
+export function connOperations(kind: IntegrationKind): readonly ConnOperation[] {
+  return connSpec(kind).operations ?? [];
+}
+
+// Defaults to the kind's first operation when opKey is absent/unknown.
+export function operationSpec(kind: IntegrationKind, opKey?: string): ConnOperation | undefined {
+  const ops = connOperations(kind);
+  return ops.find((o) => o.key === opKey) ?? ops[0];
+}
+
+// Field keys referenced by some operation — i.e. the call-site params.
+function paramKeys(spec: ConnSpec): ReadonlySet<string> {
+  const s = new Set<string>();
+  for (const op of spec.operations ?? []) for (const k of op.params) s.add(k);
+  return s;
+}
+
+// Connection-level fields = those no operation references (stored on the
+// instance). A kind with no operations keeps all its fields here.
+export function connectionFields(kind: IntegrationKind): readonly ConnField[] {
+  const spec = connSpec(kind);
+  const params = paramKeys(spec);
+  return spec.fields.filter((f) => !params.has(f.key));
+}
+
+// Resolve an operation's param keys to their field definitions, in order.
+export function operationFields(kind: IntegrationKind, opKey?: string): readonly ConnField[] {
+  const spec = connSpec(kind);
+  const op = operationSpec(kind, opKey);
+  if (!op) return [];
+  const byKey = new Map(spec.fields.map((f) => [f.key, f]));
+  return op.params.map((k) => byKey.get(k)).filter((f): f is ConnField => !!f);
 }
 
 export const EXECUTABLE_CONNECTIONS = CATALOG.filter((c) => c.executable);

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref, computed, onMounted } from 'vue';
 import { useProjectStore } from '../../../stores/project';
-import Dropdown from '../../../components/Dropdown.vue';
 import Icon from '../../../components/Icon.vue';
+import FieldInput from './FieldInput.vue';
 import { toast } from '../../../lib/toast';
-import { connSpec } from '@nodrix/integrations-shared';
+import { connSpec, connectionFields } from '@nodrix/integrations-shared';
 import type { Integration, IntegrationKind } from '../../../types';
 
 const props = defineProps<{
@@ -15,6 +15,9 @@ const emit = defineEmits<{ saved: []; cancel: [] }>();
 
 const project = useProjectStore();
 const spec = computed(() => connSpec(props.kind));
+// Only connection-level fields belong on the instance; operation params are
+// authored on the automation's call_integration node.
+const fields = computed(() => connectionFields(props.kind));
 
 const name = ref('');
 const values = reactive<Record<string, string>>({});
@@ -23,7 +26,7 @@ const submitting = ref(false);
 onMounted(() => {
   const cfg = (props.integration?.config as Record<string, unknown> | null) ?? null;
   name.value = props.integration?.name ?? '';
-  for (const f of spec.value.fields) {
+  for (const f of fields.value) {
     const raw = cfg ? cfg[f.key] : undefined;
     if (f.type === 'json') {
       values[f.key] = raw && typeof raw === 'object' ? JSON.stringify(raw, null, 2) : '';
@@ -35,13 +38,9 @@ onMounted(() => {
   }
 });
 
-function selectOptions(opts: readonly string[] | undefined) {
-  return (opts ?? []).map((o) => ({ value: o, label: o }));
-}
-
 function buildConfig(): Record<string, unknown> | null {
   const config: Record<string, unknown> = {};
-  for (const f of spec.value.fields) {
+  for (const f of fields.value) {
     const v = (values[f.key] ?? '').trim();
     if (!v) {
       if (f.required) { toast.error(`${f.label} is required.`); return null; }
@@ -100,42 +99,10 @@ async function submit() {
       <input v-model="name" type="text" required class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" :placeholder="`e.g. ${spec.label} alerts`" />
     </label>
 
-    <div v-for="f in spec.fields" :key="f.key" class="mt-3">
+    <div v-for="f in fields" :key="f.key" class="mt-3">
       <label class="block">
         <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</span>
-
-        <Dropdown
-          v-if="f.type === 'select'"
-          :model-value="values[f.key] ?? ''"
-          :options="selectOptions(f.options)"
-          size="sm"
-          class="mt-1 w-40"
-          @update:model-value="(v) => { values[f.key] = String(v); }"
-        />
-        <textarea
-          v-else-if="f.type === 'textarea' || f.type === 'json'"
-          v-model="values[f.key]"
-          rows="3"
-          :placeholder="f.placeholder"
-          class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-          :class="f.mono ? 'font-mono' : ''"
-        />
-        <textarea
-          v-else-if="f.type === 'code'"
-          v-model="values[f.key]"
-          rows="8"
-          :placeholder="f.placeholder"
-          class="mt-1 w-full rounded-md border border-neutral-300 bg-neutral-950 px-3 py-2 font-mono text-xs text-neutral-100 dark:border-neutral-700"
-        />
-        <input
-          v-else
-          v-model="values[f.key]"
-          :type="f.type === 'url' ? 'url' : 'text'"
-          :placeholder="f.placeholder"
-          :required="f.required"
-          class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-          :class="f.mono ? 'font-mono text-xs' : ''"
-        />
+        <FieldInput :field="f" v-model="values[f.key]" />
       </label>
       <p v-if="f.hint" class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">{{ f.hint }}</p>
     </div>

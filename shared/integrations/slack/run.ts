@@ -1,17 +1,17 @@
 import type { IntegrationResult } from '../index';
-import { interpolate } from '../index';
 import { doFetch, str } from '../lib';
 
-// Posts to a Slack incoming webhook. The webhook URL is the credential; the
-// message is interpolated against the trigger payload.
+// Posts to a Slack incoming webhook. The webhook URL is connection config; the
+// message is a call-site param (already interpolated by the runtime).
 export async function runSlack(
   config: Record<string, unknown>,
-  body: Record<string, unknown>
+  params: Record<string, unknown>,
+  _operation?: string
 ): Promise<IntegrationResult> {
   const url = str(config.webhook_url);
   if (!url) return { status: 'error', detail: 'missing webhook_url' };
 
-  const text = interpolate(str(config.message), body) || 'Nodrix notification';
+  const text = str(params.message) || 'Nodrix notification';
 
   return doFetch(url, {
     method: 'POST',

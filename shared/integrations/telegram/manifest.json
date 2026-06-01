@@ -27,9 +27,13 @@
       "key": "message",
       "label": "Message",
       "type": "textarea",
+      "required": true,
       "placeholder": "{{variable}} = {{value}}",
       "hint": "Supports {{variable}}, {{value}}, {{event}}, {{source}}."
     }
   ],
-  "summary": { "template": "chat {{chat_id}}", "fallback": "No chat id set" }
+  "operations": [
+    { "key": "send_message", "label": "Send message", "params": ["chat_id", "message"] }
+  ],
+  "summary": { "value": "Telegram bot", "requires": "bot_token", "fallback": "No bot token set" }
 }

@@ -158,7 +158,11 @@ export async function testIntegration(
     event: 'test',
     depth: 0,
   };
-  const result = await executeIntegration({ ...row, enabled: 1 }, ctx, { test: true });
+  // Connection-reachability check. Operation params (recipient, message, …) now
+  // live on the automation node, so a bare test exercises the default operation
+  // with empty params — body-posting connectors deliver; operation connectors
+  // surface a clean "missing <param>" until invoked from an automation.
+  const result = await executeIntegration({ ...row, enabled: 1 }, ctx, {});
   await recordIntegrationRun(env, id, result).catch(() => {});
 
   await recordAudit(env, {

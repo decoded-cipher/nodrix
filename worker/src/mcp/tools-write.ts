@@ -204,7 +204,9 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       description:
         'Create an automation. Prefer `graph` (a {nodes,edges} flow — multi-trigger, conditions/branching) ' +
         'for anything beyond a single trigger → linear actions; call list_block_types first for the node ' +
-        'kinds and their config shapes. The legacy trigger_type+trigger_config+actions still works for a ' +
+        'kinds and their config shapes. A call_integration node’s config is ' +
+        '{ integration_id, operation, params } — see list_integration_kinds for each kind’s operations and ' +
+        'params. The legacy trigger_type+trigger_config+actions still works for a ' +
         'simple linear automation (trigger_type ∈ variable|manual|schedule|sunset_sunrise|event).',
       inputSchema: {
         project,

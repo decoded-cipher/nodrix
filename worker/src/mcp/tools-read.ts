@@ -16,7 +16,7 @@ import { listIntegrations } from '../domains/integrations/service';
 import { redactIntegration } from './redact';
 import { CATALOG as WIDGET_CATALOG } from '@nodrix/widgets-shared';
 import { TRIGGER_CATALOG, CONDITION_CATALOG, ACTION_CATALOG, type BlockManifest } from '@nodrix/blocks-shared';
-import { CATALOG as INTEGRATION_CATALOG } from '@nodrix/integrations-shared';
+import { CATALOG as INTEGRATION_CATALOG, connectionFields, operationFields } from '@nodrix/integrations-shared';
 
 // Public MCP shape — mirrors what the old worker/src/mcp/widget-specs.ts exposed.
 const WIDGET_SPECS = WIDGET_CATALOG.map((m) => ({
@@ -193,8 +193,11 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     'list_integration_kinds',
     {
       description:
-        'List integration kinds and the config fields each expects. Call before create_integration so ' +
-        '`config` carries the right field keys (e.g. webhook → url; email → api_key, from, to).',
+        'List integration kinds with their `connection_fields` (stored on the integration via ' +
+        'create_integration, e.g. credentials) and their `operations`. Each operation lists the ' +
+        '`params` (field definitions) an automation’s call_integration node supplies as ' +
+        '`{ operation, params }` — a field shared by several operations appears in each. A kind with ' +
+        'no operations has a single implicit operation and no call-site params.',
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -205,7 +208,13 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
           label: c.label,
           description: c.description,
           executable: c.executable,
-          fields: c.fields,
+          connection_fields: connectionFields(c.kind),
+          operations: (c.operations ?? []).map((o) => ({
+            key: o.key,
+            label: o.label,
+            description: o.description,
+            params: operationFields(c.kind, o.key),
+          })),
         })),
       }))
   );

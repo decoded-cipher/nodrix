@@ -18,9 +18,13 @@
       "key": "message",
       "label": "Message",
       "type": "textarea",
+      "required": true,
       "placeholder": "{{variable}} = {{value}}",
       "hint": "Supports {{variable}}, {{value}}, {{event}}, {{source}}."
     }
+  ],
+  "operations": [
+    { "key": "send_message", "label": "Send message", "params": ["message"] }
   ],
   "summary": { "value": "Slack channel", "requires": "webhook_url", "fallback": "No webhook set" }
 }

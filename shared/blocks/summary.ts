@@ -62,7 +62,10 @@ export function blockLines(kind: string, config: Record<string, unknown>, r: Sum
     case 'call_integration': {
       const i = r.integration?.(s(c['integration_id']));
       out.push(i?.name ?? 'no integration');
-      if (i?.kindLabel) out.push(i.kindLabel);
+      // Show the chosen operation when set (e.g. "Send photo"); else the kind.
+      const op = s(c['operation']);
+      if (op) out.push(op.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase()));
+      else if (i?.kindLabel) out.push(i.kindLabel);
       break;
     }
   }
