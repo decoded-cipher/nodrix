@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Handle, Position } from '@vue-flow/core';
+import { connSpec } from '@nodrix/integrations-shared';
 import Icon from '../../../components/Icon.vue';
 import { useProjectStore } from '../../../stores/project';
 import { blockOf, type BlockData } from './graph-edit';
@@ -14,33 +15,53 @@ const hasIn = computed(() => !!manifest.value?.ports.in?.length);
 const outPorts = computed(() => manifest.value?.ports.out ?? []);
 
 const OP: Record<string, string> = { '>': '>', '<': '<', '>=': '≥', '<=': '≤', '==': '=', '!=': '≠' };
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// A short, human detail line summarising the node's config.
-const detail = computed(() => {
+// Up to two short lines summarising the node's config.
+const details = computed<string[]>(() => {
   const c = (props.data.config ?? {}) as Record<string, unknown>;
   const s = (v: unknown) => (v === undefined || v === null || v === '' ? '' : String(v));
+  const out: string[] = [];
+
   switch (props.data.kind) {
-    case 'variable':
-      return c['operator'] === 'changed'
+    case 'variable': {
+      out.push(c['operator'] === 'changed'
         ? `${s(c['variable']) || '?'} changed`
-        : `${s(c['variable']) || '?'} ${OP[s(c['operator'])] ?? s(c['operator'])} ${s(c['value'])}`.trim();
-    case 'schedule': return c['time'] ? `at ${s(c['time'])}` : '';
-    case 'sunset_sunrise': return s(c['event']) || 'sunset';
-    case 'event': return c['event'] ? `"${s(c['event'])}"` : '';
-    case 'set_variable': return `${s(c['variable']) || '?'} = ${s(c['value'])}`;
-    case 'emit_event': return c['event'] ? `"${s(c['event'])}"` : '';
+        : `${s(c['variable']) || '?'} ${OP[s(c['operator'])] ?? s(c['operator'])} ${s(c['value'])}`.trim());
+      const mode = c['mode'] === 'always' ? 'every reading' : 'on entry';
+      const cd = Number(c['cooldown_seconds'] ?? 0);
+      out.push(cd > 0 ? `${mode} · ${cd}s cooldown` : mode);
+      break;
+    }
+    case 'schedule': {
+      out.push(c['time'] ? `at ${s(c['time'])}` : 'no time set');
+      const days = Array.isArray(c['days']) ? (c['days'] as number[]) : [];
+      out.push(days.length === 0 ? 'every day' : days.slice().sort().map((d) => DAY[d]).join(' '));
+      break;
+    }
+    case 'sunset_sunrise': {
+      out.push(s(c['event']) || 'sunset');
+      const off = Number(c['offset_minutes'] ?? 0);
+      if (off) out.push(`${off > 0 ? '+' : ''}${off} min`);
+      break;
+    }
+    case 'event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
+    case 'set_variable': out.push(`${s(c['variable']) || '?'} = ${s(c['value']) || '—'}`); break;
+    case 'emit_event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
     case 'call_integration': {
       const i = project.integrations.find((x) => x.id === c['integration_id']);
-      return i?.name ?? 'integration';
+      out.push(i?.name ?? 'no integration');
+      if (i) out.push(connSpec(i.kind).label);
+      break;
     }
-    default: return '';
   }
+  return out.filter(Boolean);
 });
 </script>
 
 <template>
   <div
-    class="min-w-[140px] max-w-[210px] rounded-md border bg-white px-2.5 py-1.5 shadow-sm transition dark:bg-neutral-900"
+    class="min-w-[150px] max-w-[220px] rounded-md border bg-white px-2.5 py-2 shadow-sm transition dark:bg-neutral-900"
     :class="[
       selected ? 'border-accent-500 ring-1 ring-accent-400' : 'border-neutral-200 dark:border-neutral-700',
     ]"
@@ -60,7 +81,12 @@ const detail = computed(() => {
         <div class="truncate text-xs font-semibold leading-tight text-neutral-900 dark:text-neutral-100">
           {{ manifest?.label ?? data.kind }}
         </div>
-        <div v-if="detail" class="truncate text-[11px] leading-tight text-neutral-500 dark:text-neutral-400">{{ detail }}</div>
+        <div
+          v-for="(line, i) in details"
+          :key="i"
+          class="truncate leading-tight"
+          :class="i === 0 ? 'text-[11px] text-neutral-500 dark:text-neutral-400' : 'text-[10px] text-neutral-400 dark:text-neutral-500'"
+        >{{ line }}</div>
       </div>
     </div>
 

@@ -44,8 +44,8 @@ function hideTip() { hovered.value = null; }
             @focus="showTip(b, $event)"
             @blur="hideTip"
           >
-            <Icon :path="b.icon" class="h-7 w-7" />
-            <span class="px-1 text-center text-[11px] font-medium leading-tight">{{ b.label }}</span>
+            <Icon :path="b.icon" class="h-5 w-5" />
+            <span class="px-1 text-center text-[10px] font-medium leading-tight">{{ b.label }}</span>
           </button>
         </div>
       </section>

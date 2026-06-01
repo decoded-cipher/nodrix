@@ -36,7 +36,9 @@ export function graphToFlow(graph: AutomationGraph): { nodes: FlowNode[]; edges:
   const nodes: FlowNode[] = graph.nodes.map((n, i) => ({
     id: n.id,
     type: 'block',
-    position: { x: n.x ?? 120, y: n.y ?? 40 + i * 130 },
+    // Fall back to a right→down diagonal when a node has no saved position
+    // (e.g. a template-built graph), matching the editor's add-block cascade.
+    position: { x: n.x ?? 80 + i * 240, y: n.y ?? 80 + i * 120 },
     data: { kind: n.kind, config: { ...n.config } },
   }));
   const edges: Edge[] = graph.edges.map((e, i) => ({

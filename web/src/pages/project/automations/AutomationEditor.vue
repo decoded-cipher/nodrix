@@ -233,4 +233,13 @@ async function save() {
 :deep(.vue-flow__node.selected .vue-flow__handle) {
   opacity: 1;
 }
+
+/* Animate the live connection line (while dragging) like committed edges. */
+:deep(.vue-flow__connection-path) {
+  stroke-dasharray: 5;
+  animation: nodrix-dash 0.5s linear infinite;
+}
+@keyframes nodrix-dash {
+  to { stroke-dashoffset: -10; }
+}
 </style>
