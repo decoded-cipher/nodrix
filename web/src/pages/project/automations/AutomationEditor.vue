@@ -23,8 +23,17 @@ const editId = computed(() => (route.params['id'] as string | undefined) || null
 
 const {
   onConnect, addEdges, addNodes, removeNodes, onNodeClick, onPaneClick,
-  toObject, findNode, setNodes, setEdges, getEdges,
+  toObject, findNode, setNodes, setEdges, getEdges, fitView, onNodesInitialized,
 } = useVueFlow();
+
+// Center the whole graph in the canvas once its nodes are measured (capped so a
+// small graph isn't zoomed in). Runs once — adding blocks later won't re-frame.
+let framed = false;
+onNodesInitialized(() => {
+  if (framed) return;
+  framed = true;
+  fitView({ padding: 0.25, maxZoom: 1 });
+});
 
 const loading = ref(true);
 const saving = ref(false);
@@ -55,10 +64,11 @@ function addBlock(kind: string) {
   const id = newNodeId();
   const prevId = selectedId.value;
   const prev = prevId ? findNode(prevId) : undefined;
-  // Lay out as a tidy horizontal chain (connected nodes), consistent spacing.
+  // Cascade each new block to the right and slightly down from the previous one
+  // (a readable left→right diagonal, not stacked directly below or across).
   const position = prev
-    ? { x: prev.position.x + 240, y: prev.position.y }
-    : { x: 60 + placed * 240, y: 140 };
+    ? { x: prev.position.x + 240, y: prev.position.y + 120 }
+    : { x: 80 + placed * 240, y: 80 + placed * 120 };
 
   addNodes([{ id, type: 'block', position, data: { kind, config: defaultConfig(manifest) } }]);
   placed++;

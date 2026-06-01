@@ -102,8 +102,9 @@ async function remove() {
 
 <template>
   <div
-    class="rounded-xl border border-neutral-200 bg-white p-4 transition hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+    class="cursor-pointer rounded-xl border border-neutral-200 bg-white p-4 transition hover:border-accent-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-700"
     :class="automation.enabled ? '' : 'opacity-60'"
+    @click="edit()"
   >
     <!-- Header -->
     <div class="flex items-start justify-between gap-3">
@@ -115,7 +116,7 @@ async function remove() {
         <p v-if="automation.description" class="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">{{ automation.description }}</p>
       </div>
 
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2" @click.stop>
         <Toggle :model-value="automation.enabled" :label="automation.enabled ? 'Disable' : 'Enable'" @update:model-value="toggle" />
         <div class="relative">
           <button
@@ -133,7 +134,6 @@ async function remove() {
             class="absolute right-0 z-50 mt-1 w-36 overflow-hidden rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
           >
             <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="run">Run now</button>
-            <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="menuOpen = false; edit()">Edit flow</button>
             <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="menuOpen = false; emit('edit-details', props.automation)">Edit details</button>
             <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="duplicate">Duplicate</button>
             <button type="button" class="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40" @click="remove">Delete</button>

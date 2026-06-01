@@ -32,12 +32,12 @@ function hideTip() { hovered.value = null; }
         <div class="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
           {{ g.label }}
         </div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-3 gap-1.5">
           <button
             v-for="b in g.items"
             :key="b.kind"
             type="button"
-            class="group flex aspect-square flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white p-2 text-neutral-600 transition hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-900/30 dark:hover:text-accent-300"
+            class="group flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:border-accent-400 hover:bg-accent-50 hover:text-accent-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:bg-accent-900/30 dark:hover:text-accent-300"
             @click="$emit('add', b.kind)"
             @mouseenter="showTip(b, $event)"
             @mouseleave="hideTip"
@@ -45,7 +45,7 @@ function hideTip() { hovered.value = null; }
             @blur="hideTip"
           >
             <Icon :path="b.icon" class="h-7 w-7" />
-            <span class="text-center text-[11px] font-medium leading-tight">{{ b.label }}</span>
+            <span class="px-1 text-center text-[11px] font-medium leading-tight">{{ b.label }}</span>
           </button>
         </div>
       </section>
