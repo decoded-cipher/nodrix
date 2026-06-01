@@ -16,6 +16,8 @@ const props = defineProps<{
   integration: (id: string) => { name: string; icon: string } | undefined;
 }>();
 
+const emit = defineEmits<{ 'edit-details': [automation: Automation] }>();
+
 const project = useProjectStore();
 const router = useRouter();
 
@@ -131,7 +133,8 @@ async function remove() {
             class="absolute right-0 z-50 mt-1 w-36 overflow-hidden rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
           >
             <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="run">Run now</button>
-            <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="menuOpen = false; edit()">Edit</button>
+            <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="menuOpen = false; edit()">Edit flow</button>
+            <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="menuOpen = false; emit('edit-details', props.automation)">Edit details</button>
             <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800" @click="duplicate">Duplicate</button>
             <button type="button" class="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40" @click="remove">Delete</button>
           </div>

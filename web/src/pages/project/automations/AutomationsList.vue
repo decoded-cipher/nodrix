@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '../../../stores/project';
+import { toast } from '../../../lib/toast';
 import Icon from '../../../components/Icon.vue';
 import AutomationCard from './AutomationCard.vue';
-import { RECIPES } from './automation-recipes';
+import { RECIPES, recipeById } from './automation-recipes';
 import { connSpec } from '@nodrix/integrations-shared';
+import { buildLinearGraph } from '@nodrix/blocks-shared';
+import type { Automation } from '../../../types';
 
 const project = useProjectStore();
 const router = useRouter();
@@ -21,11 +24,64 @@ const integration = (id: string) => {
 
 const hasAny = computed(() => project.automations.length > 0);
 
-function newAutomation() {
-  router.push({ name: 'automation-editor' });
+function openEditor(id: string) {
+  router.push({ name: 'automation-editor', params: { id } });
 }
-function startRecipe(id: string) {
-  router.push({ name: 'automation-editor', query: { recipe: id } });
+
+// ─── Create / edit-details modal (name + description live here, not the editor) ──
+const mode = ref<'create' | 'edit' | null>(null);
+const editingId = ref<string | null>(null);
+const form = ref({ name: '', description: '' });
+const busy = ref(false);
+
+function openCreate() {
+  mode.value = 'create';
+  editingId.value = null;
+  form.value = { name: '', description: '' };
+}
+function openEditDetails(a: Automation) {
+  mode.value = 'edit';
+  editingId.value = a.id;
+  form.value = { name: a.name, description: a.description ?? '' };
+}
+function closeModal() { mode.value = null; }
+
+async function submitModal() {
+  const name = form.value.name.trim();
+  if (!name) return;
+  busy.value = true;
+  try {
+    if (mode.value === 'create') {
+      const a = await project.createAutomation({ name, description: form.value.description.trim() || null, graph: { nodes: [], edges: [] } });
+      mode.value = null;
+      openEditor(a.id);
+    } else if (editingId.value) {
+      await project.updateAutomation(editingId.value, { name, description: form.value.description.trim() || null });
+      mode.value = null;
+    }
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    busy.value = false;
+  }
+}
+
+// A recipe creates a named automation with a starter graph, then opens the editor.
+async function startRecipe(id: string) {
+  const r = recipeById(id);
+  if (!r) return;
+  busy.value = true;
+  try {
+    const a = await project.createAutomation({
+      name: r.name,
+      graph: buildLinearGraph(r.trigger_type, r.trigger_config ?? {}, r.actions ?? []),
+    });
+    openEditor(a.id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
@@ -38,7 +94,7 @@ function startRecipe(id: string) {
       <button
         type="button"
         class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700"
-        @click="newAutomation"
+        @click="openCreate"
       >New automation</button>
     </div>
 
@@ -50,6 +106,7 @@ function startRecipe(id: string) {
         :automation="a"
         :variable-label="variableLabel"
         :integration="integration"
+        @edit-details="openEditDetails"
       />
     </div>
 
@@ -63,7 +120,7 @@ function startRecipe(id: string) {
         <button
           type="button"
           class="mt-4 rounded-md bg-accent-600 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-700"
-          @click="newAutomation"
+          @click="openCreate"
         >New automation</button>
       </div>
 
@@ -86,6 +143,51 @@ function startRecipe(id: string) {
             </div>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Create / edit-details modal -->
+    <div
+      v-if="mode"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 px-4 dark:bg-black/70"
+      @click.self="closeModal"
+    >
+      <div class="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-neutral-900 dark:ring-1 dark:ring-neutral-800">
+        <header class="border-b border-neutral-100 px-5 py-3 text-sm font-semibold dark:border-neutral-800">
+          {{ mode === 'create' ? 'New automation' : 'Edit automation' }}
+        </header>
+        <form class="space-y-3 px-5 py-4" @submit.prevent="submitModal">
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Name</span>
+            <input
+              v-model="form.name"
+              type="text"
+              required
+              placeholder="e.g. Fan on when hot"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Description (optional)</span>
+            <textarea
+              v-model="form.description"
+              rows="2"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            />
+          </label>
+          <div class="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              @click="closeModal"
+            >Cancel</button>
+            <button
+              type="submit"
+              :disabled="busy || !form.name.trim()"
+              class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+            >{{ busy ? 'Saving…' : mode === 'create' ? 'Create & edit flow' : 'Save changes' }}</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

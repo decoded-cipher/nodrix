@@ -87,11 +87,10 @@ export function serializeTriggerKinds(graph: AutomationGraph): string {
 }
 
 // Validates a graph for saving. Returns an error message, or null if valid.
-// Enforces: ≥1 trigger, known node kinds, edges reference real nodes, and DAG
-// (no cycles) — the executor relies on acyclicity for its bounded traversal.
+// Enforces known node kinds, edges referencing real nodes, and DAG (no cycles) —
+// the executor relies on acyclicity for its bounded traversal. An empty/triggerless
+// graph is allowed (a draft that simply never fires).
 export function graphError(graph: AutomationGraph): string | null {
-  if (triggerNodes(graph).length === 0) return 'Add at least one trigger.';
-
   const ids = new Set(graph.nodes.map((n) => n.id));
   for (const n of graph.nodes) {
     if (!VALID_TRIGGER_KINDS.has(n.kind) && !VALID_ACTION_KINDS.has(n.kind)) {
