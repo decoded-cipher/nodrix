@@ -4,6 +4,9 @@
 import webhook from './webhook/manifest.json';
 import httpService from './http_service/manifest.json';
 import email from './email/manifest.json';
+import telegram from './telegram/manifest.json';
+import slack from './slack/manifest.json';
+import discord from './discord/manifest.json';
 
 // ─── Catalog types ────────────────────────────────────────────────────────────
 
@@ -83,7 +86,7 @@ export type IntegrationContext = {
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
-const RAW = [webhook, httpService, email] as const;
+const RAW = [webhook, httpService, email, telegram, slack, discord] as const;
 
 export type IntegrationKind = (typeof RAW)[number]['kind'];
 

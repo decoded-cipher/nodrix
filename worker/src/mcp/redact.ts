@@ -3,7 +3,7 @@
 // human, but we never expose secret values to a model. Applied at the tool layer
 // so the underlying services stay truthful for the HTTP path.
 
-const SECRET_KEY = /secret|token|password|passwd|auth|api[_-]?key|signing|credential|bearer/i;
+const SECRET_KEY = /secret|token|password|passwd|auth|api[_-]?key|signing|credential|bearer|webhook/i;
 
 export function redactConfig(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactConfig);

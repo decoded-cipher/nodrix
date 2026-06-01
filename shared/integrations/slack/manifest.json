@@ -1,0 +1,26 @@
+{
+  "kind": "slack",
+  "label": "Slack",
+  "description": "Post a message to a Slack channel via an incoming webhook.",
+  "icon": "M5.25 14.25a2.25 2.25 0 1 1-2.25-2.25h2.25v2.25Zm1.5 0a2.25 2.25 0 0 1 4.5 0v5.25a2.25 2.25 0 0 1-4.5 0v-5.25Zm2.25-9a2.25 2.25 0 1 1 2.25-2.25v2.25H9Zm0 1.5a2.25 2.25 0 0 1 0 4.5H3.75a2.25 2.25 0 0 1 0-4.5H9Zm9.75 2.25a2.25 2.25 0 1 1 2.25 2.25h-2.25V9Zm-1.5 0a2.25 2.25 0 0 1-4.5 0V3.75a2.25 2.25 0 0 1 4.5 0V9Zm-2.25 9a2.25 2.25 0 1 1-2.25 2.25v-2.25H15Zm0-1.5a2.25 2.25 0 0 1 0-4.5h5.25a2.25 2.25 0 0 1 0 4.5H15Z",
+  "executable": true,
+  "fields": [
+    {
+      "key": "webhook_url",
+      "label": "Incoming webhook URL",
+      "type": "url",
+      "required": true,
+      "mono": true,
+      "placeholder": "https://hooks.slack.com/services/…",
+      "hint": "Create one at api.slack.com/messaging/webhooks. Treated as a secret."
+    },
+    {
+      "key": "message",
+      "label": "Message",
+      "type": "textarea",
+      "placeholder": "{{variable}} = {{value}}",
+      "hint": "Supports {{variable}}, {{value}}, {{event}}, {{source}}."
+    }
+  ],
+  "summary": { "value": "Slack channel", "requires": "webhook_url", "fallback": "No webhook set" }
+}

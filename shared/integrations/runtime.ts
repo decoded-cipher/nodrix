@@ -7,6 +7,9 @@ import type { IntegrationContext, IntegrationResult, IntegrationRow } from './in
 import { runWebhook } from './webhook/run';
 import { runHttpService } from './http_service/run';
 import { runEmail } from './email/run';
+import { runTelegram } from './telegram/run';
+import { runSlack } from './slack/run';
+import { runDiscord } from './discord/run';
 
 export type { IntegrationResult } from './index';
 
@@ -30,6 +33,9 @@ export async function executeIntegration(
     case 'webhook': return runWebhook(config, body);
     case 'http_service': return runHttpService(config, body);
     case 'email': return runEmail(config, body);
+    case 'telegram': return runTelegram(config, body);
+    case 'slack': return runSlack(config, body);
+    case 'discord': return runDiscord(config, body);
     default: return { status: 'skipped', detail: `kind '${integration.kind}' not executable yet` };
   }
 }
