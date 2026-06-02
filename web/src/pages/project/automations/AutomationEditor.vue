@@ -5,6 +5,7 @@ import { VueFlow, useVueFlow, type Connection, type Edge } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css';
 import { graphError } from '@nodrix/blocks-shared';
 import { useProjectStore } from '../../../stores/project';
+import { useUiStore } from '../../../stores/ui';
 import { toast } from '../../../lib/toast';
 import Spinner from '../../../components/Spinner.vue';
 import BlockNode from './BlockNode.vue';
@@ -17,6 +18,7 @@ import {
 } from './graph-edit';
 
 const project = useProjectStore();
+const ui = useUiStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -34,7 +36,10 @@ let framed = false;
 onNodesInitialized(() => {
   if (framed) return;
   framed = true;
-  fitView({ padding: 0.25, maxZoom: 1 });
+  // On mobile keep nodes legible: clamp the fit zoom up so the graph stays
+  // readable and the user pans to see the rest, rather than zooming far out.
+  if (ui.isMobile) fitView({ padding: 0.15, minZoom: 0.75, maxZoom: 1 });
+  else fitView({ padding: 0.25, maxZoom: 1 });
 });
 
 const loading = ref(true);
@@ -215,11 +220,10 @@ async function save() {
         </VueFlow>
       </div>
 
-      <!-- Settings panel is desktop-only; on mobile you build structure and
-           configure on desktop (same as the dashboard editor). -->
+      <!-- Block settings: a bottom sheet on mobile, a floating right panel on lg+. -->
       <aside
         v-if="selectedNode && !loading"
-        class="absolute right-4 top-4 bottom-4 z-30 hidden w-[calc(100%-2rem)] max-w-[20rem] flex-col rounded-lg border border-neutral-200 bg-white shadow-xl lg:flex dark:border-neutral-800 dark:bg-neutral-900"
+        class="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col rounded-t-2xl border-t border-neutral-200 bg-white shadow-xl lg:absolute lg:inset-x-auto lg:right-4 lg:top-4 lg:bottom-4 lg:z-30 lg:max-h-none lg:w-[20rem] lg:rounded-lg lg:border dark:border-neutral-800 dark:bg-neutral-900"
       >
         <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
           <span class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Block settings</span>
@@ -244,7 +248,7 @@ async function save() {
       <!-- Opens the blocks drawer (below lg). Pinned bottom-right, always on top
            so it stays reachable while panning the canvas. -->
       <button
-        v-if="!loading && !notFound"
+        v-if="!loading && !notFound && !selectedNode"
         type="button"
         class="absolute bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-accent-700 lg:hidden"
         @click="paletteOpen = true"
