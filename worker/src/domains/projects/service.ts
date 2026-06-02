@@ -2,7 +2,24 @@ import type { Env } from '../../env';
 import { type Actor, isInstanceAdmin, ServiceError } from '../../platform/lib/service';
 import { newId } from '../../platform/lib/ids';
 import { recordAudit } from '../../platform/lib/audit';
-import { buildUpdate } from '../../platform/lib/sql';
+import { buildUpdate, chunk, inClause, MAX_BOUND_PARAMS } from '../../platform/lib/sql';
+
+// Keep only the ids that name a real project, preserving caller order. Reads just
+// the requested ids (IN-list) instead of loading the whole projects table to
+// filter in JS — used when validating project assignments for users/invites.
+export async function filterExistingProjectIds(env: Env, ids: string[]): Promise<string[]> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return [];
+  const found = new Set<string>();
+  for (const part of chunk(unique, MAX_BOUND_PARAMS)) {
+    const rows = await env.DB
+      .prepare(`SELECT id FROM projects WHERE id IN ${inClause(part.length)}`)
+      .bind(...part)
+      .all<{ id: string }>();
+    for (const r of rows.results) found.add(r.id);
+  }
+  return ids.filter((id) => found.has(id));
+}
 
 export type ProjectSummary = {
   id: string;

@@ -15,6 +15,10 @@ import type {
 import { sunTimes } from './solar';
 import { runAutomation } from './run';
 import { toGraph, triggerNodes, nodesById } from './graph';
+import { chunk, inClause, MAX_BOUND_PARAMS } from '../lib/sql';
+
+// Column projection the engine reads from `automations`.
+const AUTOMATION_COLS = 'id, project_id, name, enabled, trigger_type, graph, last_run_at';
 
 // A due fire is a specific schedule/solar trigger node within an automation.
 export type ScheduleDue = { id: string; nodeId: string };
@@ -25,8 +29,7 @@ export type SchedulePlan = { fireAt: number | null; due: ScheduleDue[] };
 export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
   const rows = await env.DB
     .prepare(
-      `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
-         FROM automations
+      `SELECT ${AUTOMATION_COLS} FROM automations
         WHERE enabled = 1 AND (trigger_kinds LIKE '%,schedule,%' OR trigger_kinds LIKE '%,sunset_sunrise,%')`
     )
     .all<AutomationRow>();
@@ -56,19 +59,19 @@ export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
 }
 
 // Run the planned fires. `fireAtSec` dedups against last_run_at so a duplicate
-// scheduler instance (or replay) can't double-fire the same instant.
+// scheduler instance (or replay) can't double-fire the same instant; firedIds
+// keeps an automation to one fire per instant even with several due trigger nodes.
 export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: number): Promise<number> {
+  if (due.length === 0) return 0;
+  const automations = await loadAutomationsByIds(env, due.map((d) => d.id));
+
   let ran = 0;
+  const firedIds = new Set<string>();
   for (const { id, nodeId } of due) {
-    const a = await env.DB
-      .prepare(
-        `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
-           FROM automations WHERE id = ? AND enabled = 1`
-      )
-      .bind(id)
-      .first<AutomationRow>();
-    if (!a) continue;
-    if (a.last_run_at != null && a.last_run_at >= fireAtSec) continue; // already fired this instant
+    const a = automations.get(id);
+    if (!a) continue;                                            // deleted or disabled
+    if (firedIds.has(id)) continue;                              // already fired this instant
+    if (a.last_run_at != null && a.last_run_at >= fireAtSec) continue;
 
     const node = nodesById(toGraph(a)).get(nodeId);
     const ctx: AutomationContext = {
@@ -80,12 +83,27 @@ export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: n
     };
     try {
       await runAutomation(env, a, ctx);
+      firedIds.add(id);
       ran++;
     } catch (e) {
       console.error('[scheduler] run failed', id, e);
     }
   }
   return ran;
+}
+
+// One indexed read for a batch of automation ids (PK IN-list), chunked under the
+// SQLite bound-param cap. Disabled/deleted rows are simply absent from the map.
+async function loadAutomationsByIds(env: Env, ids: string[]): Promise<Map<string, AutomationRow>> {
+  const map = new Map<string, AutomationRow>();
+  for (const part of chunk([...new Set(ids)], MAX_BOUND_PARAMS)) {
+    const rows = await env.DB
+      .prepare(`SELECT ${AUTOMATION_COLS} FROM automations WHERE enabled = 1 AND id IN ${inClause(part.length)}`)
+      .bind(...part)
+      .all<AutomationRow>();
+    for (const a of rows.results) map.set(a.id, a);
+  }
+  return map;
 }
 
 // ── delay continuations ──────────────────────────────────────────────────────
@@ -109,17 +127,15 @@ export async function runDueDelays(env: Env, nowMs: number): Promise<number> {
     .bind(nowMs)
     .all<{ id: string; automation_id: string; resume_node_id: string; ctx: string }>();
 
+  if (rows.results.length === 0) return 0;
+  // One batched read for all referenced automations instead of one per delay row.
+  const automations = await loadAutomationsByIds(env, rows.results.map((r) => r.automation_id));
+
   let ran = 0;
   for (const row of rows.results) {
     await env.DB.prepare(`DELETE FROM automation_delays WHERE id = ?`).bind(row.id).run();
 
-    const a = await env.DB
-      .prepare(
-        `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
-           FROM automations WHERE id = ? AND enabled = 1`
-      )
-      .bind(row.automation_id)
-      .first<AutomationRow>();
+    const a = automations.get(row.automation_id);
     if (!a) continue; // automation deleted or disabled
 
     let ctx: AutomationContext;

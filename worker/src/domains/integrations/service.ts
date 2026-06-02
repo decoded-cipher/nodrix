@@ -5,6 +5,7 @@ import { executeIntegration, recordIntegrationRun } from '../../platform/engine/
 import type { AutomationContext, IntegrationRow as EngineIntegrationRow } from '../../platform/engine/types';
 import { VALID_KINDS } from '@nodrix/integrations-shared';
 import { safeParse, buildUpdate } from '../../platform/lib/sql';
+import { sealIntegrationConfig, openIntegrationConfig } from '../../platform/lib/integration-secrets';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
 
@@ -18,18 +19,30 @@ type IntegrationRow = EngineIntegrationRow & {
   last_error: string | null;
 };
 
-// Raw shape (config parsed, NOT redacted). The HTTP admin API shows secrets to
-// the logged-in human; MCP redaction is applied at the tool layer (see
-// mcp/redact.ts) so it never leaks the real config to a model.
-export type IntegrationShape = ReturnType<typeof shape>;
+// Raw shape (config decrypted + parsed, NOT redacted). The HTTP admin API shows
+// secrets to the logged-in human; MCP redaction is applied at the tool layer
+// (see mcp/redact.ts) so it never leaks the real config to a model.
+export type IntegrationShape = {
+  id: string;
+  project_id: string;
+  name: string;
+  kind: string;
+  config: unknown;
+  enabled: boolean;
+  created_at: number;
+  updated_at: number;
+  last_run_at: number | null;
+  last_run_status: 'ok' | 'error' | 'skipped' | null;
+  last_error: string | null;
+};
 
-function shape(r: IntegrationRow) {
+async function shape(env: Env, r: IntegrationRow): Promise<IntegrationShape> {
   return {
     id: r.id,
     project_id: r.project_id,
     name: r.name,
     kind: r.kind,
-    config: safeParse(r.config),
+    config: safeParse(await openIntegrationConfig(env, r.config)),
     enabled: r.enabled === 1,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -51,7 +64,7 @@ export async function listIntegrations(env: Env, projectId: string): Promise<Int
     )
     .bind(projectId)
     .all<IntegrationRow>();
-  return rows.results.map(shape);
+  return Promise.all(rows.results.map((r) => shape(env, r)));
 }
 
 export async function createIntegration(
@@ -69,13 +82,14 @@ export async function createIntegration(
 
   const id = newId('integration');
   const now = Math.floor(Date.now() / 1000);
+  const enabled = input.enabled === false ? 0 : 1;
   await env.DB
     .prepare(
       `INSERT INTO integrations
          (id, project_id, name, kind, config, enabled, created_by, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, projectId, name, input.kind, JSON.stringify(input.config ?? {}), input.enabled === false ? 0 : 1, actor.userId, now, now)
+    .bind(id, projectId, name, input.kind, await sealIntegrationConfig(env, input.config), enabled, actor.userId, now, now)
     .run();
 
   await recordAudit(env, {
@@ -86,8 +100,14 @@ export async function createIntegration(
     targetId: id,
     metadata: { name, kind: input.kind, source: actor.source },
   });
-  const row = await env.DB.prepare(`SELECT * FROM integrations WHERE id = ?`).bind(id).first<IntegrationRow>();
-  return shape(row!);
+  // Build the response from known values — no re-read of the row we just wrote.
+  return {
+    id, project_id: projectId, name, kind: input.kind,
+    config: input.config ?? {},
+    enabled: enabled === 1,
+    created_at: now, updated_at: now,
+    last_run_at: null, last_run_status: null, last_error: null,
+  };
 }
 
 export async function updateIntegration(
@@ -98,17 +118,23 @@ export async function updateIntegration(
   input: { name?: string; config?: unknown; enabled?: boolean }
 ): Promise<IntegrationShape> {
   await assertProjectAccess(env, actor, projectId);
+  // Load the full row up front so we can return the post-update shape without a
+  // second read of the (now ciphertext) config blob.
   const existing = await env.DB
-    .prepare(`SELECT id FROM integrations WHERE id = ? AND project_id = ?`)
+    .prepare(
+      `SELECT id, project_id, name, kind, config, enabled,
+              created_at, updated_at, archived_at,
+              last_run_at, last_run_status, last_error
+         FROM integrations WHERE id = ? AND project_id = ?`
+    )
     .bind(id, projectId)
-    .first<{ id: string }>();
+    .first<IntegrationRow>();
   if (!existing) throw new ServiceError('not_found', 'integration not found');
 
-  const u = buildUpdate({
-    name: typeof input.name === 'string' && input.name.trim() ? input.name.trim() : undefined,
-    config: 'config' in input ? JSON.stringify(input.config ?? {}) : undefined,
-    enabled: typeof input.enabled === 'boolean' ? (input.enabled ? 1 : 0) : undefined,
-  });
+  const name = typeof input.name === 'string' && input.name.trim() ? input.name.trim() : undefined;
+  const config = 'config' in input ? await sealIntegrationConfig(env, input.config) : undefined;
+  const enabled = typeof input.enabled === 'boolean' ? (input.enabled ? 1 : 0) : undefined;
+  const u = buildUpdate({ name, config, enabled });
   if (!u) throw new ServiceError('bad_request', 'no fields to update', 'no_fields');
 
   const now = Math.floor(Date.now() / 1000);
@@ -128,8 +154,13 @@ export async function updateIntegration(
     targetId: id,
     metadata: { source: actor.source },
   });
-  const row = await env.DB.prepare(`SELECT * FROM integrations WHERE id = ?`).bind(id).first<IntegrationRow>();
-  return shape(row!);
+  return shape(env, {
+    ...existing,
+    name: name ?? existing.name,
+    config: config ?? existing.config,
+    enabled: enabled ?? existing.enabled,
+    updated_at: now,
+  });
 }
 
 // Fire the connection once with a synthetic context. Records the outcome.
@@ -162,7 +193,8 @@ export async function testIntegration(
   // live on the automation node, so a bare test exercises the default operation
   // with empty params — body-posting connectors deliver; operation connectors
   // surface a clean "missing <param>" until invoked from an automation.
-  const result = await executeIntegration({ ...row, enabled: 1 }, ctx, {});
+  const config = await openIntegrationConfig(env, row.config);
+  const result = await executeIntegration({ ...row, config, enabled: 1 }, ctx, {});
   await recordIntegrationRun(env, id, result).catch(() => {});
 
   await recordAudit(env, {

@@ -1,15 +1,31 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../../env';
+import { INTEGRATION_KINDS } from '@nodrix/integrations-shared';
 import { requireSession } from '../../platform/middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../../platform/middleware/resolve-project';
 import { recordAudit } from '../../platform/lib/audit';
 import { listIntegrations, createIntegration, updateIntegration, testIntegration } from './service';
 import { actorFromSession, serviceErrorResponse } from '../../platform/lib/service';
+import { parseBody } from '../../platform/lib/validate';
 
 const integrations = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
 integrations.use('*', requireSession);
 integrations.use('*', resolveProject);
+
+const configSchema = z.record(z.string(), z.unknown());
+const createSchema = z.object({
+  name: z.string().min(1).max(200),
+  kind: z.enum(INTEGRATION_KINDS),
+  config: configSchema.optional(),
+  enabled: z.boolean().optional(),
+});
+const updateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  config: configSchema.optional(),
+  enabled: z.boolean().optional(),
+});
 
 // GET /v1/admin/projects/:proj/integrations
 integrations.get('/', async (c) => {
@@ -20,14 +36,9 @@ integrations.get('/', async (c) => {
 // POST /v1/admin/projects/:proj/integrations
 integrations.post('/', async (c) => {
   const project = c.get('project');
-  const body = await c.req.json<{ name?: string; kind?: string; config?: unknown; enabled?: boolean }>();
   try {
-    const i = await createIntegration(c.env, actorFromSession(c.get('user')), project.id, {
-      name: body.name ?? '',
-      kind: body.kind ?? '',
-      config: body.config,
-      enabled: body.enabled,
-    });
+    const body = await parseBody(c, createSchema);
+    const i = await createIntegration(c.env, actorFromSession(c.get('user')), project.id, body);
     return c.json(i, 201);
   } catch (e) {
     return serviceErrorResponse(c, e);
@@ -51,8 +62,8 @@ integrations.post('/:id/test', async (c) => {
 integrations.patch('/:id', async (c) => {
   const project = c.get('project');
   const id = c.req.param('id');
-  const body = await c.req.json<{ name?: string; config?: unknown; enabled?: boolean }>();
   try {
+    const body = await parseBody(c, updateSchema);
     const i = await updateIntegration(c.env, actorFromSession(c.get('user')), project.id, id, {
       name: body.name,
       ...('config' in body ? { config: body.config } : {}),

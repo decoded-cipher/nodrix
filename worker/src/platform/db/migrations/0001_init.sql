@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS project_members (
   added_by   TEXT REFERENCES users(id),
   PRIMARY KEY (user_id, project_id)
 );
+-- project_id-leading index for the project-delete FK cascade + project→members
+-- lookups (the PK is (user_id, project_id), so it can't serve project_id alone).
+CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);
 
 -- Variables: project-scoped data points. `key` is the telemetry JSON field name,
 -- auto-created on first telemetry write. Minimal by design — no type/permission/
@@ -210,7 +213,7 @@ CREATE TABLE IF NOT EXISTS integrations (
   project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   kind        TEXT NOT NULL,
-  config      TEXT NOT NULL,                                   -- JSON, kind-specific
+  config      TEXT NOT NULL,                                   -- AES-GCM sealed JSON (v1:iv:ct), kind-specific; see lib/integration-secrets.ts
   enabled     INTEGER NOT NULL DEFAULT 1,
   created_by  TEXT REFERENCES users(id),
   created_at  INTEGER NOT NULL,

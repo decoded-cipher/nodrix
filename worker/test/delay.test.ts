@@ -27,8 +27,7 @@ function fakeEnv(pendingCount = 0): any {
 function row(graph: AutomationGraph): AutomationRow {
   return {
     id: 'auto1', project_id: 'p1', name: 't', enabled: 1,
-    trigger_type: 'variable', trigger_config: '{}', actions: '[]',
-    graph: JSON.stringify(graph), last_run_at: null,
+    trigger_type: 'variable', graph: JSON.stringify(graph), last_run_at: null,
   };
 }
 

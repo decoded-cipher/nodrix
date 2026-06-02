@@ -4,89 +4,47 @@ import { requireProjectToken, type ProjectTokenContextVars } from '../../platfor
 import { newId } from '../../platform/lib/ids';
 import { chunk, MAX_BOUND_PARAMS } from '../../platform/lib/sql';
 import { projectStub } from '../../platform/durable-objects/stubs';
-import type { IngestPoint } from '../../platform/durable-objects/project-do';
+import { parseTelemetryBody, MAX_POINTS, MAX_KEY_LEN, MAX_STRING_VALUE } from './validate';
 
 const telemetry = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
 telemetry.use('*', requireProjectToken);
 
-// A valid project token authorizes a device, but the payload is still untrusted.
-// These per-request caps stop a buggy/compromised device exploding the time
-// series, storing oversized values, or flooding keys in a single POST.
 const MAX_BODY_BYTES = 256 * 1024;
-const MAX_POINTS = 200;
-const MAX_KEY_LEN = 64;
-const MAX_STRING_VALUE = 512;
 
 // Per-request caps only bound a single POST; a device sending fresh keys across
 // many requests could still grow project_variables without bound. Cap the total
 // distinct auto-created variables per project (enforced in upsertVariables).
 const MAX_VARIABLES_PER_PROJECT = 250;
 
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
-
-function validKey(k: string): boolean {
-  return k.length >= 1 && k.length <= MAX_KEY_LEN && !CONTROL_CHARS.test(k);
-}
-
-function validValue(v: unknown): v is number | string | boolean | null {
-  if (v === null) return true;
-  switch (typeof v) {
-    case 'number': return Number.isFinite(v);
-    case 'boolean': return true;
-    case 'string': return v.length <= MAX_STRING_VALUE;
-    default: return false;
-  }
-}
-
 // Body: { metrics: { [key]: number|string|boolean } } or { metric, value }.
 // Readings are stamped server-side at receive time, so clockless devices
-// (ESP/Arduino) don't send a timestamp.
-// Response: 204 No Content.
+// (ESP/Arduino) don't send a timestamp. Response: 204 No Content.
 telemetry.post('/', async (c) => {
   const len = Number(c.req.header('content-length') ?? '0');
   if (Number.isFinite(len) && len > MAX_BODY_BYTES) {
     return c.json({ error: 'payload_too_large', max_bytes: MAX_BODY_BYTES }, 413);
   }
 
-  let body: {
-    metrics?: Record<string, unknown>;
-    metric?: unknown;
-    value?: unknown;
-  };
+  let body: unknown;
   try {
     body = await c.req.json();
   } catch {
     return c.json({ error: 'invalid_json' }, 400);
   }
-  if (!body || typeof body !== 'object') {
-    return c.json({ error: 'invalid_body' }, 400);
-  }
 
-  // Collect raw (key, value) pairs from either accepted shape.
-  const raw: Array<[string, unknown]> = [];
-  if (body.metrics && typeof body.metrics === 'object' && !Array.isArray(body.metrics)) {
-    for (const [k, v] of Object.entries(body.metrics)) raw.push([k, v]);
-  } else if (typeof body.metric === 'string') {
-    raw.push([body.metric, body.value ?? null]);
-  }
-
-  if (raw.length === 0) return c.json({ error: 'no_metrics' }, 400);
-  if (raw.length > MAX_POINTS) {
-    return c.json({ error: 'too_many_metrics', max: MAX_POINTS }, 413);
-  }
-
-  // Reject the whole batch on any bad key/value rather than silently dropping.
-  const points: IngestPoint[] = [];
-  for (const [variable, value] of raw) {
-    if (!validKey(variable)) {
-      return c.json({ error: 'invalid_key', reason: `keys must be 1-${MAX_KEY_LEN} chars with no control characters` }, 400);
+  const parsed = parseTelemetryBody(body);
+  if (!parsed.ok) {
+    switch (parsed.error.code) {
+      case 'too_many_metrics': return c.json({ error: 'too_many_metrics', max: MAX_POINTS }, 413);
+      case 'invalid_key':
+        return c.json({ error: 'invalid_key', reason: `keys must be 1-${MAX_KEY_LEN} chars with no control characters` }, 400);
+      case 'invalid_value':
+        return c.json({ error: 'invalid_value', key: parsed.error.key, reason: `values must be number | string(<=${MAX_STRING_VALUE}) | boolean | null` }, 400);
+      default: return c.json({ error: parsed.error.code }, 400); // invalid_body | no_metrics
     }
-    if (!validValue(value)) {
-      return c.json({ error: 'invalid_value', key: variable, reason: `values must be number | string(<=${MAX_STRING_VALUE}) | boolean | null` }, 400);
-    }
-    points.push({ variable, value });
   }
+  const points = parsed.points;
 
   const { project_id } = c.get('projectToken');
   const stub = projectStub(c.env, project_id);

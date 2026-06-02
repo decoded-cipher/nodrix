@@ -3,6 +3,7 @@
 
 import type { Env } from '../../env';
 import { executeIntegration, recordIntegrationRun } from './integrations';
+import { openIntegrationConfig } from '../lib/integration-secrets';
 import type { AutomationContext, AutomationRow, IntegrationRow } from './types';
 
 export const MAX_DEPTH = 5;
@@ -58,7 +59,7 @@ export async function runActionNode(kind: string, args: HandlerArgs): Promise<vo
 }
 
 async function loadIntegration(env: Env, projectId: string, id: string): Promise<IntegrationRow | null> {
-  return env.DB
+  const row = await env.DB
     .prepare(
       `SELECT id, project_id, name, kind, config, enabled
          FROM integrations
@@ -66,4 +67,9 @@ async function loadIntegration(env: Env, projectId: string, id: string): Promise
     )
     .bind(id, projectId)
     .first<IntegrationRow>();
+  if (!row) return null;
+  // Decrypt config at the engine boundary so the shared runtime keeps seeing
+  // plaintext JSON (it has no access to the signing secret).
+  row.config = await openIntegrationConfig(env, row.config);
+  return row;
 }

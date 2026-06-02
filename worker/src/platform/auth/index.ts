@@ -15,6 +15,7 @@ import { decryptSecret } from '../lib/crypto';
 import { getOrCreateSigningSecret } from '../lib/auth-secret';
 import { findOpenInviteByEmail, consumeInvite } from '../lib/invites';
 import { hashPassword as pbkdf2Hash, verifyPassword as pbkdf2Verify } from '../lib/password';
+import { authRateLimit } from '../middleware/rate-limit';
 
 // Shared with admin/auth-providers.ts — encryption info string for OAuth
 // client secrets at rest in D1. Changing this invalidates existing rows.
@@ -156,7 +157,9 @@ export async function buildAuth(env: Env, request?: Request) {
         role: {
           type: 'string',
           required: true,
-          defaultValue: 'viewer',
+          // Never actually used — the create before-hook always sets role
+          // explicitly — but keep it a valid enum value (owner/admin/member).
+          defaultValue: 'member',
           input: false,
         },
       },
@@ -316,6 +319,9 @@ export type Auth = Awaited<ReturnType<typeof buildAuth>>;
 // sub-app so multi-segment callback paths route reliably. Wraps buildAuth() with
 // the user.logout audit entry + optional debug logging.
 export const authApp = new Hono<{ Bindings: Env }>();
+
+// Throttle credential POSTs (sign-in/sign-up/password) before they hit Better Auth.
+authApp.use('*', authRateLimit);
 
 authApp.all('*', async (c) => {
   const auth = await buildAuth(c.env, c.req.raw);

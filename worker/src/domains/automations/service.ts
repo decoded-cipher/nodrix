@@ -108,6 +108,7 @@ export async function createAutomation(
 
   const id = newId('automation');
   const now = Math.floor(Date.now() / 1000);
+  const enabled = input.enabled === false ? 0 : 1;
   await env.DB
     .prepare(
       `INSERT INTO automations
@@ -117,8 +118,7 @@ export async function createAutomation(
     )
     .bind(
       id, projectId, name, input.description ?? null,
-      input.enabled === false ? 0 : 1, cols.trigger_type,
-      cols.trigger_kinds, cols.graph,
+      enabled, cols.trigger_type, cols.trigger_kinds, cols.graph,
       actor.userId, now, now
     )
     .run();
@@ -134,8 +134,13 @@ export async function createAutomation(
   await invalidateProjectDO(env, projectId);
   if (hasScheduledTrigger(graph)) await safeReschedule(env);
 
-  const row = await env.DB.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
-  return shape(row!);
+  // Shape from known values — no re-read of the row we just wrote.
+  return shape({
+    id, project_id: projectId, name, description: input.description ?? null,
+    enabled, trigger_type: cols.trigger_type, graph: cols.graph,
+    created_at: now, updated_at: now,
+    last_run_at: null, last_run_status: null, last_error: null,
+  });
 }
 
 // Canonical graph from create/update input: an explicit graph wins; otherwise
@@ -170,10 +175,16 @@ export async function updateAutomation(
   }
 ) {
   await assertProjectAccess(env, actor, projectId);
+  // Load the full row up front so we can return the post-update shape in-memory.
   const existing = await env.DB
-    .prepare(`SELECT trigger_type, graph FROM automations WHERE id = ? AND project_id = ?`)
+    .prepare(
+      `SELECT id, project_id, name, description, enabled, trigger_type,
+              graph, created_at, updated_at,
+              last_run_at, last_run_status, last_error
+         FROM automations WHERE id = ? AND project_id = ?`
+    )
     .bind(id, projectId)
-    .first<{ trigger_type: string; graph: string | null }>();
+    .first<AutomationRow>();
   if (!existing) throw new ServiceError('not_found', 'automation not found');
 
   // Any trigger/action/graph field rebuilds the canonical graph + derived columns.
@@ -200,12 +211,10 @@ export async function updateAutomation(
     graphCols = graphColumns(graph);
   }
 
-  const u = buildUpdate({
-    name: typeof input.name === 'string' && input.name.trim() ? input.name.trim() : undefined,
-    description: 'description' in input ? (input.description ?? null) : undefined,
-    enabled: typeof input.enabled === 'boolean' ? (input.enabled ? 1 : 0) : undefined,
-    ...(graphCols ? graphCols : {}),
-  });
+  const name = typeof input.name === 'string' && input.name.trim() ? input.name.trim() : undefined;
+  const description = 'description' in input ? (input.description ?? null) : undefined;
+  const enabled = typeof input.enabled === 'boolean' ? (input.enabled ? 1 : 0) : undefined;
+  const u = buildUpdate({ name, description, enabled, ...(graphCols ? graphCols : {}) });
   if (!u) throw new ServiceError('bad_request', 'no fields to update', 'no_fields');
 
   const now = Math.floor(Date.now() / 1000);
@@ -228,8 +237,16 @@ export async function updateAutomation(
   // Re-arm if the automation had or now has a scheduled trigger.
   if (isScheduled(existing.trigger_type) || (graph && hasScheduledTrigger(graph))) await safeReschedule(env);
 
-  const row = await env.DB.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
-  return shape(row!);
+  // Shape from the loaded row + the applied patch — no re-read.
+  return shape({
+    ...existing,
+    name: name ?? existing.name,
+    description: description !== undefined ? description : existing.description,
+    enabled: enabled ?? existing.enabled,
+    trigger_type: graphCols ? graphCols.trigger_type : existing.trigger_type,
+    graph: graphCols ? graphCols.graph : existing.graph,
+    updated_at: now,
+  });
 }
 
 // Manual run — drives manual-trigger automations and doubles as a test for any

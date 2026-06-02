@@ -12,6 +12,12 @@ export function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+// Placeholder list `(?, ?, …)` for an `IN` clause. Keep `count` within
+// MAX_BOUND_PARAMS (chunk() the inputs if larger).
+export function inClause(count: number): string {
+  return `(${Array(count).fill('?').join(', ')})`;
+}
+
 // Parse JSON from a text column we wrote ourselves, tolerating corruption by
 // returning null rather than throwing.
 export function safeParse(s: string): unknown {

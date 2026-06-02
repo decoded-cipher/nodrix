@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../../env';
 import { requireSession, type UserContextVars } from '../../platform/middleware/require-session';
 import { recordAudit } from '../../platform/lib/audit';
+import { filterExistingProjectIds } from '../projects/service';
 
 // Instance user management — owner/admin only. This is the single place access is
 // managed: instance role (owner-only) AND project assignments for members.
@@ -108,13 +109,9 @@ users.put('/:id/projects', async (c) => {
 
   const body = await c.req.json<{ project_ids?: unknown }>();
   const requested = Array.isArray(body.project_ids)
-    ? [...new Set(body.project_ids.filter((p): p is string => typeof p === 'string' && p.length > 0))]
+    ? body.project_ids.filter((p): p is string => typeof p === 'string' && p.length > 0)
     : [];
-
-  // Keep only ids that actually exist.
-  const existing = await c.env.DB.prepare(`SELECT id FROM projects`).all<{ id: string }>();
-  const valid = new Set(existing.results.map((r) => r.id));
-  const projectIds = requested.filter((p) => valid.has(p));
+  const projectIds = await filterExistingProjectIds(c.env, requested);
 
   const now = Math.floor(Date.now() / 1000);
   const stmts = [c.env.DB.prepare(`DELETE FROM project_members WHERE user_id = ?`).bind(id)];

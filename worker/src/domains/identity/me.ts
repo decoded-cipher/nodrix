@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../../env';
 import { requireSession, type UserContextVars } from '../../platform/middleware/require-session';
 import { recordAudit } from '../../platform/lib/audit';
+import { actorFromSession } from '../../platform/lib/service';
+import { listAccessibleProjects } from '../projects/service';
 
 const me = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -29,28 +31,10 @@ me.get('/', async (c) => {
     }>();
 
   // Instance owner/admin see every project; members see only the projects
-  // they're assigned to. Anyone who sees a project has full control of it.
-  const instanceAdmin = user.role === 'owner' || user.role === 'admin';
-  const projects = instanceAdmin
-    ? await c.env.DB
-        .prepare(
-          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at
-             FROM projects p
-            ORDER BY p.created_at ASC`
-        )
-        .all()
-    : await c.env.DB
-        .prepare(
-          `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.archived_at
-             FROM projects p
-             JOIN project_members pm ON pm.project_id = p.id
-            WHERE pm.user_id = ?
-            ORDER BY p.created_at ASC`
-        )
-        .bind(user.id)
-        .all();
+  // they're assigned to (single source: listAccessibleProjects).
+  const projects = await listAccessibleProjects(c.env, actorFromSession(user));
 
-  return c.json({ user: fullUser, projects: projects.results });
+  return c.json({ user: fullUser, projects });
 });
 
 // PATCH /v1/admin/me  body: { first_name?, last_name? }

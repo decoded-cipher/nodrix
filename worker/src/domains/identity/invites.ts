@@ -4,6 +4,7 @@ import { requireSession, type UserContextVars } from '../../platform/middleware/
 import { newId } from '../../platform/lib/ids';
 import { generateToken } from '../../platform/lib/tokens';
 import { recordAudit } from '../../platform/lib/audit';
+import { filterExistingProjectIds } from '../projects/service';
 
 // Invite management — owner/instance-admin only. An invite is a self-serve LINK:
 // the invitee sets their own password at /invite/<token>. It binds an email so
@@ -78,12 +79,8 @@ invites.post('/', async (c) => {
   // Keep only project ids that actually exist (optional).
   let projectIds: string[] = [];
   if (instanceRole === 'member' && Array.isArray(body.project_ids)) {
-    const requested = [...new Set(body.project_ids.filter((p): p is string => typeof p === 'string' && p.length > 0))];
-    if (requested.length) {
-      const projRows = await c.env.DB.prepare(`SELECT id FROM projects`).all<{ id: string }>();
-      const valid = new Set(projRows.results.map((r) => r.id));
-      projectIds = requested.filter((p) => valid.has(p));
-    }
+    const requested = body.project_ids.filter((p): p is string => typeof p === 'string' && p.length > 0);
+    projectIds = await filterExistingProjectIds(c.env, requested);
   }
 
   // Block inviting an email that already has an account — change an existing

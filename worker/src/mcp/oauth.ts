@@ -58,13 +58,21 @@ oauth.get('/', async (c) => {
     return errorResponse(c, 400, 'Invalid authorization request', 'The link is missing or malformed. Try starting the connection again from the MCP client.');
   }
 
+  // Validate the redirect against the client's registered URIs up front. The
+  // approve path is covered by completeAuthorization, but the deny path (below)
+  // redirects to redirectUri directly — without this an attacker-crafted
+  // redirect_uri would be an open redirect on denial.
+  const client = await c.env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
+  if (!clientRedirectAllowed(client, authReq.redirectUri)) {
+    return errorResponse(c, 400, 'Invalid authorization request', "The redirect target isn't registered for this client. Start the connection again from the MCP client.");
+  }
+
   const user = await currentUser(c.env, c.req.raw);
   if (!user) {
     const url = new URL(c.req.url);
     return c.redirect(`/login?redirect=${encodeURIComponent(url.pathname + url.search)}`);
   }
 
-  const client = await c.env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   const clientName = client?.clientName?.trim() || authReq.clientId;
   const redirectHost = safeHost(authReq.redirectUri);
   const wantsManage = (authReq.scope ?? []).includes('mcp:manage');
@@ -95,6 +103,13 @@ oauth.post('/consent', async (c) => {
     authReq = JSON.parse(b64decode(String(form.get('req') ?? ''))) as AuthRequest;
   } catch {
     return errorResponse(c, 400, 'Invalid request', 'The submitted form was malformed. Start over from the MCP client.');
+  }
+
+  // The form (incl. redirectUri) is attacker-controllable, so re-validate the
+  // redirect here too — the deny branch trusts it directly.
+  const client = await c.env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
+  if (!clientRedirectAllowed(client, authReq.redirectUri)) {
+    return errorResponse(c, 400, 'Invalid request', "The redirect target isn't registered for this client. Start over from the MCP client.");
   }
 
   if (decision !== 'approve') {
@@ -132,6 +147,14 @@ oauth.post('/consent', async (c) => {
 
 function safeHost(uri: string): string {
   try { return new URL(uri).host; } catch { return uri; }
+}
+
+// A redirect is allowed only if it exactly matches one the client registered.
+function clientRedirectAllowed(
+  client: { redirectUris?: string[] } | null | undefined,
+  uri: string
+): boolean {
+  return !!client && Array.isArray(client.redirectUris) && client.redirectUris.includes(uri);
 }
 
 function errorResponse(
