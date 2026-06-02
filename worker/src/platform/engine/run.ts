@@ -17,6 +17,9 @@ import { toGraph, entryNode, nodesById, outgoingEdges, countActionNodes, trigger
 import type { AutomationContext, AutomationRow, RunResult, RunStatus } from './types';
 
 const MAX_STEPS = 100;
+const MAX_DELAY_SECONDS = 86_400;              // 24h — longer waits belong on a schedule trigger
+const MAX_PENDING_DELAYS_PER_PROJECT = 100;    // bounds accumulated continuations (cost guard)
+const UNIT_SECONDS: Record<string, number> = { seconds: 1, minutes: 60, hours: 3600 };
 
 export type RunDeps = {
   // Enqueue a control write. Defaults to the PROJECT_DO stub path.
@@ -25,6 +28,13 @@ export type RunDeps = {
   emitEvent?: ActionDeps['emitEvent'];
   // Read a variable's latest value (for condition nodes). Defaults to the DO stub.
   getVariable?: (variable: string) => Promise<unknown>;
+  // Persist a delay continuation + arm the scheduler. Defaults to the D1 path.
+  scheduleDelay?: (
+    automation: AutomationRow,
+    nodeId: string,
+    ctx: AutomationContext,
+    fireAtMs: number
+  ) => Promise<void>;
 };
 
 export async function runAutomation(
@@ -40,9 +50,9 @@ export async function runAutomation(
 
   // Trigger cooldown: suppress re-fires within the window, measured from the last
   // real run. Skipped silently (no last_run_at write) so the window isn't reset,
-  // and never applied to manual runs.
+  // never applied to manual runs, and never to a delay resume (it must complete).
   const cooldown = Number((start?.config as { cooldown_seconds?: unknown })?.cooldown_seconds ?? 0);
-  if (ctx.source !== 'manual' && cooldown > 0 && automation.last_run_at != null
+  if (ctx.source !== 'manual' && ctx.resumeNodeId == null && cooldown > 0 && automation.last_run_at != null
       && ctx.ts - automation.last_run_at < cooldown) {
     return { status: 'skipped', actionsRun: 0 };
   }
@@ -52,6 +62,7 @@ export async function runAutomation(
     emitEvent: deps.emitEvent ?? defaultEmitEvent(env),
   };
   const getVariable = deps.getVariable ?? defaultGetVariable(env, automation.project_id);
+  const scheduleDelay = deps.scheduleDelay ?? defaultScheduleDelay(env);
 
   let actionsRun = 0;
   let status: RunStatus = countActionNodes(graph) === 0 ? 'skipped' : 'ok';
@@ -69,9 +80,16 @@ export async function runAutomation(
     if (!node) return;
 
     // Action nodes execute; condition nodes pick a branch port; trigger nodes are
-    // pass-through entrypoints.
+    // pass-through entrypoints. `delay` suspends the branch on the first pass and
+    // passes through when re-entered as a resume.
     let branch: string | null = null;
-    if (VALID_ACTION_KINDS.has(node.kind)) {
+    if (node.kind === 'delay') {
+      if (ctx.resumeNodeId !== id) {
+        const secs = delaySeconds(node.config);
+        await scheduleDelay(automation, id, ctx, Date.now() + secs * 1000);
+        return; // suspend until resumed
+      }
+    } else if (VALID_ACTION_KINDS.has(node.kind)) {
       await runActionNode(node.kind, { env, automation, ctx, config: node.config, deps: actionDeps });
       actionsRun++;
     } else if (VALID_CONDITION_KINDS.has(node.kind)) {
@@ -115,7 +133,7 @@ export async function dispatchEvent(
 ): Promise<number> {
   const rows = await env.DB
     .prepare(
-      `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
+      `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
          FROM automations
         WHERE project_id = ? AND enabled = 1 AND trigger_kinds LIKE '%,event,%'`
     )
@@ -141,6 +159,38 @@ export async function dispatchEvent(
     }
   }
   return ran;
+}
+
+// Resolve a delay node's config to whole seconds, clamped to [1, MAX]. Bad or
+// missing config falls back to 30s rather than failing the run.
+function delaySeconds(config: Record<string, unknown>): number {
+  const amount = Number(config.delay_amount);
+  const unit = UNIT_SECONDS[String(config.delay_unit)] ?? 1;
+  const secs = Number.isFinite(amount) && amount > 0 ? amount * unit : 30;
+  return Math.min(Math.max(Math.round(secs), 1), MAX_DELAY_SECONDS);
+}
+
+function defaultScheduleDelay(env: Env): NonNullable<RunDeps['scheduleDelay']> {
+  return async (automation, nodeId, ctx, fireAtMs) => {
+    const pending = await env.DB
+      .prepare(`SELECT COUNT(*) AS n FROM automation_delays WHERE project_id = ?`)
+      .bind(automation.project_id)
+      .first<{ n: number }>();
+    if ((pending?.n ?? 0) >= MAX_PENDING_DELAYS_PER_PROJECT) {
+      throw new Error('pending delay limit reached');
+    }
+    await env.DB
+      .prepare(
+        `INSERT INTO automation_delays (id, automation_id, project_id, resume_node_id, ctx, fire_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(newId('delay'), automation.id, automation.project_id, nodeId, JSON.stringify(ctx), fireAtMs, Math.floor(Date.now() / 1000))
+      .run();
+    // Lazy import: keeps the DO module (and `cloudflare:workers`) out of the
+    // engine's static graph and avoids a scheduler→schedule→run cycle.
+    const { rescheduleScheduler } = await import('../durable-objects/scheduler-do');
+    await rescheduleScheduler(env); // re-arm to this (possibly sooner) fire time
+  };
 }
 
 function defaultSetVariable(env: Env, projectId: string): ActionDeps['setVariable'] {

@@ -190,6 +190,20 @@ CREATE INDEX IF NOT EXISTS idx_automations_enabled ON automations(enabled) WHERE
 CREATE INDEX IF NOT EXISTS idx_automations_project_enabled_type
   ON automations(project_id, enabled, trigger_type);
 
+-- Pending `delay` continuations: one row per in-flight wait. The SchedulerDO
+-- alarm fires at fire_at and resumes the automation at resume_node_id.
+CREATE TABLE IF NOT EXISTS automation_delays (
+  id             TEXT PRIMARY KEY,
+  automation_id  TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+  project_id     TEXT NOT NULL REFERENCES projects(id)    ON DELETE CASCADE,
+  resume_node_id TEXT NOT NULL,
+  ctx            TEXT NOT NULL,                               -- JSON AutomationContext snapshot
+  fire_at        INTEGER NOT NULL,                            -- ms epoch
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_automation_delays_fire    ON automation_delays(fire_at);
+CREATE INDEX IF NOT EXISTS idx_automation_delays_project ON automation_delays(project_id);
+
 -- Integrations: reusable connectors (webhook, HTTP service, email, ...).
 -- `kind` is validated against the shared catalog (VALID_KINDS), not a DB enum,
 -- so adding/removing a connector never needs a schema migration.

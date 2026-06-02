@@ -57,6 +57,7 @@ export function blockLines(kind: string, config: Record<string, unknown>, r: Sum
         if (days.length) out.push(days.slice().sort().map((d) => DAY[d]).join(' '));
       }
       break;
+    case 'delay': out.push(`wait ${s(c['delay_amount']) || '30'} ${s(c['delay_unit']) || 'seconds'}`); break;
     case 'set_variable': out.push(`${vl(s(c['variable'])) || '?'} = ${s(c['value']) || '—'}`); break;
     case 'emit_event': out.push(c['event'] ? `"${s(c['event'])}"` : 'no event'); break;
     case 'call_integration': {

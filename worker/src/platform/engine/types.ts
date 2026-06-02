@@ -53,6 +53,7 @@ export type AutomationContext = {
   payload?: Record<string, unknown>;
   depth: number;                       // emit_event recursion depth
   entryNodeId?: string;                // trigger node that fired; defaults to the graph entry
+  resumeNodeId?: string;               // set when resuming a delay: that node passes through, cooldown is bypassed
 };
 
 export type RunStatus = 'ok' | 'error' | 'skipped';

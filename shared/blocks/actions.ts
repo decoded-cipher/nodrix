@@ -40,4 +40,18 @@ export const ACTION_CATALOG = [
       { key: 'event', label: 'Event name', type: 'text', required: true, mono: true, placeholder: 'event name' },
     ],
   },
+  {
+    kind: 'delay',
+    category: 'action',
+    label: 'Delay',
+    description: 'Pause the flow, then continue. Resumes via the scheduler — no held compute.',
+    icon: 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+    executable: true,
+    ports: { in: ['in'], out: ['out'] },
+    fields: [
+      { key: 'delay_amount', label: 'Wait', type: 'number', default: 30 },
+      { key: 'delay_unit', label: 'Unit', type: 'select', options: ['seconds', 'minutes', 'hours'], default: 'seconds' },
+    ],
+    summary: { template: 'wait {{delay_amount:30}} {{delay_unit:seconds}}' },
+  },
 ] as const satisfies readonly BlockManifest[];

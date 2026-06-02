@@ -25,7 +25,7 @@ export type SchedulePlan = { fireAt: number | null; due: ScheduleDue[] };
 export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
   const rows = await env.DB
     .prepare(
-      `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
+      `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
          FROM automations
         WHERE enabled = 1 AND (trigger_kinds LIKE '%,schedule,%' OR trigger_kinds LIKE '%,sunset_sunrise,%')`
     )
@@ -62,7 +62,7 @@ export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: n
   for (const { id, nodeId } of due) {
     const a = await env.DB
       .prepare(
-        `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, last_run_at
+        `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
            FROM automations WHERE id = ? AND enabled = 1`
       )
       .bind(id)
@@ -83,6 +83,60 @@ export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: n
       ran++;
     } catch (e) {
       console.error('[scheduler] run failed', id, e);
+    }
+  }
+  return ran;
+}
+
+// ── delay continuations ──────────────────────────────────────────────────────
+
+// Soonest pending delay resume (ms epoch), or null when none are queued.
+export async function nextDelayFireAt(env: Env): Promise<number | null> {
+  const row = await env.DB
+    .prepare(`SELECT MIN(fire_at) AS m FROM automation_delays`)
+    .first<{ m: number | null }>();
+  return row?.m ?? null;
+}
+
+// Resume every delay whose fire_at has passed. Each row is deleted before its run
+// so it can't double-fire; re-entry at resume_node_id makes the delay pass through.
+export async function runDueDelays(env: Env, nowMs: number): Promise<number> {
+  const rows = await env.DB
+    .prepare(
+      `SELECT id, automation_id, resume_node_id, ctx
+         FROM automation_delays WHERE fire_at <= ? ORDER BY fire_at`
+    )
+    .bind(nowMs)
+    .all<{ id: string; automation_id: string; resume_node_id: string; ctx: string }>();
+
+  let ran = 0;
+  for (const row of rows.results) {
+    await env.DB.prepare(`DELETE FROM automation_delays WHERE id = ?`).bind(row.id).run();
+
+    const a = await env.DB
+      .prepare(
+        `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
+           FROM automations WHERE id = ? AND enabled = 1`
+      )
+      .bind(row.automation_id)
+      .first<AutomationRow>();
+    if (!a) continue; // automation deleted or disabled
+
+    let ctx: AutomationContext;
+    try {
+      ctx = JSON.parse(row.ctx) as AutomationContext;
+    } catch {
+      continue;
+    }
+    ctx.entryNodeId = row.resume_node_id;
+    ctx.resumeNodeId = row.resume_node_id;
+    ctx.ts = Math.floor(Date.now() / 1000);
+
+    try {
+      await runAutomation(env, a, ctx);
+      ran++;
+    } catch (e) {
+      console.error('[scheduler] delay resume failed', row.id, e);
     }
   }
   return ran;
