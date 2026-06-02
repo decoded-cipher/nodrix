@@ -7,7 +7,7 @@
   "whenToUse": "Set a continuous numeric value — brightness, fan speed, setpoint, volume. Sends the command on release; reflects reported state via the chosen metric.",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12h18\"/><circle cx=\"14\" cy=\"12\" r=\"3.25\" fill=\"currentColor\" stroke=\"none\"/></svg>",
 
-  "defaultSize": { "w": 5, "h": 3 },
+  "defaultSize": { "w": 4, "h": 2 },
   "defaultProps": {
     "title": "",
     "variable": "",

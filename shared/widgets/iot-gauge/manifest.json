@@ -7,7 +7,7 @@
   "whenToUse": "Visualize a single bounded value such as battery percentage, fill level, or signal strength.",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 17a9 9 0 0 1 18 0\"/><path d=\"M12 17l4.5-4.5\"/><circle cx=\"12\" cy=\"17\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/></svg>",
 
-  "defaultSize": { "w": 4, "h": 4 },
+  "defaultSize": { "w": 3, "h": 3 },
   "defaultProps": { "title": "", "variable": "", "min": 0, "max": 100 },
 
   "fields": [
