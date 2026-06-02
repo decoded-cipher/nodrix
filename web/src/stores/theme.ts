@@ -34,9 +34,9 @@ export const useThemeStore = defineStore('theme', () => {
     localStorage.setItem(STORAGE_KEY, next);
   }
 
-  // Cycles light → dark → system → light (used by the topbar quick toggle).
-  function cycle(): void {
-    setMode(mode.value === 'light' ? 'dark' : mode.value === 'dark' ? 'system' : 'light');
+  // Topbar quick toggle: light ↔ dark off the resolved theme (System lives in Settings).
+  function toggle(): void {
+    setMode(resolved.value === 'dark' ? 'light' : 'dark');
   }
 
   function init(): void {
@@ -48,5 +48,5 @@ export const useThemeStore = defineStore('theme', () => {
     watch(resolved, apply);
   }
 
-  return { mode, resolved, systemDark, setMode, cycle, init };
+  return { mode, resolved, systemDark, setMode, toggle, init };
 });

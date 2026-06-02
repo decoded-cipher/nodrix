@@ -10,11 +10,9 @@ const ui = useUiStore();
 const project = useProjectStore();
 const theme = useThemeStore();
 
-const themeTitle = computed(() => {
-  if (theme.mode === 'system') return `Theme: system (${theme.resolved}). Click to switch to light.`;
-  if (theme.mode === 'light') return 'Theme: light. Click to switch to dark.';
-  return 'Theme: dark. Click to switch to system.';
-});
+const themeTitle = computed(() =>
+  theme.resolved === 'dark' ? 'Theme: dark. Click to switch to light.' : 'Theme: light. Click to switch to dark.'
+);
 
 // Pages can teleport context-specific actions into #topbar-actions; when they
 // do, swap out the default theme + GitHub controls rather than stacking both.
@@ -76,7 +74,6 @@ const crumbs = computed<Crumb[]>(() => {
 
 <template>
   <header class="flex h-14 items-center justify-between gap-2 border-b border-neutral-200 bg-white px-3 sm:px-5 dark:border-neutral-800 dark:bg-neutral-900">
-    <!-- Hamburger: opens the sidebar drawer on mobile. -->
     <button
       type="button"
       class="-ml-1 shrink-0 rounded-md p-2 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 lg:hidden dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
@@ -116,11 +113,10 @@ const crumbs = computed<Crumb[]>(() => {
         class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900 active:scale-95 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:border-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
         :title="themeTitle"
         :aria-label="themeTitle"
-        @click="theme.cycle()"
+        @click="theme.toggle()"
       >
-        <!-- Sun (light) -->
         <svg
-          v-if="theme.mode === 'light'"
+          v-if="theme.resolved === 'light'"
           xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
           class="h-4 w-4"
@@ -128,24 +124,13 @@ const crumbs = computed<Crumb[]>(() => {
           <circle cx="12" cy="12" r="4" />
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
         </svg>
-        <!-- Moon (dark) -->
-        <svg
-          v-else-if="theme.mode === 'dark'"
-          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
-          class="h-4 w-4"
-        >
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-        <!-- Monitor (system) -->
         <svg
           v-else
           xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
           class="h-4 w-4"
         >
-          <rect x="3" y="4" width="18" height="12" rx="2" />
-          <path d="M8 20h8M12 16v4" />
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       </button>
       <a
