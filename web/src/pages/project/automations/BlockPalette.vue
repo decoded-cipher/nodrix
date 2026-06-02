@@ -3,7 +3,10 @@ import { ref } from 'vue';
 import { TRIGGER_CATALOG, CONDITION_CATALOG, ACTION_CATALOG, type BlockManifest } from '@nodrix/blocks-shared';
 import Icon from '../../../components/Icon.vue';
 
-defineEmits<{ add: [kind: string] }>();
+// `open` drives the off-canvas drawer below lg; on lg+ the palette is a static
+// column and `open` is ignored.
+defineProps<{ open?: boolean }>();
+defineEmits<{ add: [kind: string]; close: [] }>();
 
 const groups = [
   { label: 'Triggers', items: TRIGGER_CATALOG },
@@ -23,9 +26,22 @@ function hideTip() { hovered.value = null; }
 </script>
 
 <template>
-  <aside class="flex w-60 shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-    <div class="border-b border-neutral-200 px-3 py-2.5 dark:border-neutral-800">
+  <!-- Backdrop behind the drawer (below lg only). -->
+  <div v-if="open" class="fixed inset-0 z-30 bg-black/40 lg:hidden" aria-hidden="true" @click="$emit('close')" />
+  <aside
+    class="fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:shrink-0 lg:translate-x-0 lg:transition-none dark:border-neutral-800 dark:bg-neutral-900"
+    :class="open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+  >
+    <div class="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5 dark:border-neutral-800">
       <span class="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Blocks</span>
+      <button
+        type="button"
+        class="rounded-md p-1 text-neutral-500 hover:bg-neutral-100 lg:hidden dark:text-neutral-400 dark:hover:bg-neutral-800"
+        aria-label="Close blocks"
+        @click="$emit('close')"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
     </div>
 
     <div class="flex-1 space-y-3 overflow-y-auto p-2">

@@ -41,6 +41,7 @@ const loading = ref(true);
 const saving = ref(false);
 const notFound = ref(false);
 const selectedId = ref<string | null>(null);
+const paletteOpen = ref(false); // off-canvas blocks drawer (below lg)
 let placed = 0;
 
 const selectedNode = computed(() => (selectedId.value ? findNode(selectedId.value) : undefined));
@@ -83,6 +84,7 @@ function addBlock(kind: string) {
     }
   }
   selectedId.value = id;
+  paletteOpen.value = false; // close the drawer on mobile so the new node shows (no-op on lg+)
 }
 
 function deleteSelected() {
@@ -190,8 +192,8 @@ async function save() {
       >{{ saving ? 'Saving…' : 'Save' }}</button>
     </Teleport>
 
-    <!-- Palette -->
-    <BlockPalette @add="addBlock" />
+    <!-- Palette (off-canvas drawer below lg) -->
+    <BlockPalette :open="paletteOpen" @add="addBlock" @close="paletteOpen = false" />
 
     <!-- Canvas + floating inspector -->
     <div class="relative flex-1">
@@ -213,9 +215,11 @@ async function save() {
         </VueFlow>
       </div>
 
+      <!-- Settings panel is desktop-only; on mobile you build structure and
+           configure on desktop (same as the dashboard editor). -->
       <aside
         v-if="selectedNode && !loading"
-        class="absolute right-4 top-4 bottom-4 z-30 flex w-[calc(100%-2rem)] max-w-[20rem] flex-col rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+        class="absolute right-4 top-4 bottom-4 z-30 hidden w-[calc(100%-2rem)] max-w-[20rem] flex-col rounded-lg border border-neutral-200 bg-white shadow-xl lg:flex dark:border-neutral-800 dark:bg-neutral-900"
       >
         <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
           <span class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Block settings</span>
@@ -233,9 +237,21 @@ async function save() {
         </div>
       </aside>
 
-      <p v-if="!loading && !notFound" class="pointer-events-none absolute bottom-4 left-4 z-10 max-w-xs text-xs text-neutral-400 dark:text-neutral-500">
+      <p v-if="!loading && !notFound" class="pointer-events-none absolute bottom-4 left-4 z-10 hidden max-w-xs text-xs text-neutral-400 lg:block dark:text-neutral-500">
         Add blocks from the left, drag between handles to connect, and click a block to configure it.
       </p>
+
+      <!-- Opens the blocks drawer (below lg). Pinned bottom-right, always on top
+           so it stays reachable while panning the canvas. -->
+      <button
+        v-if="!loading && !notFound"
+        type="button"
+        class="absolute bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-accent-700 lg:hidden"
+        @click="paletteOpen = true"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
+        Blocks
+      </button>
     </div>
   </main>
 </template>
