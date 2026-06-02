@@ -9,7 +9,7 @@ import { safeParse, buildUpdate } from '../../platform/lib/sql';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
 import {
-  buildLinearGraph, isGraph, graphError, graphColumns, hasScheduledTrigger,
+  buildLinearGraph, isGraph, graphError, graphColumns, legacyView, hasScheduledTrigger,
   type AutomationGraph,
 } from './graph-build';
 
@@ -47,6 +47,10 @@ type AutomationRow = EngineAutomationRow & {
 };
 
 function shape(r: AutomationRow) {
+  const graph = r.graph ? safeParse(r.graph) : null;
+  // Legacy { trigger_config, actions } view derived from the graph for the API
+  // response — those columns are no longer stored.
+  const legacy = isGraph(graph) ? legacyView(graph) : { trigger_config: {}, actions: [] };
   return {
     id: r.id,
     project_id: r.project_id,
@@ -54,9 +58,9 @@ function shape(r: AutomationRow) {
     description: r.description,
     enabled: r.enabled === 1,
     trigger_type: r.trigger_type,
-    trigger_config: safeParse(r.trigger_config),
-    actions: safeParse(r.actions),
-    graph: r.graph ? safeParse(r.graph) : null,
+    trigger_config: legacy.trigger_config,
+    actions: legacy.actions,
+    graph,
     created_at: r.created_at,
     updated_at: r.updated_at,
     last_run_at: r.last_run_at,
@@ -70,7 +74,7 @@ export async function listAutomations(env: Env, projectId: string) {
   const rows = await env.DB
     .prepare(
       `SELECT id, project_id, name, description, enabled, trigger_type,
-              trigger_config, actions, graph, created_at, updated_at,
+              graph, created_at, updated_at,
               last_run_at, last_run_status, last_error
          FROM automations WHERE project_id = ? ORDER BY created_at DESC`
     )
@@ -108,13 +112,13 @@ export async function createAutomation(
     .prepare(
       `INSERT INTO automations
          (id, project_id, name, description, enabled, trigger_type,
-          trigger_config, actions, trigger_kinds, graph, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          trigger_kinds, graph, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id, projectId, name, input.description ?? null,
       input.enabled === false ? 0 : 1, cols.trigger_type,
-      cols.trigger_config, cols.actions, cols.trigger_kinds, cols.graph,
+      cols.trigger_kinds, cols.graph,
       actor.userId, now, now
     )
     .run();
@@ -167,9 +171,9 @@ export async function updateAutomation(
 ) {
   await assertProjectAccess(env, actor, projectId);
   const existing = await env.DB
-    .prepare(`SELECT trigger_type, trigger_config, actions FROM automations WHERE id = ? AND project_id = ?`)
+    .prepare(`SELECT trigger_type, graph FROM automations WHERE id = ? AND project_id = ?`)
     .bind(id, projectId)
-    .first<{ trigger_type: string; trigger_config: string; actions: string }>();
+    .first<{ trigger_type: string; graph: string | null }>();
   if (!existing) throw new ServiceError('not_found', 'automation not found');
 
   // Any trigger/action/graph field rebuilds the canonical graph + derived columns.
@@ -178,13 +182,19 @@ export async function updateAutomation(
   let graphCols: ReturnType<typeof graphColumns> | undefined;
   let graph: AutomationGraph | undefined;
   if (touchesGraph) {
-    graph = isGraph(input.graph)
-      ? input.graph
-      : buildLinearGraph(
-          input.trigger_type ?? existing.trigger_type,
-          ('trigger_config' in input ? input.trigger_config : safeParse(existing.trigger_config)) as Record<string, unknown>,
-          'actions' in input ? (Array.isArray(input.actions) ? input.actions : []) : (safeParse(existing.actions) as unknown[])
-        );
+    if (isGraph(input.graph)) {
+      graph = input.graph;
+    } else {
+      // Legacy partial update: merge the provided legacy fields onto the current
+      // graph's derived view (graph is the source of truth now).
+      const cur = existing.graph ? safeParse(existing.graph) : null;
+      const base = isGraph(cur) ? legacyView(cur) : { trigger_config: {}, actions: [] };
+      graph = buildLinearGraph(
+        input.trigger_type ?? existing.trigger_type,
+        ('trigger_config' in input ? input.trigger_config : base.trigger_config) as Record<string, unknown>,
+        'actions' in input ? (Array.isArray(input.actions) ? input.actions : []) : base.actions
+      );
+    }
     const err = graphError(graph);
     if (err) throw new ServiceError('bad_request', err, 'invalid_graph');
     graphCols = graphColumns(graph);

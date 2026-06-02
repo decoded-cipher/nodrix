@@ -133,7 +133,7 @@ export async function dispatchEvent(
 ): Promise<number> {
   const rows = await env.DB
     .prepare(
-      `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
+      `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
          FROM automations
         WHERE project_id = ? AND enabled = 1 AND trigger_kinds LIKE '%,event,%'`
     )
@@ -188,8 +188,8 @@ function defaultScheduleDelay(env: Env): NonNullable<RunDeps['scheduleDelay']> {
       .run();
     // Lazy import: keeps the DO module (and `cloudflare:workers`) out of the
     // engine's static graph and avoids a scheduler→schedule→run cycle.
-    const { rescheduleScheduler } = await import('../durable-objects/scheduler-do');
-    await rescheduleScheduler(env); // re-arm to this (possibly sooner) fire time
+    const { armSchedulerFor } = await import('../durable-objects/scheduler-do');
+    await armSchedulerFor(env, fireAtMs); // O(1) — only pulls the alarm earlier if needed
   };
 }
 

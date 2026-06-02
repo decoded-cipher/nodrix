@@ -33,6 +33,14 @@ export class SchedulerDO extends DurableObject<Env> {
     await this.reschedule();
   }
 
+  // Pull the alarm earlier for a new delay, without a full recompute. A later
+  // delay needs nothing — the next reschedule() picks it up when the current
+  // alarm fires. O(1): no D1 scan on the hot delay-creation path.
+  async armFor(fireAtMs: number): Promise<void> {
+    const current = await this.ctx.storage.getAlarm();
+    if (current == null || fireAtMs < current) await this.ctx.storage.setAlarm(fireAtMs);
+  }
+
   override async alarm(): Promise<void> {
     const now = Date.now();
     // The alarm may have fired for a schedule or a delay (or both at once). Run
@@ -63,7 +71,11 @@ function soonest(a: number | null, b: number | null): number | null {
 
 const NAME = 'scheduler';
 
-type SchedulerStub = { reschedule(): Promise<void>; ensure(): Promise<void> };
+type SchedulerStub = {
+  reschedule(): Promise<void>;
+  ensure(): Promise<void>;
+  armFor(fireAtMs: number): Promise<void>;
+};
 
 function stub(env: Env): SchedulerStub {
   return env.SCHEDULER_DO.get(env.SCHEDULER_DO.idFromName(NAME)) as unknown as SchedulerStub;
@@ -76,4 +88,8 @@ export async function rescheduleScheduler(env: Env): Promise<void> {
 
 export async function ensureScheduler(env: Env): Promise<void> {
   try { await stub(env).ensure(); } catch (e) { console.error('ensure scheduler failed', e); }
+}
+
+export async function armSchedulerFor(env: Env, fireAtMs: number): Promise<void> {
+  try { await stub(env).armFor(fireAtMs); } catch (e) { console.error('arm scheduler failed', e); }
 }

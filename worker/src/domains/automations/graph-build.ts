@@ -1,6 +1,7 @@
-// Service-side graph helpers: derive the persisted columns from a canonical
-// graph (graph is the source of truth; legacy trigger_type/trigger_config/actions
-// are kept populated for back-compat + the convert-on-read fallback).
+// Service-side graph helpers. The graph is the single source of truth; we persist
+// it plus two cheap denormalized columns: trigger_kinds (multi-trigger lookups)
+// and trigger_type (the indexed scan). The legacy { trigger_config, actions } view
+// is derived on read for the API response, not stored.
 
 import {
   triggerNodes, actionNodes, serializeTriggerKinds,
@@ -13,16 +14,23 @@ export function graphColumns(graph: AutomationGraph): {
   graph: string;
   trigger_kinds: string;
   trigger_type: string;
-  trigger_config: string;
-  actions: string;
 } {
-  const primary = triggerNodes(graph)[0];
   return {
     graph: JSON.stringify(graph),
     trigger_kinds: serializeTriggerKinds(graph),
-    trigger_type: primary?.kind ?? 'manual',
-    trigger_config: JSON.stringify(primary?.config ?? {}),
-    actions: JSON.stringify(actionNodes(graph).map((n) => ({ type: n.kind, ...n.config }))),
+    trigger_type: triggerNodes(graph)[0]?.kind ?? 'manual',
+  };
+}
+
+// Legacy { trigger_config, actions } view derived from the graph — for the admin
+// API response shape only (those columns no longer exist).
+export function legacyView(graph: AutomationGraph): {
+  trigger_config: Record<string, unknown>;
+  actions: Array<Record<string, unknown>>;
+} {
+  return {
+    trigger_config: triggerNodes(graph)[0]?.config ?? {},
+    actions: actionNodes(graph).map((n) => ({ type: n.kind, ...n.config })),
   };
 }
 

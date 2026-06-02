@@ -25,7 +25,7 @@ export type SchedulePlan = { fireAt: number | null; due: ScheduleDue[] };
 export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
   const rows = await env.DB
     .prepare(
-      `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
+      `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
          FROM automations
         WHERE enabled = 1 AND (trigger_kinds LIKE '%,schedule,%' OR trigger_kinds LIKE '%,sunset_sunrise,%')`
     )
@@ -62,7 +62,7 @@ export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: n
   for (const { id, nodeId } of due) {
     const a = await env.DB
       .prepare(
-        `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
+        `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
            FROM automations WHERE id = ? AND enabled = 1`
       )
       .bind(id)
@@ -115,7 +115,7 @@ export async function runDueDelays(env: Env, nowMs: number): Promise<number> {
 
     const a = await env.DB
       .prepare(
-        `SELECT id, project_id, name, enabled, trigger_type, trigger_config, actions, graph, last_run_at
+        `SELECT id, project_id, name, enabled, trigger_type, graph, last_run_at
            FROM automations WHERE id = ? AND enabled = 1`
       )
       .bind(row.automation_id)

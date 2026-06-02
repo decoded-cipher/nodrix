@@ -1,7 +1,7 @@
 // Shared types for the automation/integration runtime.
 //
-// Trigger configs and action descriptors are stored as JSON in the D1
-// `automations` table (trigger_config / actions). These are the parsed shapes.
+// Trigger/action node configs live inside the automation's `graph` JSON. These
+// are the parsed config shapes for each node kind.
 
 export type VariableOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'changed';
 
@@ -70,10 +70,8 @@ export type AutomationRow = {
   project_id: string;
   name: string;
   enabled: number;
-  trigger_type: string;
-  trigger_config: string;              // JSON
-  actions: string;                     // JSON
-  graph?: string | null;               // JSON AutomationGraph; preferred when present
+  trigger_type: string;                // denormalized primary trigger kind
+  graph: string | null;                // JSON AutomationGraph; the source of truth
   last_run_at: number | null;
 };
 
