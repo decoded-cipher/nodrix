@@ -6,6 +6,9 @@ import email from './email/manifest.json';
 import telegram from './telegram/manifest.json';
 import slack from './slack/manifest.json';
 import discord from './discord/manifest.json';
+import twilio from './twilio/manifest.json';
+import msTeams from './ms_teams/manifest.json';
+import pagerduty from './pagerduty/manifest.json';
 
 // ─── Catalog types ────────────────────────────────────────────────────────────
 
@@ -96,7 +99,7 @@ export type IntegrationContext = {
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
-const RAW = [httpService, email, telegram, slack, discord] as const;
+const RAW = [httpService, email, telegram, slack, discord, twilio, msTeams, pagerduty] as const;
 
 export type IntegrationKind = (typeof RAW)[number]['kind'];
 

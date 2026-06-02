@@ -10,6 +10,9 @@ import { runEmail } from './email/run';
 import { runTelegram } from './telegram/run';
 import { runSlack } from './slack/run';
 import { runDiscord } from './discord/run';
+import { runTwilio } from './twilio/run';
+import { runMsTeams } from './ms_teams/run';
+import { runPagerDuty } from './pagerduty/run';
 
 export type { IntegrationResult } from './index';
 
@@ -49,6 +52,9 @@ export async function executeIntegration(
     case 'telegram': return runTelegram(config, params, op);
     case 'slack': return runSlack(config, params, op);
     case 'discord': return runDiscord(config, params, op);
+    case 'twilio': return runTwilio(config, params, op);
+    case 'ms_teams': return runMsTeams(config, params, op);
+    case 'pagerduty': return runPagerDuty(config, params, op);
     default: return { status: 'skipped', detail: `kind '${integration.kind}' not executable yet` };
   }
 }
