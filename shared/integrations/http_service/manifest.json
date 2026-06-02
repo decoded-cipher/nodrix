@@ -1,7 +1,7 @@
 {
   "kind": "http_service",
   "label": "HTTP service",
-  "description": "Send an HTTP request to any URL — the full event or a templated body — with optional HMAC signing.",
+  "description": "Send an HTTP request to any URL, optionally HMAC-signed.",
   "icon": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m-9 9h18",
   "executable": true,
   "fields": [
