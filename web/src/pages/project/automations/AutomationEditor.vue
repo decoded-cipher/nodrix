@@ -220,10 +220,10 @@ async function save() {
         </VueFlow>
       </div>
 
-      <!-- Block settings: a bottom sheet on mobile, a floating right panel on lg+. -->
+      <!-- Block settings: floating right panel (same on mobile and desktop). -->
       <aside
         v-if="selectedNode && !loading"
-        class="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col rounded-t-2xl border-t border-neutral-200 bg-white shadow-xl lg:absolute lg:inset-x-auto lg:right-4 lg:top-4 lg:bottom-4 lg:z-30 lg:max-h-none lg:w-[20rem] lg:rounded-lg lg:border dark:border-neutral-800 dark:bg-neutral-900"
+        class="absolute right-4 top-4 bottom-4 z-30 flex w-[calc(100%-2rem)] max-w-[20rem] flex-col rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
       >
         <div class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
           <span class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Block settings</span>
