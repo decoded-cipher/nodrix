@@ -10,6 +10,7 @@
 
 import type { Env } from '../../env';
 import { getSetting, setSetting } from './deployment-settings';
+import { nanoid } from 'nanoid';
 import { VERSION, COMMIT } from '../../version.gen';
 import { VALID_KINDS } from '@nodrix/integrations-shared';
 import { MCP_ENABLED_KEY } from '../../mcp/flags';
@@ -34,7 +35,7 @@ interface Payload {
 async function getOrCreateInstanceId(env: Env): Promise<string> {
   const existing = await getSetting(env, INSTANCE_ID_KEY);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+  const id = nanoid();
   await setSetting(env, INSTANCE_ID_KEY, id);
   return id;
 }
