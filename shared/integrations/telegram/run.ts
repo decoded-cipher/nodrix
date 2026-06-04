@@ -1,8 +1,8 @@
 import type { IntegrationResult } from '../index';
 import { doFetch, str } from '../lib';
 
-// Telegram Bot API. The bot token is connection config; chat_id and message
-// arrive as already-interpolated call-site params.
+// Telegram Bot API. The bot token and target chat_id are connection config;
+// the message is a call-site param (already interpolated).
 export async function runTelegram(
   config: Record<string, unknown>,
   params: Record<string, unknown>,
@@ -10,7 +10,7 @@ export async function runTelegram(
 ): Promise<IntegrationResult> {
   const token = str(config.bot_token);
   if (!token) return { status: 'error', detail: 'missing bot_token' };
-  const chatId = str(params.chat_id);
+  const chatId = str(config.chat_id);
   if (!chatId) return { status: 'error', detail: 'missing chat_id' };
 
   const text = str(params.message) || 'Nodrix notification';

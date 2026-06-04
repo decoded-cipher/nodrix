@@ -33,7 +33,7 @@
     }
   ],
   "operations": [
-    { "key": "send_message", "label": "Send message", "params": ["chat_id", "message"] }
+    { "key": "send_message", "label": "Send message", "params": ["message"] }
   ],
   "summary": { "value": "Telegram bot", "requires": "bot_token", "fallback": "No bot token set" }
 }
