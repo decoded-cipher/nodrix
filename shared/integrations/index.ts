@@ -174,7 +174,7 @@ export function summarize(spec: Pick<ConnSpec, 'summary'>, config: Record<string
 
 // Like interpolate, but supports {{key:default}} for summary descriptors.
 function fillTemplate(tpl: string, vars: Record<string, unknown>): string {
-  return tpl.replace(/\{\{\s*([\w.]+)(?::([^}]*))?\}\}/g, (_, k: string, def?: string) => {
+  return tpl.replace(/\{\{\s*([\w.]+)(?::([^{}]*))?\}\}/g, (_, k: string, def?: string) => {
     const v = vars[k];
     const s = v === undefined || v === null ? '' : String(v);
     return s !== '' ? s : (def ?? '');
