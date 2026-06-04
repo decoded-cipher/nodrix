@@ -41,7 +41,11 @@ export async function controlWsHandler(c: Context<{ Bindings: Env }>): Promise<R
   if (!row) return c.text('unauthorized', 401);
 
   c.executionCtx.waitUntil(touchTokenLastUsed(c.env, 'project', row.id));
-  return projectStub(c.env, row.project_id).fetch(c.req.raw);
+  // Hand the DO its project_id before the upgrade resolves, so socket-driven
+  // telemetry/events work even if this device never uses the HTTP ingest path.
+  const stub = projectStub(c.env, row.project_id);
+  await stub.setProjectId(row.project_id);
+  return stub.fetch(c.req.raw);
 }
 
 export default control;

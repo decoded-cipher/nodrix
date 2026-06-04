@@ -2,12 +2,14 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../../env';
 import { newId } from '../lib/ids';
 import { dashboardStub } from './stubs';
-import { runAutomation } from '../engine/run';
+import { runAutomation, dispatchEvent } from '../engine/run';
 import { matchVariableCondition } from '../engine/triggers';
 import { toGraph, triggerNodes } from '../engine/graph';
 import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '../engine/types';
 import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
+import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
+import { upsertVariables } from '../../domains/telemetry/variables';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
 // state, recent ring buffer, pending control writes, and the R2 flush cursor.
@@ -67,6 +69,16 @@ export class ProjectDO extends DurableObject<Env> {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.initSchema();
+  }
+
+  // Called by the worker on WS connect so the DO knows its project_id for
+  // socket-driven ingest/events — an all-WS device may never hit the HTTP path
+  // that otherwise stores it (see projectId()).
+  async setProjectId(projectId: string): Promise<void> {
+    this.sql.exec(
+      `INSERT INTO flush_meta (k, v) VALUES ('project_id', ?) ON CONFLICT(k) DO NOTHING`,
+      projectId
+    );
   }
 
   async ingest(projectId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
@@ -429,15 +441,35 @@ export class ProjectDO extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  override async webSocketMessage(_ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    try {
-      const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
-      const msg = JSON.parse(raw) as { type?: string; ids?: unknown };
-      if (msg.type === 'ack' && Array.isArray(msg.ids)) {
-        const ids = msg.ids.filter((x): x is string => typeof x === 'string');
-        if (ids.length > 0) await this.ackControl(ids);
+  // Device->cloud frames on the control socket. The same verbs as the HTTP API:
+  // ack (control), telemetry, and events — routed through the shared parser/ingest
+  // so both transports behave identically. Invalid input gets an error frame back
+  // (HTTP returns structured errors); unknown/garbage frames are dropped.
+  override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    const msg = parseDeviceMessage(raw);
+    switch (msg.kind) {
+      case 'ack':
+        if (msg.ids.length > 0) await this.ackControl(msg.ids);
+        return;
+      case 'telemetry': {
+        const pid = this.projectId();
+        await this.ingest(pid, msg.points);
+        const now = Math.floor(Date.now() / 1000);
+        this.ctx.waitUntil(upsertVariables(this.env, pid, msg.points.map((p) => p.variable), now));
+        return;
       }
-    } catch { /* malformed frame — drop */ }
+      case 'event':
+        this.ctx.waitUntil(dispatchEvent(this.env, this.projectId(), msg.event, msg.payload));
+        return;
+      case 'error':
+        try {
+          ws.send(JSON.stringify({ type: 'error', code: msg.code, ...(msg.key ? { key: msg.key } : {}) }));
+        } catch { /* dead socket; ignore */ }
+        return;
+      case 'ignore':
+        return;
+    }
   }
 
   override async webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): Promise<void> {
