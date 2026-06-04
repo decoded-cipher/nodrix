@@ -32,6 +32,10 @@
     "snapshot": { "kind": "valueProperty" }
   },
 
+  "quirks": {
+    "mobile": { "paired": true }
+  },
+
   "mcp": {
     "description": "Arc gauge with min/max bounds.",
     "propTypes": {
