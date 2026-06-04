@@ -11,13 +11,8 @@ telemetry.use('*', requireProjectToken);
 
 const MAX_BODY_BYTES = 256 * 1024;
 
-// Body: { metrics: { [key]: number|string|boolean } } or { metric, value }.
-// Readings are stamped server-side at receive time, so clockless devices
-// (ESP/Arduino) don't send a timestamp. Response: 204 No Content.
-//
-// The same ingest path is also reachable over the control WebSocket
-// (see project-do.ts webSocketMessage); both share parseTelemetryBody +
-// stub.ingest + upsertVariables so HTTP and WS stay identical.
+// Body: { metrics: {…} } or { metric, value }. Stamped server-side (clockless devices send no
+// timestamp); 204 on success. The same ingest also runs over the WS (project-do webSocketMessage).
 telemetry.post('/', async (c) => {
   const len = Number(c.req.header('content-length') ?? '0');
   if (Number.isFinite(len) && len > MAX_BODY_BYTES) {
@@ -48,8 +43,7 @@ telemetry.post('/', async (c) => {
   const stub = projectStub(c.env, project_id);
   await stub.ingest(project_id, points);
 
-  // Best-effort: permissively auto-create variable rows for any new keys and
-  // bump last_seen. Don't block the device response on it.
+  // Auto-create new variables + bump last_seen off the response path (best-effort).
   const now = Math.floor(Date.now() / 1000);
   c.executionCtx.waitUntil(
     upsertVariables(c.env, project_id, points.map((p) => p.variable), now)

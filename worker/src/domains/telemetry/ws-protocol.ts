@@ -1,7 +1,5 @@
-// Pure classifier for device→cloud frames on the control WebSocket. Keeping it
-// pure (no DO/state) makes the accepted shapes unit-testable, and lets the DO's
-// webSocketMessage handler stay a thin switch. Telemetry reuses parseTelemetryBody
-// so HTTP and WS enforce the exact same caps/validation.
+// Pure classifier for device→cloud WebSocket frames. Reuses parseTelemetryBody so HTTP
+// and WS validate telemetry identically; staying pure keeps it unit-testable.
 
 import { parseTelemetryBody } from './validate';
 import type { IngestPoint } from '../../platform/durable-objects/project-do';
@@ -13,10 +11,8 @@ export type DeviceMessage =
   | { kind: 'error'; code: string; key?: string }
   | { kind: 'ignore' };
 
-// Accepted frames: {type:"ack",ids:[…]}, {type:"telemetry",metrics:{…}} (also
-// {type:"telemetry",metric,value}), {type:"event",event,payload?}. Anything else
-// (unknown type, non-JSON, non-object) is ignored; invalid telemetry/event is an
-// error the caller can echo back so a WS device gets HTTP-parity diagnostics.
+// Unknown type / non-JSON → ignore (dropped). Bad telemetry/event → error (the caller
+// echoes it back so a WS device gets the same diagnostics HTTP returns).
 export function parseDeviceMessage(raw: string): DeviceMessage {
   let msg: unknown;
   try {

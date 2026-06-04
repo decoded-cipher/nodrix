@@ -1,21 +1,14 @@
-// Permissive auto-creation of project_variables rows on telemetry ingest, plus a
-// best-effort last_seen refresh. Shared by the HTTP telemetry route and the project
-// DO's WebSocket telemetry path so both transports behave identically.
+// Auto-creates project_variables rows on first sight and refreshes last_seen.
+// Shared by the HTTP telemetry route and the DO's WebSocket path so both behave the same.
 
 import type { Env } from '../../env';
 import { newId } from '../../platform/lib/ids';
 import { chunk, MAX_BOUND_PARAMS } from '../../platform/lib/sql';
 
-// Per-request caps only bound a single ingest; a device sending fresh keys across
-// many requests could still grow project_variables without bound. Cap the total
-// distinct auto-created variables per project.
+// Bounds variable growth from a device that spams fresh keys.
 const MAX_VARIABLES_PER_PROJECT = 250;
 
-// Best-effort in-isolate throttle so a chatty device doesn't rewrite
-// project_variables.last_seen on every ingest. Isolates are short-lived, so the
-// worst case is one write per key per window per isolate — far fewer than
-// per-request. A key never seen in this isolate always writes, so first-sight
-// auto-creation stays immediate.
+// In-isolate throttle so a chatty device doesn't rewrite last_seen on every ingest.
 const LAST_SEEN_THROTTLE_MS = 60_000;
 const lastSeenWrites = new Map<string, number>();
 
@@ -24,7 +17,6 @@ function dueForLastSeen(projectId: string, key: string, nowMs: number): boolean 
   const prev = lastSeenWrites.get(k);
   if (prev !== undefined && nowMs - prev < LAST_SEEN_THROTTLE_MS) return false;
   lastSeenWrites.set(k, nowMs);
-  // Soft cap: drop stale entries if the map grows large (high key cardinality).
   if (lastSeenWrites.size > 10_000) {
     const cutoff = nowMs - LAST_SEEN_THROTTLE_MS;
     for (const [mk, t] of lastSeenWrites) if (t < cutoff) lastSeenWrites.delete(mk);
@@ -32,10 +24,6 @@ function dueForLastSeen(projectId: string, key: string, nowMs: number): boolean 
   return true;
 }
 
-// Permissive ingest: ensure a project_variables row exists for each key (created
-// on first sight) and refresh last_seen. UNIQUE(project_id, key) makes the
-// INSERT idempotent; the UPDATE keeps last_seen current for existing rows. New
-// keys are created only under MAX_VARIABLES_PER_PROJECT; existing keys always refresh.
 export async function upsertVariables(
   env: Env,
   projectId: string,
@@ -43,12 +31,11 @@ export async function upsertVariables(
   now: number
 ): Promise<void> {
   const nowMs = Date.now();
-  // Only touch keys whose last_seen is actually due (throttled per isolate).
   const due = [...new Set(keys)].filter((key) => dueForLastSeen(projectId, key, nowMs));
   if (due.length === 0) return;
   try {
-    // Existing rows only need last_seen refreshed; new keys count against the cap.
-    // Chunk the IN(...) lookup under the 100 bound-param limit (project_id takes one).
+    // Existing keys only refresh last_seen; new keys count against the cap. Chunk the
+    // IN(...) under the bound-param limit (project_id takes one slot).
     const existing = new Set<string>();
     for (const part of chunk(due, MAX_BOUND_PARAMS - 1)) {
       const placeholders = part.map(() => '?').join(',');
@@ -65,10 +52,7 @@ export async function upsertVariables(
         .prepare(`SELECT COUNT(*) AS n FROM project_variables WHERE project_id = ?`)
         .bind(projectId)
         .first<{ n: number }>();
-      const remaining = Math.max(0, MAX_VARIABLES_PER_PROJECT - (countRow?.n ?? 0));
-      // Best-effort guardrail: a small overshoot under concurrency is acceptable
-      // since the cap bounds growth rather than enforcing an exact invariant.
-      toCreate = toCreate.slice(0, remaining);
+      toCreate = toCreate.slice(0, Math.max(0, MAX_VARIABLES_PER_PROJECT - (countRow?.n ?? 0)));
     }
 
     const keysToWrite = [...existing, ...toCreate];
@@ -85,9 +69,7 @@ export async function upsertVariables(
       )
     );
   } catch {
-    // last_seen + auto-create are best-effort; never fail telemetry on them.
-    // Clear the throttle stamps so a failed write retries on the next ingest
-    // instead of waiting out the window.
+    // Best-effort — never fail telemetry on it. Clear stamps so a failed write retries next ingest.
     for (const key of due) lastSeenWrites.delete(`${projectId}:${key}`);
   }
 }

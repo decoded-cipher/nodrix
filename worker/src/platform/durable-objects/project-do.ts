@@ -71,9 +71,8 @@ export class ProjectDO extends DurableObject<Env> {
     this.initSchema();
   }
 
-  // Called by the worker on WS connect so the DO knows its project_id for
-  // socket-driven ingest/events — an all-WS device may never hit the HTTP path
-  // that otherwise stores it (see projectId()).
+  // WS connect calls this so the DO has its project_id for socket-driven ingest —
+  // an all-WS device never POSTs, which is where projectId() otherwise gets set.
   async setProjectId(projectId: string): Promise<void> {
     this.sql.exec(
       `INSERT INTO flush_meta (k, v) VALUES ('project_id', ?) ON CONFLICT(k) DO NOTHING`,
@@ -441,10 +440,8 @@ export class ProjectDO extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  // Device->cloud frames on the control socket. The same verbs as the HTTP API:
-  // ack (control), telemetry, and events — routed through the shared parser/ingest
-  // so both transports behave identically. Invalid input gets an error frame back
-  // (HTTP returns structured errors); unknown/garbage frames are dropped.
+  // Device->cloud frames: ack, telemetry, events — same verbs as HTTP via the shared
+  // parser. Invalid input → error frame; unknown/garbage → dropped.
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
     const msg = parseDeviceMessage(raw);
