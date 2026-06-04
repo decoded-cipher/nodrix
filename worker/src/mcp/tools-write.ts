@@ -9,6 +9,7 @@ import type { Env } from '../env';
 import type { McpProps } from './gate';
 import { actorOf, scopeProjectId } from './scope';
 import { run } from './result';
+import { parseStructured, parseStructuredArray } from './coerce';
 import { redactIntegration } from './redact';
 import { createProject, updateProject } from '../domains/projects/service';
 import { createVariable, updateVariable, setVariableControl } from '../domains/variables/service';
@@ -82,7 +83,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       description: 'Create a dashboard. Layout is the widget-grid object; omit for an empty grid.',
       inputSchema: { project, name: z.string(), layout: z.any().optional() },
     },
-    (args) => run(() => createDashboard(env, actor(), scopeProjectId(props, args.project), { name: args.name, layout: args.layout }))
+    (args) => run(() => createDashboard(env, actor(), scopeProjectId(props, args.project), { name: args.name, layout: parseStructured(args.layout) }))
   );
 
   server.registerTool(
@@ -103,7 +104,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         updateDashboard(env, actor(), scopeProjectId(props, args.project), args.dashboard_id, {
           name: args.name,
           description: args.description,
-          layout: args.layout,
+          layout: parseStructured(args.layout),
           if_updated_at: args.if_updated_at,
         })
       )
@@ -224,10 +225,10 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         createAutomation(env, actor(), scopeProjectId(props, args.project), {
           name: args.name,
           description: args.description,
-          graph: args.graph,
+          graph: parseStructured(args.graph),
           trigger_type: args.trigger_type,
-          trigger_config: args.trigger_config,
-          actions: args.actions,
+          trigger_config: parseStructured(args.trigger_config),
+          actions: parseStructuredArray(args.actions),
           enabled: args.enabled,
         })
       )
@@ -256,10 +257,10 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
           name: args.name,
           description: args.description,
           enabled: args.enabled,
-          graph: args.graph,
+          graph: parseStructured(args.graph),
           trigger_type: args.trigger_type,
-          trigger_config: args.trigger_config,
-          actions: args.actions,
+          trigger_config: parseStructured(args.trigger_config),
+          actions: parseStructuredArray(args.actions),
         })
       )
   );
@@ -309,7 +310,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
           await createIntegration(env, actor(), scopeProjectId(props, args.project), {
             name: args.name,
             kind: args.kind,
-            config: args.config,
+            config: parseStructured(args.config),
             enabled: args.enabled,
           })
         )
@@ -333,7 +334,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         redactIntegration(
           await updateIntegration(env, actor(), scopeProjectId(props, args.project), args.integration_id, {
             name: args.name,
-            config: args.config,
+            config: parseStructured(args.config),
             enabled: args.enabled,
           })
         )
