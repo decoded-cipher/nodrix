@@ -94,5 +94,9 @@ NODRIX_UPSTREAM_REPO = "decoded-cipher/nodrix"
 # OAuth callback URLs and Better Auth's baseURL are derived from each
 # request's origin, so no APP_URL env var is needed either.
 
+# Daily anonymous usage-stats heartbeat (scheduled handler in worker/src/index.ts).
+[triggers]
+crons = ["0 0 * * *"]
+
 [observability]
 enabled = true

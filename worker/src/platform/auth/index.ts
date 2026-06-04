@@ -16,6 +16,7 @@ import { getOrCreateSigningSecret } from '../lib/auth-secret';
 import { findOpenInviteByEmail, consumeInvite } from '../lib/invites';
 import { hashPassword as pbkdf2Hash, verifyPassword as pbkdf2Verify } from '../lib/password';
 import { authRateLimit } from '../middleware/rate-limit';
+import { sendInstall } from '../lib/usage-stats';
 
 // Shared with admin/auth-providers.ts — encryption info string for OAuth
 // client secrets at rest in D1. Changing this invalidates existing rows.
@@ -95,10 +96,14 @@ async function loadProviders(env: Env, signingSecret: string): Promise<SocialPro
 // localhost, *.workers.dev, and custom domains with no env var to set.
 // The signing secret is generated on first boot and persisted in
 // deployment_settings — see lib/auth-secret.ts.
-export async function buildAuth(env: Env, request?: Request) {
+export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionContext) {
   const signingSecret = await getOrCreateSigningSecret(env);
   const socialProviders = await loadProviders(env, signingSecret);
   const db = drizzle(env.DB, { schema });
+
+  // Set by the user-create before-hook when this is the first (bootstrap) user;
+  // the after-hook then announces the install. Request-scoped (fresh per build).
+  let bootstrapInstall = false;
 
   const baseURL = request
     ? new URL(request.url).origin
@@ -235,6 +240,7 @@ export async function buildAuth(env: Env, request?: Request) {
               .prepare(`SELECT 1 AS one FROM users LIMIT 1`)
               .first<{ one: number }>();
             if (!existing) {
+              bootstrapInstall = true;
               return { data: { ...user, role: 'owner', emailVerified: true } };
             }
             const email = String((user as { email?: string }).email ?? '').toLowerCase();
@@ -276,6 +282,9 @@ export async function buildAuth(env: Env, request?: Request) {
               targetId: user.id,
               metadata: { email: user.email },
             });
+
+            // First user = the instance owner → announce the install once.
+            if (bootstrapInstall && ctx) sendInstall(env, ctx);
           },
         },
       },
@@ -324,7 +333,7 @@ export const authApp = new Hono<{ Bindings: Env }>();
 authApp.use('*', authRateLimit);
 
 authApp.all('*', async (c) => {
-  const auth = await buildAuth(c.env, c.req.raw);
+  const auth = await buildAuth(c.env, c.req.raw, c.executionCtx);
   const url = new URL(c.req.url);
   const path = url.pathname;
   const debug = Boolean(c.env.NODRIX_DEBUG_AUTH);

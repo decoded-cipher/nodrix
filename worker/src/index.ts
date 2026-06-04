@@ -13,6 +13,7 @@ import type { Env } from './env';
 import app from './app';
 import { NodrixMcpAgent } from './mcp/agent';
 import { mcpEnabled } from './mcp/flags';
+import { sendHeartbeat } from './platform/lib/usage-stats';
 
 export { ProjectDO } from './platform/durable-objects/project-do';
 export { DashboardDO } from './platform/durable-objects/dashboard-do';
@@ -49,5 +50,9 @@ export default {
   fetch(req: Request, env: Env, ctx: ExecutionContext) {
     (env as { OAUTH_KV: KVNamespace }).OAUTH_KV = env.KV;
     return oauthProvider.fetch(req, env, ctx);
+  },
+  // Daily cron → anonymous usage heartbeat (refresh version/counts/last_seen).
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    sendHeartbeat(env, ctx);
   },
 } satisfies ExportedHandler<Env>;

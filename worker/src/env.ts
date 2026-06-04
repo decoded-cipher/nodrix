@@ -35,4 +35,8 @@ export interface Env {
   // redirect logs. Errors are always logged regardless. Off in production keeps
   // the auth hot path quiet (observability log volume).
   NODRIX_DEBUG_AUTH?: string;
+
+  // Optional override for the anonymous usage-stats collector endpoint (defaults
+  // to https://telemetry.nodrix.live/ingest). See lib/usage-stats.ts.
+  NODRIX_USAGE_STATS_URL?: string;
 }
