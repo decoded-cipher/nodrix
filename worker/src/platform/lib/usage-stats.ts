@@ -1,6 +1,6 @@
 // Anonymous usage stats (product analytics) — separate from the device-data
 // ingress in `domains/telemetry`. Always on and anonymous: the payload is a
-// random instance UUID, version/commit, configured integration kinds, exact
+// random instance id, version/commit, configured integration kinds, exact
 // counts, and boolean flags — never an IP, hostname, name, or any value.
 // Best-effort: failures are swallowed so a down collector can't affect the app.
 //
@@ -98,13 +98,19 @@ export function sendInstall(env: Env, ctx: ExecutionContext): void {
   );
 }
 
-// Daily cron: refresh the instance's details. No-op until the instance is set up.
+// Daily cron: refresh the instance's details — version, counts, last_seen. If the instance id is missing, create it and send an install event.
 export function sendHeartbeat(env: Env, ctx: ExecutionContext): void {
   ctx.waitUntil(
     (async () => {
-      const id = await getSetting(env, INSTANCE_ID_KEY);
-      if (!id) return;
-      await post(env, await buildPayload(env, id, 'heartbeat'));
+      const existing = await getSetting(env, INSTANCE_ID_KEY);
+      if (existing) {
+        await post(env, await buildPayload(env, existing, 'heartbeat'));
+        return;
+      }
+      const owner = await env.DB.prepare(`SELECT 1 AS one FROM users LIMIT 1`).first();
+      if (!owner) return;
+      const id = await getOrCreateInstanceId(env);
+      await post(env, await buildPayload(env, id, 'install'));
     })().catch(() => {}),
   );
 }
