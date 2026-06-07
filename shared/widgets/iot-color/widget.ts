@@ -102,8 +102,8 @@ const TEMPLATE = `
     }
     .card {
       display: grid;
-      grid-template-rows: auto 1fr auto auto auto;
-      gap: clamp(7px, 3cqh, 15px);
+      grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+      gap: clamp(5px, 2cqh, 11px);
       height: 100%;
       width: 100%;
       box-sizing: border-box;
@@ -111,7 +111,7 @@ const TEMPLATE = `
       background: var(--color-bg-elevated, white);
       border: 1px solid var(--color-border, #e5e5e5);
       border-radius: 10px;
-      transition: border-color 120ms ease, box-shadow 200ms ease;
+      transition: border-color 120ms ease;
       overflow: hidden;
     }
     .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
@@ -123,7 +123,8 @@ const TEMPLATE = `
       min-width: 0;
     }
     .title {
-      font-size: clamp(10px, 5cqmin, 13px);
+      /* font-size: clamp(10px, 5cqmin, 13px); */
+      font-size: 11px;
       color: var(--color-text-muted, #525252);
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -185,14 +186,14 @@ const TEMPLATE = `
     .track-wrap {
       position: relative;
       flex: 1;
-      height: clamp(16px, 7cqh, 28px);
+      height: clamp(12px, 5cqh, 18px);
       display: flex;
       align-items: center;
     }
     .track {
       position: relative;
       width: 100%;
-      height: clamp(8px, 3.5cqh, 15px);
+      height: clamp(5px, 2.4cqh, 9px);
       border-radius: 9999px;
       background: linear-gradient(to right, #000, #fff);
       box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
@@ -215,12 +216,12 @@ const TEMPLATE = `
       position: absolute;
       top: 50%;
       left: 0;
-      width: clamp(16px, 7cqh, 28px);
-      height: clamp(16px, 7cqh, 28px);
+      width: clamp(11px, 4.5cqh, 16px);
+      height: clamp(11px, 4.5cqh, 16px);
       border-radius: 9999px;
       background: #fff;
-      border: 2px solid rgba(0, 0, 0, 0.15);
-      box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.3);
+      border: 1.5px solid rgba(0, 0, 0, 0.18);
+      box-shadow: 0 1px 3px -1px rgba(0, 0, 0, 0.28);
       transform: translate(-50%, -50%);
       pointer-events: none;
     }
@@ -232,10 +233,10 @@ const TEMPLATE = `
     .swatch {
       flex: 1;
       min-width: 0;
-      height: clamp(16px, 8cqh, 30px);
+      height: clamp(14px, 6cqh, 24px);
       padding: 0;
       border: 1px solid rgba(0, 0, 0, 0.12);
-      border-radius: 7px;
+      border-radius: 6px;
       cursor: pointer;
       transition: transform 100ms ease, box-shadow 120ms ease;
     }
@@ -436,13 +437,6 @@ export class IotColorElement extends HTMLElement {
     bthumb.style.left = `${this.#v * 100}%`;
     const brange = shadow.querySelector('.brange') as HTMLInputElement;
     if (document.activeElement !== this) brange.value = String(Math.round(this.#v * 100));
-
-    // Ambient glow: scaled by brightness so a dim bulb glows faintly.
-    const card = shadow.querySelector('.card') as HTMLElement;
-    const a = 0.15 + this.#v * 0.5;
-    card.style.boxShadow =
-      `0 6px 26px -8px rgba(${live.r}, ${live.g}, ${live.b}, ${a.toFixed(3)}), ` +
-      `0 0 0 1px rgba(${live.r}, ${live.g}, ${live.b}, ${(a * 0.3).toFixed(3)})`;
 
     // Hex field reflects the live value unless the user is editing it.
     const hex = shadow.querySelector('.hex') as HTMLInputElement;
