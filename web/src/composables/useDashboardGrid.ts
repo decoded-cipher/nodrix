@@ -15,7 +15,7 @@ import {
   type DataIndex,
 } from '../builder/render-widget';
 import { manifestFor, type WidgetType } from '@nodrix/widgets-shared';
-import { ROW_HEIGHT_VIEW, GRID_MARGIN, normalizeLayout } from '../builder/grid';
+import { ROW_HEIGHT, GRID_MARGIN, normalizeLayout } from '../builder/grid';
 import type { CompactSeries, Layout, SnapshotMsg, UpdateMsg } from '../types';
 
 // Widgets that write back to hardware. In read-only contexts (public shares,
@@ -64,7 +64,7 @@ export function useDashboardGrid() {
 
     container.style.display = 'grid';
     container.style.gridTemplateColumns = `repeat(${layout.grid.columns}, 1fr)`;
-    container.style.gridAutoRows = `${ROW_HEIGHT_VIEW}px`;
+    container.style.gridAutoRows = `${ROW_HEIGHT}px`;
     container.style.gap = `${GRID_MARGIN}px`;
 
     const placed: Array<{ x: number; y: number; w: number; h: number; src: Layout['items'][number] }> = [];

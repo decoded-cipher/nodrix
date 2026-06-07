@@ -5,7 +5,7 @@ import { GridLayout, GridItem } from 'grid-layout-plus';
 import { useProjectStore } from '../../stores/project';
 import { toast } from '../../lib/toast';
 import { manifestFor as specFor } from '@nodrix/widgets-shared';
-import { GRID_COLUMNS, ROW_HEIGHT_EDIT, GRID_MARGIN, MIN_UNITS, normalizeLayout } from '../../builder/grid';
+import { GRID_COLUMNS, ROW_HEIGHT, GRID_MARGIN, MIN_UNITS, normalizeLayout } from '../../builder/grid';
 import WidgetPalette from '../../builder/WidgetPalette.vue';
 import WidgetConfigPanel from '../../builder/WidgetConfigPanel.vue';
 import { applyProps, createWidgetElement, buildDataIndex, applyLiveUpdate, applySnapshotItem, type DataIndex } from '../../builder/render-widget';
@@ -368,7 +368,7 @@ function exitToView() {
 
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ err }}</div>
 
-      <div class="canvas-dots flex-1 overflow-auto p-6 select-none" @click="selectedId = null">
+      <div class="canvas-dots flex-1 overflow-auto px-6 py-6 select-none lg:px-12" @click="selectedId = null">
         <p
           v-if="viewMode === 'mobile'"
           class="mx-auto mb-3 max-w-[412px] text-center text-xs text-neutral-500 dark:text-neutral-400"
@@ -390,7 +390,7 @@ function exitToView() {
           :key="viewMode"
           :layout="gridItems"
           :col-num="activeLayout.grid.columns"
-          :row-height="ROW_HEIGHT_EDIT"
+          :row-height="ROW_HEIGHT"
           :is-draggable="true"
           :is-resizable="true"
           :margin="[GRID_MARGIN, GRID_MARGIN]"
