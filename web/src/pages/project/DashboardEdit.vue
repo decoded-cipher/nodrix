@@ -368,7 +368,7 @@ function exitToView() {
 
       <div v-if="err" class="bg-red-50 px-6 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ err }}</div>
 
-      <div class="canvas-dots flex-1 overflow-auto px-6 py-6 select-none lg:px-12" @click="selectedId = null">
+      <div class="canvas-dots flex-1 overflow-auto p-6 select-none" @click="selectedId = null">
         <p
           v-if="viewMode === 'mobile'"
           class="mx-auto mb-3 max-w-[412px] text-center text-xs text-neutral-500 dark:text-neutral-400"
