@@ -1,0 +1,62 @@
+{
+  "id": "iot-color",
+  "label": "Color",
+  "description": "Pick a color and send it to a device.",
+  "category": "Control",
+  "dataTypes": ["Color command"],
+  "whenToUse": "Set the color of a smart light or RGB device — Hue bulbs, LED strips, ambient lighting. Drag the wheel for hue and saturation, set brightness below; sends on release and reflects the latest reported color.",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"8.2\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"8.2\" cy=\"13.6\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"15.8\" cy=\"13.6\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+
+  "defaultSize": { "w": 3, "h": 4 },
+  "defaultProps": {
+    "title": "",
+    "variable": "",
+    "format": "hex",
+    "brightness": true,
+    "hexInput": true,
+    "presets": true
+  },
+
+  "fields": [
+    { "key": "title", "label": "Title", "type": "string" },
+    { "key": "variable", "label": "Variable", "type": "variable" },
+    {
+      "key": "format",
+      "label": "Output format",
+      "type": "select",
+      "options": ["hex", "hsv", "rgb"]
+    },
+    { "key": "brightness", "label": "Brightness control", "type": "boolean" },
+    { "key": "hexInput", "label": "Hex input", "type": "boolean" },
+    { "key": "presets", "label": "Preset swatches", "type": "boolean" }
+  ],
+  "bindings": {
+    "attributes": [
+      { "prop": "title", "type": "string" },
+      { "prop": "variable", "type": "string" },
+      { "prop": "format", "type": "string" },
+      { "prop": "brightness", "type": "boolean" },
+      { "prop": "hexInput", "type": "boolean" },
+      { "prop": "presets", "type": "boolean" }
+    ],
+    "properties": []
+  },
+
+  "runtime": {
+    "variableExtractor": { "kind": "scalar", "prop": "variable" },
+    "liveUpdate": { "kind": "valueProperty" },
+    "snapshot": { "kind": "valueProperty" }
+  },
+
+  "mcp": {
+    "description": "Pick a color and send it to a device.",
+    "propTypes": {
+      "title": "string",
+      "variable": "string (variable key)",
+      "format": "\"hex\" | \"hsv\" | \"rgb\"",
+      "brightness": "boolean",
+      "hexInput": "boolean",
+      "presets": "boolean"
+    }
+  }
+}

@@ -9,6 +9,7 @@ import { IotMapElement } from './iot-map/widget';
 import { IotToggleElement } from './iot-toggle/widget';
 import { IotPushElement } from './iot-push/widget';
 import { IotSliderElement } from './iot-slider/widget';
+import { IotColorElement } from './iot-color/widget';
 
 let registered = false;
 
@@ -22,4 +23,5 @@ export function registerWidgets(): void {
   if (!customElements.get('iot-toggle')) customElements.define('iot-toggle', IotToggleElement);
   if (!customElements.get('iot-push')) customElements.define('iot-push', IotPushElement);
   if (!customElements.get('iot-slider')) customElements.define('iot-slider', IotSliderElement);
+  if (!customElements.get('iot-color')) customElements.define('iot-color', IotColorElement);
 }
