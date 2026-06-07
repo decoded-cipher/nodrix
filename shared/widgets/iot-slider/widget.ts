@@ -66,7 +66,8 @@ const TEMPLATE = `
       white-space: nowrap;
     }
     .value {
-      font-size: clamp(16px, min(20cqh, 10cqw), 36px);
+      /* font-size: clamp(16px, min(20cqh, 10cqw), 36px); */
+      font-size: 18px;
       font-weight: 700;
       letter-spacing: -0.02em;
     }
