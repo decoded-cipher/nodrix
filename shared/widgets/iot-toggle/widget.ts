@@ -41,7 +41,8 @@ const TEMPLATE = `
     }
     .card:hover { border-color: var(--color-border-strong, #d4d4d4); }
     .title {
-      font-size: clamp(10px, min(8cqh, 4cqw), 14px);
+      /* font-size: clamp(10px, min(8cqh, 4cqw), 14px); */
+      font-size: 11px;
       color: var(--color-text-muted, #525252);
       text-transform: uppercase;
       letter-spacing: 0.06em;

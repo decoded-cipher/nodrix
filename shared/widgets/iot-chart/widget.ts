@@ -72,7 +72,8 @@ const WIDGET_CSS = `
     min-width: 0;
   }
   .title {
-    font-size: clamp(10px, min(8cqh, 4cqw), 14px);
+    /* font-size: clamp(10px, min(8cqh, 4cqw), 14px); */
+    font-size: 11px;
     line-height: 1.2;
     min-height: 16px;
     color: var(--color-text-muted, #525252);
