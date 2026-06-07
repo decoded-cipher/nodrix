@@ -20,10 +20,30 @@
   "fields": [
     { "key": "title", "label": "Title", "type": "string" },
     { "key": "variable", "label": "Variable", "type": "variable" },
-    { "key": "min", "label": "Min", "type": "number" },
-    { "key": "max", "label": "Max", "type": "number" },
+    {
+      "type": "group",
+      "fields": [
+        { "key": "min", "label": "Min", "type": "number" },
+        { "key": "max", "label": "Max", "type": "number" }
+      ]
+    },
     { "key": "unit", "label": "Unit", "type": "string" },
-    { "key": "thresholds", "label": "Colour thresholds", "type": "thresholds" }
+    {
+      "key": "thresholds",
+      "label": "Colour thresholds",
+      "type": "block",
+      "addLabel": "Add threshold",
+      "removeLabel": "Remove threshold",
+      "fields": [
+        {
+          "type": "group",
+          "fields": [
+            { "key": "value", "label": "From", "type": "number", "suffix": "%", "default": 0 },
+            { "key": "color", "label": "Colour", "type": "color", "default": "#22c55e" }
+          ]
+        }
+      ]
+    }
   ],
   "bindings": {
     "attributes": [

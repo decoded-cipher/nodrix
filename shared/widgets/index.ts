@@ -16,12 +16,21 @@ import iotPercent from './iot-percent/manifest.json';
 
 export type Kinded = { kind: string } & Record<string, unknown>;
 
+export type WidgetSelectOption = string | { value: string; label: string };
+
+// Config form schema (rendered generically): leaf | group (inline) | block (repeatable).
 export type WidgetField = {
-  key: string;
-  label: string;
-  type: string;
-  options?: ReadonlyArray<string>;
+  type: string; // string|number|select|variable|boolean|color|group|block
+  key?: string;
+  label?: string;
+  placeholder?: string;
+  suffix?: string;
   default?: unknown;
+  options?: ReadonlyArray<WidgetSelectOption>;
+  fields?: ReadonlyArray<WidgetField>;
+  addLabel?: string;
+  removeLabel?: string;
+  showWhen?: { key: string; equals: unknown };
 };
 
 export type WidgetManifest = {

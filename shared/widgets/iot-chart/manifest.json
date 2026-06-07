@@ -31,7 +31,17 @@
       "options": ["line", "area", "bar", "stepline"]
     },
     { "key": "zoom", "label": "Enable zoom", "type": "boolean" },
-    { "key": "series", "label": "Series", "type": "series" }
+    {
+      "key": "series",
+      "label": "Series",
+      "type": "block",
+      "addLabel": "Add series",
+      "removeLabel": "Remove series",
+      "fields": [
+        { "key": "variable", "type": "variable", "placeholder": "variable", "default": "" },
+        { "key": "label", "type": "string", "placeholder": "label (optional)", "default": "" }
+      ]
+    }
   ],
   "bindings": {
     "attributes": [

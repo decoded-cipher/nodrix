@@ -13,8 +13,13 @@
   "fields": [
     { "key": "title", "label": "Title", "type": "string" },
     { "key": "variable", "label": "Variable", "type": "variable" },
-    { "key": "min", "label": "Min", "type": "number" },
-    { "key": "max", "label": "Max", "type": "number" }
+    {
+      "type": "group",
+      "fields": [
+        { "key": "min", "label": "Min", "type": "number" },
+        { "key": "max", "label": "Max", "type": "number" }
+      ]
+    }
   ],
   "bindings": {
     "attributes": [

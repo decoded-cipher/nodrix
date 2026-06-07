@@ -26,9 +26,50 @@
       "options": ["auto", "streets", "light", "dark", "satellite"]
     },
     { "key": "zoom", "label": "Default zoom (before data)", "type": "number" },
-    { "key": "centerLat", "label": "Center latitude", "type": "number" },
-    { "key": "centerLng", "label": "Center longitude", "type": "number" },
-    { "key": "markers", "label": "Markers", "type": "markers" }
+    {
+      "type": "group",
+      "fields": [
+        { "key": "centerLat", "label": "Center latitude", "type": "number" },
+        { "key": "centerLng", "label": "Center longitude", "type": "number" }
+      ]
+    },
+    {
+      "key": "markers",
+      "label": "Markers",
+      "type": "block",
+      "addLabel": "Add marker",
+      "removeLabel": "Remove marker",
+      "fields": [
+        {
+          "key": "source",
+          "type": "select",
+          "default": "static",
+          "options": [
+            { "value": "static", "label": "Static coordinates" },
+            { "value": "variable", "label": "Lat/Lng variables" }
+          ]
+        },
+        {
+          "type": "group",
+          "showWhen": { "key": "source", "equals": "static" },
+          "fields": [
+            { "key": "lat", "type": "number", "placeholder": "Latitude", "default": 0 },
+            { "key": "lng", "type": "number", "placeholder": "Longitude", "default": 0 }
+          ]
+        },
+        {
+          "type": "group",
+          "showWhen": { "key": "source", "equals": "variable" },
+          "fields": [
+            { "key": "latVar", "type": "variable", "placeholder": "Latitude variable", "default": "" },
+            { "key": "lngVar", "type": "variable", "placeholder": "Longitude variable", "default": "" }
+          ]
+        },
+        { "key": "label", "type": "string", "placeholder": "label (optional)", "default": "" },
+        { "key": "valueVar", "type": "variable", "placeholder": "value variable (optional)", "default": "" },
+        { "key": "color", "label": "Marker colour", "type": "color", "default": "#ea580c" }
+      ]
+    }
   ],
   "bindings": {
     "attributes": [

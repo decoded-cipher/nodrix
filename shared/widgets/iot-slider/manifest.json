@@ -27,9 +27,14 @@
       "type": "select",
       "options": ["horizontal", "vertical"]
     },
-    { "key": "min", "label": "Min", "type": "number" },
-    { "key": "max", "label": "Max", "type": "number" },
-    { "key": "step", "label": "Step", "type": "number" },
+    {
+      "type": "group",
+      "fields": [
+        { "key": "min", "label": "Min", "type": "number" },
+        { "key": "max", "label": "Max", "type": "number" },
+        { "key": "step", "label": "Step", "type": "number" }
+      ]
+    },
     { "key": "unit", "label": "Unit", "type": "string" }
   ],
   "bindings": {
