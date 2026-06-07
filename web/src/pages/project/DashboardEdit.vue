@@ -52,8 +52,16 @@ const gridItems = computed(() =>
     y: it.y,
     w: it.w,
     h: it.h,
+    type: it.type,
   }))
 );
+
+// Smallest resize for a widget, in grid units — from the manifest's optional
+// minSize, falling back to the global MIN_UNITS.
+function minUnits(type: string, axis: 'w' | 'h'): number {
+  try { return specFor(type).minSize?.[axis] ?? MIN_UNITS; }
+  catch { return MIN_UNITS; }
+}
 
 type GridShape = { i: string; x: number; y: number; w: number; h: number };
 
@@ -398,8 +406,8 @@ function exitToView() {
             :y="g.y"
             :w="g.w"
             :h="g.h"
-            :min-w="MIN_UNITS"
-            :min-h="MIN_UNITS"
+            :min-w="minUnits(g.type, 'w')"
+            :min-h="minUnits(g.type, 'h')"
             drag-allow-from=".drag-handle"
           >
             <div

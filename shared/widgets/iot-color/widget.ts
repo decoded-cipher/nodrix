@@ -136,15 +136,17 @@ const TEMPLATE = `
     .stage {
       display: grid;
       place-items: center;
+      container-type: size;
       min-height: 0;
       min-width: 0;
     }
     .wheel {
       position: relative;
-      aspect-ratio: 1;
-      height: 100%;
-      max-width: 100%;
-      max-height: 100%;
+      /* Largest square that fits BOTH the stage's width and height, so the wheel
+         never overflows the card at any cell ratio. Sized against .stage, which
+         is a size container. */
+      width: min(100cqw, 100cqh);
+      height: min(100cqw, 100cqh);
       border-radius: 50%;
       cursor: crosshair;
       touch-action: none;

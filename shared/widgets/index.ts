@@ -9,6 +9,7 @@ import iotToggle from './iot-toggle/manifest.json';
 import iotPush from './iot-push/manifest.json';
 import iotSlider from './iot-slider/manifest.json';
 import iotColor from './iot-color/manifest.json';
+import iotPercent from './iot-percent/manifest.json';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 // Loose on purpose — runtime data shape matches what the manifests declare.
@@ -34,6 +35,7 @@ export type WidgetManifest = {
   icon: string;
   // Layout
   defaultSize: { w: number; h: number };
+  minSize?: { w: number; h: number }; // smallest resize, in grid units; falls back to MIN_UNITS
   defaultProps: Record<string, unknown>;
   // Form + render
   fields: ReadonlyArray<WidgetField>;
@@ -58,7 +60,7 @@ export type WidgetManifest = {
 
 // ─── Catalog ────────────────────────────────────────────────────────────────
 
-const RAW = [iotValue, iotGauge, iotChart, iotMap, iotToggle, iotPush, iotSlider, iotColor] as const;
+const RAW = [iotValue, iotGauge, iotChart, iotMap, iotToggle, iotPush, iotSlider, iotColor, iotPercent] as const;
 
 export type WidgetType = (typeof RAW)[number]['id'];
 

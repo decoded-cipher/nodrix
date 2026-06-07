@@ -63,6 +63,27 @@ function removeSeries(idx: number) {
   setProp('series', series);
 }
 
+function updateThreshold(idx: number, key: string, v: unknown) {
+  if (!props.item) return;
+  const thresholds = [...((props.item.props['thresholds'] as Array<Record<string, unknown>>) ?? [])];
+  thresholds[idx] = { ...thresholds[idx], [key]: v };
+  setProp('thresholds', thresholds);
+}
+
+function addThreshold() {
+  if (!props.item) return;
+  const thresholds = [...((props.item.props['thresholds'] as Array<Record<string, unknown>>) ?? [])];
+  thresholds.push({ value: 0, color: '#22c55e' });
+  setProp('thresholds', thresholds);
+}
+
+function removeThreshold(idx: number) {
+  if (!props.item) return;
+  const thresholds = [...((props.item.props['thresholds'] as Array<Record<string, unknown>>) ?? [])];
+  thresholds.splice(idx, 1);
+  setProp('thresholds', thresholds);
+}
+
 function updateMarker(idx: number, key: string, v: unknown) {
   if (!props.item) return;
   const markers = [...((props.item.props['markers'] as Array<Record<string, unknown>>) ?? [])];
@@ -213,6 +234,42 @@ function removeMarker(idx: number) {
             class="w-full rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             @click="addSeries"
           >+ Add series</button>
+        </div>
+
+        <div v-else-if="f.type === 'thresholds'" class="space-y-2">
+          <div class="text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</div>
+          <div class="text-xs text-neutral-500 dark:text-neutral-400">Ring colour by percentage — the band with the highest “From” at or below the value wins.</div>
+          <div
+            v-for="(t, idx) in (item.props.thresholds as Array<Record<string, unknown>>) ?? []"
+            :key="idx"
+            class="flex items-center gap-2 rounded-md border border-neutral-200 p-2 dark:border-neutral-800"
+          >
+            <span class="text-xs text-neutral-500 dark:text-neutral-400">From</span>
+            <input
+              :value="t['value'] ?? 0"
+              type="number"
+              class="w-16 rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+              @input="updateThreshold(idx, 'value', Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="text-xs text-neutral-500 dark:text-neutral-400">%</span>
+            <input
+              :value="(t['color'] as string) || '#22c55e'"
+              type="color"
+              class="h-7 w-9 shrink-0 cursor-pointer rounded border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950"
+              @input="updateThreshold(idx, 'color', ($event.target as HTMLInputElement).value)"
+            />
+            <button
+              type="button"
+              aria-label="Remove threshold"
+              class="ml-auto rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+              @click="removeThreshold(idx)"
+            >✕</button>
+          </div>
+          <button
+            type="button"
+            class="w-full rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            @click="addThreshold"
+          >+ Add threshold</button>
         </div>
 
         <div v-else-if="f.type === 'markers'" class="space-y-3">
