@@ -142,9 +142,7 @@ const TEMPLATE = `
     }
     .wheel {
       position: relative;
-      /* Largest square that fits BOTH the stage's width and height, so the wheel
-         never overflows the card at any cell ratio. Sized against .stage, which
-         is a size container. */
+      /* Largest square that fits the stage box — never overflows the card. */
       width: min(100cqw, 100cqh);
       height: min(100cqw, 100cqh);
       border-radius: 50%;

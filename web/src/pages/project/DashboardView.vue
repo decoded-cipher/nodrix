@@ -7,6 +7,7 @@ import { DashboardWs } from '../../ws';
 import { useDashboardGrid } from '../../composables/useDashboardGrid';
 import { useIsPhone } from '../../composables/useViewport';
 import { effectiveMobileLayout } from '../../builder/mobile-layout';
+import { GRID_COLUMNS } from '../../builder/grid';
 import ShareDialog from '../../components/ShareDialog.vue';
 import type { Dashboard, Layout, SnapshotMsg, WsServerMsg } from '../../types';
 
@@ -33,7 +34,7 @@ let ws: DashboardWs | null = null;
 const isPhone = useIsPhone();
 const renderLayout = computed<Layout>(() => {
   const d = dashboard.value;
-  if (!d) return { grid: { columns: 16 }, items: [] };
+  if (!d) return { grid: { columns: GRID_COLUMNS }, items: [] };
   return isPhone.value ? effectiveMobileLayout(d.layout) : d.layout;
 });
 // Re-applied after a breakpoint remount so the new grid shows live data at once.

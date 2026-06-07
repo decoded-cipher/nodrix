@@ -56,8 +56,7 @@ const gridItems = computed(() =>
   }))
 );
 
-// Smallest resize for a widget, in grid units — from the manifest's optional
-// minSize, falling back to the global MIN_UNITS.
+// Smallest resize (grid units) — manifest minSize, else MIN_UNITS.
 function minUnits(type: string, axis: 'w' | 'h'): number {
   try { return specFor(type).minSize?.[axis] ?? MIN_UNITS; }
   catch { return MIN_UNITS; }

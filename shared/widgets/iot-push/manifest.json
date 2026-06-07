@@ -7,7 +7,7 @@
   "whenToUse": "Trigger a one-shot action — restart a device, run a scene, reset a counter. No persistent state; each press sends the command once.",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\" fill=\"currentColor\" stroke=\"none\"/></svg>",
 
-  "defaultSize": { "w": 3, "h": 2 },
+  "defaultSize": { "w": 5, "h": 3 },
   "defaultProps": { "title": "", "variable": "", "value": "", "label": "" },
 
   "fields": [

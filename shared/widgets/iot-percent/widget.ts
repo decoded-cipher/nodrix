@@ -1,8 +1,5 @@
-// <iot-percent> — circular percentage ring. Maps a value through min/max to a
-// 0–100% fill and shows it in the centre. A thresholds list ({ value, color },
-// value as a percentage) recolours the ring by the current percentage: the band
-// with the greatest `value <= current` wins; below all bands (or none) falls
-// back to the accent colour. The centre number stays neutral.
+// <iot-percent> — circular percentage ring. Maps value through min/max to 0–100%;
+// thresholds ({ value, color }, value as %) recolour the ring (highest band ≤ value wins).
 
 type Threshold = { value: number; color: string };
 
