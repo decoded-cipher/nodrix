@@ -4,7 +4,7 @@
   "description": "Circular percentage ring with colour thresholds.",
   "category": "Monitor",
   "dataTypes": ["Percentage"],
-  "whenToUse": "Show a value as a percentage of a range — battery, capacity, progress, utilization. Set thresholds so the ring recolours by value (e.g. green, amber, red).",
+  "usage": "Show a value as a percentage of a range — battery, capacity, progress, utilization. Set thresholds so the ring recolours by value (e.g. green, amber, red).",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 12 L12 3 A9 9 0 0 1 19.8 16.5 Z\" fill=\"currentColor\" stroke=\"none\"/></svg>",
 
   "defaultSize": { "w": 5, "h": 5 },

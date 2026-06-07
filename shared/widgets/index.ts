@@ -40,7 +40,7 @@ export type WidgetManifest = {
   description: string;
   category: string;
   dataTypes: ReadonlyArray<string>;
-  whenToUse: string;
+  usage: string;
   icon: string;
   // Layout
   defaultSize: { w: number; h: number };

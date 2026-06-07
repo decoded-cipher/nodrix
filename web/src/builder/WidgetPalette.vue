@@ -115,7 +115,7 @@ function hideTip() {
           <div class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             When to use
           </div>
-          <p class="mt-1 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">{{ hovered.whenToUse }}</p>
+          <p class="mt-1 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">{{ hovered.usage }}</p>
         </div>
       </div>
     </Teleport>
