@@ -236,34 +236,34 @@ function removeMarker(idx: number) {
           >+ Add series</button>
         </div>
 
-        <div v-else-if="f.type === 'thresholds'" class="space-y-2">
+        <div v-else-if="f.type === 'thresholds'" class="space-y-3">
           <div class="text-xs font-medium text-neutral-600 dark:text-neutral-300">{{ f.label }}</div>
-          <div class="text-xs text-neutral-500 dark:text-neutral-400">Ring colour by percentage — the band with the highest “From” at or below the value wins.</div>
           <div
             v-for="(t, idx) in (item.props.thresholds as Array<Record<string, unknown>>) ?? []"
             :key="idx"
-            class="flex items-center gap-2 rounded-md border border-neutral-200 p-2 dark:border-neutral-800"
+            class="space-y-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800"
           >
-            <span class="text-xs text-neutral-500 dark:text-neutral-400">From</span>
-            <input
-              :value="t['value'] ?? 0"
-              type="number"
-              class="w-16 rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-              @input="updateThreshold(idx, 'value', Number(($event.target as HTMLInputElement).value))"
-            />
-            <span class="text-xs text-neutral-500 dark:text-neutral-400">%</span>
-            <input
-              :value="(t['color'] as string) || '#22c55e'"
-              type="color"
-              class="h-7 w-9 shrink-0 cursor-pointer rounded border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950"
-              @input="updateThreshold(idx, 'color', ($event.target as HTMLInputElement).value)"
-            />
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">From</span>
+              <input
+                :value="t['value'] ?? 0"
+                type="number"
+                class="w-20 rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                @input="updateThreshold(idx, 'value', Number(($event.target as HTMLInputElement).value))"
+              />
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">%</span>
+              <input
+                :value="(t['color'] as string) || '#22c55e'"
+                type="color"
+                class="ml-auto h-7 w-9 shrink-0 cursor-pointer rounded border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950"
+                @input="updateThreshold(idx, 'color', ($event.target as HTMLInputElement).value)"
+              />
+            </div>
             <button
               type="button"
-              aria-label="Remove threshold"
-              class="ml-auto rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+              class="w-full rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               @click="removeThreshold(idx)"
-            >✕</button>
+            >Remove threshold</button>
           </div>
           <button
             type="button"

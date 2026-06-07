@@ -121,7 +121,7 @@ export class IotPercentElement extends HTMLElement {
   #ts: number | null = null;
 
   static get observedAttributes() {
-    return ['data-title', 'data-min', 'data-max', 'data-decimals', 'data-unit'];
+    return ['data-title', 'data-min', 'data-max', 'data-unit'];
   }
 
   constructor() {
@@ -167,7 +167,6 @@ export class IotPercentElement extends HTMLElement {
     const shadow = this.shadowRoot!;
     const min = Number(this.getAttribute('data-min') ?? '0');
     const max = Number(this.getAttribute('data-max') ?? '100');
-    const decimals = Math.max(0, Math.min(4, Number(this.getAttribute('data-decimals') ?? '0') || 0));
     const unit = this.getAttribute('data-unit') ?? '%';
     const value = this.#value;
 
@@ -190,7 +189,7 @@ export class IotPercentElement extends HTMLElement {
     const pct = range !== 0 ? clamp01((value - min) / range) : 0;
     const displayPct = pct * 100;
 
-    valueEl.textContent = displayPct.toFixed(decimals);
+    valueEl.textContent = String(Math.round(displayPct));
     unitEl.textContent = unit;
     arc.setAttribute('stroke-dasharray', `${pct * C} ${C}`);
     arc.style.stroke = this.colorFor(displayPct);
