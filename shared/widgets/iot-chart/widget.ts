@@ -55,7 +55,7 @@ const WIDGET_CSS = `
     height: 100%;
     width: 100%;
     box-sizing: border-box;
-    padding: clamp(10px, 4cqmin, 16px) clamp(10px, 4cqmin, 16px) clamp(36px, 9cqmin, 48px);
+    padding: clamp(10px, 4cqmin, 16px) clamp(10px, 4cqmin, 16px) clamp(22px, 7cqmin, 34px);
     background: var(--color-bg-elevated, white);
     border: 1px solid var(--color-border, #e5e5e5);
     border-radius: 10px;

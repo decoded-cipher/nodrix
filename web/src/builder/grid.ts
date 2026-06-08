@@ -3,7 +3,7 @@ import type { Layout } from '../types';
 export const GRID_COLUMNS = 24;
 export const ROW_HEIGHT = 40;      // grid row height, px (shared by editor + viewer)
 export const GRID_MARGIN = 12;     // gap between cells, px
-export const MIN_UNITS = 3;        // smallest widget side, in grid units
+export const MIN_UNITS = 2;        // smallest widget side, in grid units
 
 // Upscale a sub-resolution (<GRID_COLUMNS) layout to the current grid, idempotently.
 export function normalizeLayout(layout: Layout): Layout {

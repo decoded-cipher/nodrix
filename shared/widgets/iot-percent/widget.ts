@@ -22,6 +22,7 @@ const TEMPLATE = `
     .card {
       display: grid;
       grid-template-rows: auto 1fr auto;
+      gap: clamp(6px, 3cqmin, 12px);
       height: 100%;
       width: 100%;
       box-sizing: border-box;
