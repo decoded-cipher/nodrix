@@ -17,14 +17,22 @@ import { useDashboardGrid } from '../../composables/useDashboardGrid';
 import { useIsPhone } from '../../composables/useViewport';
 import { effectiveMobileLayout } from '../../builder/mobile-layout';
 import { publicApi, PublicApiError } from '../../lib/public-api';
+import { useThemeStore } from '../../stores/theme';
 import type { CompactSeries, Layout, PublicDashboard, PublicState } from '../../types';
 
 const route = useRoute();
 const grid = useDashboardGrid();
+const theme = useThemeStore();
 
+const main = ref<HTMLElement | null>(null);
 const container = ref<HTMLElement | null>(null);
 const name = ref('');
+const description = ref<string | null>(null);
+const itemCount = ref(0);
 const status = ref<'loading' | 'ready' | 'notfound' | 'failed'>('loading');
+
+// A shared dashboard with no widgets would otherwise render as a blank page.
+const isEmpty = computed(() => status.value === 'ready' && itemCount.value === 0);
 
 const token = route.params['token'] as string;
 const isEmbed = computed(() => route.name === 'public-embed');
@@ -42,12 +50,20 @@ let ticker: ReturnType<typeof setInterval> | undefined;
 // layout payload — NOT a URL param — so viewers can't override it to poll faster.
 const refreshSecs = ref(5);
 const secondsToRefresh = ref(refreshSecs.value);
-const countdownLabel = computed(() => {
-  const s = secondsToRefresh.value;
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return r ? `${m}m ${r}s` : `${m}m`;
+const refreshing = ref(false);
+
+// "Updated Xs ago" trust signal: newest data ts (received_at / series ts, both in
+// seconds) measured against a `now` the 1s ticker keeps fresh.
+const newestTs = ref<number | null>(null);
+const nowSec = ref(Math.floor(Date.now() / 1000));
+const updatedLabel = computed(() => {
+  if (newestTs.value == null) return '';
+  const diff = Math.max(0, nowSec.value - newestTs.value);
+  if (diff < 5) return 'just now';
+  if (diff < 60) return `${diff}s ago`;
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
 });
 
 // Below 768px render the phone layout (override if set, else auto-derived).
@@ -67,6 +83,7 @@ function mountGrid(): void {
 onMounted(() => {
   void load();
   document.addEventListener('visibilitychange', onVisibility);
+  document.addEventListener('fullscreenchange', onFullscreenChange);
 });
 
 // Remount when the desktop<->phone breakpoint flips, preserving the last state.
@@ -77,16 +94,20 @@ watch(isPhone, () => {
 onBeforeUnmount(() => {
   stopPolling();
   document.removeEventListener('visibilitychange', onVisibility);
+  document.removeEventListener('fullscreenchange', onFullscreenChange);
 });
 
 async function load() {
   status.value = 'loading';
   lastState = null;
   lastTs = null; // force the next poll to fetch a full snapshot
+  newestTs.value = null;
   try {
     const d = await publicApi.get<PublicDashboard>(`/v1/public/dashboards/${token}`);
     name.value = d.name;
+    description.value = d.description;
     layout = d.layout;
+    itemCount.value = d.layout.items.length;
     refreshSecs.value = d.layout.refresh ?? 5; // server-clamped
     status.value = 'ready';
     // Wait a tick so the container is rendered before mounting the grid.
@@ -102,9 +123,9 @@ async function load() {
 function startPolling() {
   stopPolling();
   secondsToRefresh.value = refreshSecs.value;
-  // One 1s ticker drives both the countdown and the poll, so "next refresh in"
-  // is exact and polling matches the chosen cadence.
+  // One 1s ticker drives the poll cadence AND keeps "updated Xs ago" current.
   ticker = setInterval(() => {
+    nowSec.value = Math.floor(Date.now() / 1000);
     if (secondsToRefresh.value <= 1) {
       secondsToRefresh.value = refreshSecs.value;
       void poll();
@@ -140,6 +161,8 @@ async function poll() {
       if (lay) grid.applyDelta(lay, s.variables, s.series);
     }
     lastTs = maxSeriesTs(lastState.series) ?? lastTs;
+    nowSec.value = Math.floor(Date.now() / 1000);
+    newestTs.value = newestDataTs(lastState) ?? newestTs.value;
   } catch (e) {
     // Sharing revoked mid-view → switch to the unavailable state and stop.
     // Other (transient) errors keep the last good render and retry next tick.
@@ -182,6 +205,38 @@ function maxSeriesTs(series: CompactSeries): number | null {
   return max;
 }
 
+// Newest data ts across latest values (received_at) and chart series — drives the
+// "updated Xs ago" label. Both are in seconds, matching nowSec.
+function newestDataTs(state: PublicState): number | null {
+  let max = maxSeriesTs(state.series);
+  for (const r of Object.values(state.variables)) {
+    if (max === null || r.received_at > max) max = r.received_at;
+  }
+  return max;
+}
+
+// Viewer "refresh now": poll immediately and restart the countdown. The brief
+// `refreshing` flag spins the button icon.
+async function refreshNow() {
+  if (refreshing.value) return;
+  refreshing.value = true;
+  secondsToRefresh.value = refreshSecs.value;
+  try {
+    await poll();
+  } finally {
+    refreshing.value = false;
+  }
+}
+
+const isFullscreen = ref(false);
+function toggleFullscreen() {
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void main.value?.requestFullscreen().catch(() => {});
+}
+function onFullscreenChange() {
+  isFullscreen.value = document.fullscreenElement != null;
+}
+
 // Resume immediately when a hidden tab/embed becomes visible again, instead of
 // waiting up to a full interval.
 function onVisibility() {
@@ -193,22 +248,73 @@ function onVisibility() {
 </script>
 
 <template>
-  <main :class="isEmbed ? 'flex h-full w-full flex-col bg-transparent' : 'flex min-h-screen flex-col bg-neutral-50 dark:bg-neutral-950'">
+  <main
+    ref="main"
+    :class="isEmbed ? 'flex h-full w-full flex-col bg-transparent' : 'flex min-h-screen flex-col bg-neutral-50 dark:bg-neutral-950'"
+  >
     <header
-      v-if="!isEmbed && status === 'ready'"
-      class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 sm:px-6 dark:border-neutral-800"
+      v-if="!isEmbed && !onlyItem && status === 'ready'"
+      class="flex items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2.5 sm:px-6 dark:border-neutral-800"
     >
-      <h1 class="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ name }}</h1>
-      <div class="ml-3 flex shrink-0 items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
-        <span class="inline-flex items-center gap-1.5">
-          <!-- Live pulse: a solid dot with a radiating wave. -->
+      <div class="min-w-0">
+        <h1 class="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ name }}</h1>
+        <p v-if="description" class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ description }}</p>
+      </div>
+
+      <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+        <!-- Live pulse + last-updated. -->
+        <div class="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
           <span class="relative flex h-2 w-2">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
             <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
           </span>
-          <span class="hidden sm:inline">Live · read-only</span>
-        </span>
-        <span class="tabular-nums">Next refresh in {{ countdownLabel }}</span>
+          <span v-if="updatedLabel" class="hidden tabular-nums sm:inline">Updated {{ updatedLabel }}</span>
+        </div>
+
+        <!-- Viewer controls. Read-only data, so just refresh / theme / fullscreen. -->
+        <div class="flex items-center gap-0.5 border-l border-neutral-200 pl-2 sm:pl-3 dark:border-neutral-800">
+          <button
+            type="button"
+            class="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            aria-label="Refresh now"
+            title="Refresh now"
+            @click="refreshNow"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" :class="{ 'animate-spin': refreshing }">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 4v5h-5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            :aria-label="theme.resolved === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+            :title="theme.resolved === 'dark' ? 'Light theme' : 'Dark theme'"
+            @click="theme.toggle()"
+          >
+            <svg v-if="theme.resolved === 'dark'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+            :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+            @click="toggleFullscreen"
+          >
+            <svg v-if="isFullscreen" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M16 21h3a2 2 0 0 0 2-2v-3M8 21H5a2 2 0 0 1-2-2v-3" />
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -256,11 +362,44 @@ function onVisibility() {
       </div>
     </div>
 
+    <!-- Empty dashboard: a shared board with no widgets, shown instead of a blank grid. -->
+    <div v-if="isEmpty && !isEmbed" class="flex flex-1 items-center justify-center p-6">
+      <div class="max-w-xs text-center">
+        <div class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+            <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+          </svg>
+        </div>
+        <h1 class="mt-4 text-base font-semibold text-neutral-900 dark:text-neutral-100">Nothing to show yet</h1>
+        <p class="mt-1.5 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+          This dashboard doesn’t have any widgets yet. Check back once it’s been set up.
+        </p>
+      </div>
+    </div>
+
     <!-- Grid. v-show (not v-if) so the container ref exists before we mount into it. -->
     <div
-      v-show="status === 'ready'"
+      v-show="status === 'ready' && !isEmpty"
       ref="container"
       :class="['flex-1 overflow-auto', onlyItem ? 'p-0' : isEmbed ? 'p-3' : 'p-6']"
     ></div>
+
+    <!-- Branding for shared pages; kept off embeds and single-widget bleeds. -->
+    <footer
+      v-if="!isEmbed && !onlyItem && status === 'ready'"
+      class="shrink-0 border-t border-neutral-200 px-4 py-2.5 text-center sm:px-6 dark:border-neutral-800"
+    >
+      <a
+        href="https://nodrix.live"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 text-xs text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+      >
+        Powered by <span class="font-semibold text-neutral-500 dark:text-neutral-400">Nodrix</span>
+      </a>
+    </footer>
   </main>
 </template>

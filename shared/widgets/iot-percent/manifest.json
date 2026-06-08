@@ -5,7 +5,7 @@
   "category": "Monitor",
   "dataTypes": ["Percentage"],
   "usage": "Show a value as a percentage of a range — battery, capacity, progress, utilization. Set thresholds so the ring recolours by value (e.g. green, amber, red).",
-  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 12 L12 3 A9 9 0 0 1 19.8 16.5 Z\" fill=\"currentColor\" stroke=\"none\"/></svg>",
+  "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\"/><path d=\"m15 9-6 6\"/><path d=\"M9 9h.01\"/><path d=\"M15 15h.01\"/></svg>",
 
   "defaultSize": { "w": 5, "h": 5 },
   "defaultProps": {
@@ -24,10 +24,10 @@
       "type": "group",
       "fields": [
         { "key": "min", "label": "Min", "type": "number" },
-        { "key": "max", "label": "Max", "type": "number" }
+        { "key": "max", "label": "Max", "type": "number" },
+        { "key": "unit", "label": "Unit", "type": "string" }
       ]
     },
-    { "key": "unit", "label": "Unit", "type": "string" },
     {
       "key": "thresholds",
       "label": "Colour thresholds",
