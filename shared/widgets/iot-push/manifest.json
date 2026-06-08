@@ -1,26 +1,24 @@
 {
   "id": "iot-push",
   "label": "Push",
-  "description": "Fire a one-shot command.",
+  "description": "Hold to drive a boolean true; release sets it false.",
   "category": "Control",
   "dataTypes": ["Momentary command"],
-  "usage": "Trigger a one-shot action — restart a device, run a scene, reset a counter. No persistent state; each press sends the command once.",
+  "usage": "Momentary push-and-hold for a boolean — true while held, false on release. Like a physical momentary button: jog a motor, sound a horn, a dead-man switch.",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\" fill=\"currentColor\" stroke=\"none\"/></svg>",
 
   "defaultSize": { "w": 5, "h": 3 },
-  "defaultProps": { "title": "", "variable": "", "value": "", "label": "" },
+  "defaultProps": { "title": "", "variable": "", "label": "" },
 
   "fields": [
     { "key": "title", "label": "Title", "type": "string" },
     { "key": "variable", "label": "Variable", "type": "variable" },
-    { "key": "value", "label": "Payload value", "type": "string" },
     { "key": "label", "label": "Button label (optional)", "type": "string" }
   ],
   "bindings": {
     "attributes": [
       { "prop": "title", "type": "string" },
       { "prop": "variable", "type": "string" },
-      { "prop": "value", "type": "string" },
       { "prop": "label", "type": "string" }
     ],
     "properties": []
@@ -37,11 +35,10 @@
   },
 
   "mcp": {
-    "description": "Fire a one-shot command.",
+    "description": "Momentary push-and-hold: true while held, false on release.",
     "propTypes": {
       "title": "string",
       "variable": "string (variable key)",
-      "value": "string",
       "label": "string (button label, optional)"
     }
   }
