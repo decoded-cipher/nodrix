@@ -66,6 +66,22 @@ const updatedLabel = computed(() => {
   return `${Math.floor(m / 60)}h ago`;
 });
 
+// Feed health for the pulse: two failed polls → offline; data not advancing → stale.
+const failedPolls = ref(0);
+const staleAfter = computed(() => Math.max(90, refreshSecs.value * 8));
+const connection = computed<'live' | 'stale' | 'offline'>(() => {
+  if (failedPolls.value >= 2) return 'offline';
+  if (newestTs.value != null && nowSec.value - newestTs.value > staleAfter.value) return 'stale';
+  return 'live';
+});
+const connectionUi = computed(() => {
+  switch (connection.value) {
+    case 'offline': return { label: 'Reconnecting…', dot: 'bg-neutral-400 dark:bg-neutral-500', ping: '' };
+    case 'stale': return { label: 'Stale', dot: 'bg-amber-500', ping: '' };
+    default: return { label: 'Live', dot: 'bg-emerald-500', ping: 'bg-emerald-400' };
+  }
+});
+
 // Below 768px render the phone layout (override if set, else auto-derived).
 const isPhone = useIsPhone();
 function currentLayout(): Layout | null {
@@ -91,8 +107,16 @@ watch(isPhone, () => {
   if (status.value === 'ready') mountGrid();
 });
 
+// Mirror feed health in the favicon while live; skip in embeds.
+watch([status, connection], ([s, c]) => {
+  if (isEmbed.value) return;
+  if (s === 'ready') setFavicon(FAVICON_COLOR[c]);
+  else restoreFavicon();
+});
+
 onBeforeUnmount(() => {
   stopPolling();
+  restoreFavicon();
   document.removeEventListener('visibilitychange', onVisibility);
   document.removeEventListener('fullscreenchange', onFullscreenChange);
 });
@@ -106,6 +130,8 @@ async function load() {
     const d = await publicApi.get<PublicDashboard>(`/v1/public/dashboards/${token}`);
     name.value = d.name;
     description.value = d.description;
+    // Router's afterEach resets the title on navigation away, so no restore.
+    if (!isEmbed.value) document.title = `${d.name} · nodrix`;
     layout = d.layout;
     itemCount.value = d.layout.items.length;
     refreshSecs.value = d.layout.refresh ?? 5; // server-clamped
@@ -163,12 +189,15 @@ async function poll() {
     lastTs = maxSeriesTs(lastState.series) ?? lastTs;
     nowSec.value = Math.floor(Date.now() / 1000);
     newestTs.value = newestDataTs(lastState) ?? newestTs.value;
+    failedPolls.value = 0;
   } catch (e) {
-    // Sharing revoked mid-view → switch to the unavailable state and stop.
-    // Other (transient) errors keep the last good render and retry next tick.
+    // Revoked mid-view (404) → unavailable + stop. Transient errors keep the
+    // last good render, mark the feed offline, and retry next tick.
     if (e instanceof PublicApiError && e.status === 404) {
       status.value = 'notfound';
       stopPolling();
+    } else {
+      failedPolls.value += 1;
     }
   }
 }
@@ -237,6 +266,35 @@ function onFullscreenChange() {
   isFullscreen.value = document.fullscreenElement != null;
 }
 
+// Status favicon: a coloured dot mirroring connection state. Swaps the static
+// icons for one generated link; restored on unmount.
+const FAVICON_COLOR: Record<'live' | 'stale' | 'offline', string> = {
+  live: '#10b981',
+  stale: '#f59e0b',
+  offline: '#9ca3af',
+};
+let faviconLink: HTMLLinkElement | null = null;
+let stashedIcons: HTMLLinkElement[] = [];
+function setFavicon(color: string): void {
+  if (!faviconLink) {
+    stashedIcons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
+    stashedIcons.forEach((l) => l.remove());
+    faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    faviconLink.type = 'image/svg+xml';
+    document.head.appendChild(faviconLink);
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="${color}"/></svg>`;
+  faviconLink.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+function restoreFavicon(): void {
+  if (!faviconLink) return;
+  faviconLink.remove();
+  faviconLink = null;
+  stashedIcons.forEach((l) => document.head.appendChild(l));
+  stashedIcons = [];
+}
+
 // Resume immediately when a hidden tab/embed becomes visible again, instead of
 // waiting up to a full interval.
 function onVisibility() {
@@ -256,19 +314,29 @@ function onVisibility() {
       v-if="!isEmbed && !onlyItem && status === 'ready'"
       class="flex items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2.5 sm:px-6 dark:border-neutral-800"
     >
-      <div class="min-w-0">
-        <h1 class="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ name }}</h1>
-        <p v-if="description" class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ description }}</p>
+      <div class="flex min-w-0 items-center gap-2.5">
+        <!-- Bind to the theme so only one variant downloads: white mark on dark
+             headers, dark-ink mark on light. -->
+        <img
+          :src="theme.resolved === 'dark' ? '/icon-192.png' : '/icon-dark-192.png'"
+          alt="nodrix"
+          class="h-7 w-7 shrink-0 object-contain"
+        />
+        <div class="min-w-0">
+          <h1 class="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ name }}</h1>
+          <p v-if="description" class="truncate text-xs text-neutral-500 dark:text-neutral-400">{{ description }}</p>
+        </div>
       </div>
 
       <div class="flex shrink-0 items-center gap-2 sm:gap-3">
-        <!-- Live pulse + last-updated. -->
+        <!-- Connection dot (colour = health, pulse only when live) + last updated. -->
         <div class="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
           <span class="relative flex h-2 w-2">
-            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+            <span v-if="connection === 'live'" class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" :class="connectionUi.ping"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full" :class="connectionUi.dot"></span>
           </span>
-          <span v-if="updatedLabel" class="hidden tabular-nums sm:inline">Updated {{ updatedLabel }}</span>
+          <span class="hidden sm:inline">{{ connectionUi.label }}</span>
+          <span v-if="updatedLabel" class="hidden tabular-nums sm:inline">· {{ updatedLabel }}</span>
         </div>
 
         <!-- Viewer controls. Read-only data, so just refresh / theme / fullscreen. -->
@@ -386,20 +454,5 @@ function onVisibility() {
       ref="container"
       :class="['flex-1 overflow-auto', onlyItem ? 'p-0' : isEmbed ? 'p-3' : 'p-6']"
     ></div>
-
-    <!-- Branding for shared pages; kept off embeds and single-widget bleeds. -->
-    <footer
-      v-if="!isEmbed && !onlyItem && status === 'ready'"
-      class="shrink-0 border-t border-neutral-200 px-4 py-2.5 text-center sm:px-6 dark:border-neutral-800"
-    >
-      <a
-        href="https://nodrix.live"
-        target="_blank"
-        rel="noopener"
-        class="inline-flex items-center gap-1 text-xs text-neutral-400 transition hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
-      >
-        Powered by <span class="font-semibold text-neutral-500 dark:text-neutral-400">Nodrix</span>
-      </a>
-    </footer>
   </main>
 </template>
