@@ -40,6 +40,11 @@ export function newToken(): string {
   return base64url(bytes);
 }
 
+// Public dashboard share link — a short plaintext URL capability (not hashed like newToken).
+export function shareToken(): string {
+  return nanoid(12);
+}
+
 export async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');

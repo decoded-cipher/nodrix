@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../../env';
 import { requireSession } from '../../platform/middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../../platform/middleware/resolve-project';
-import { newToken } from '../../platform/lib/ids';
+import { shareToken } from '../../platform/lib/ids';
 import { recordAudit } from '../../platform/lib/audit';
 import { dashboardStub } from '../../platform/durable-objects/stubs';
 import { createDashboard, updateDashboard, listDashboards, getDashboard } from './service';
@@ -124,7 +124,7 @@ dashboards.post('/:id/share', async (c) => {
     .first<{ share_token: string | null }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
 
-  const token = row.share_token ?? newToken();
+  const token = row.share_token ?? shareToken();
   const now = Math.floor(Date.now() / 1000);
   await c.env.DB
     .prepare(
