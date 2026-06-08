@@ -260,7 +260,7 @@ function onVisibility() {
     <div
       v-show="status === 'ready'"
       ref="container"
-      :class="['flex-1 overflow-auto', onlyItem ? 'p-0' : isEmbed ? 'p-3' : 'px-6 py-6 lg:px-12']"
+      :class="['flex-1 overflow-auto', onlyItem ? 'p-0' : isEmbed ? 'p-3' : 'p-6']"
     ></div>
   </main>
 </template>

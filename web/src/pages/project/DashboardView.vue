@@ -133,7 +133,7 @@ function onShareChange(next: { visibility: 'private' | 'public'; share_token: st
       </div>
     </Teleport>
     <div v-if="error" class="p-6 text-sm text-red-600 dark:text-red-400">{{ error }}</div>
-    <div ref="gridContainer" class="flex-1 overflow-auto px-6 py-6 lg:px-12"></div>
+    <div ref="gridContainer" class="flex-1 overflow-auto p-6"></div>
 
     <ShareDialog
       v-if="sharing && dashboard"
