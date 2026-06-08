@@ -189,10 +189,15 @@ async function copyText(text: string, key?: string) {
 // Version & updates state. Polled once on mount — the worker side
 // KV-caches the upstream lookup (1h) so this is cheap to re-fetch.
 type VersionInfo = {
+  channel: 'release' | 'edge';
   current: { version: string; commit: string; short_commit: string; built_at: number | null };
   upstream_repo: string;
+  // Normalized ref: a release tag (release channel) or short commit SHA (edge).
   upstream: {
-    commit: { sha: string; short_sha: string; message: string; author_date: number | null; html_url: string };
+    ref: string;
+    title: string;
+    ref_date: number | null;
+    html_url: string;
     fetched_at: number;
   } | null;
   status: 'up_to_date' | 'behind' | 'unknown';
@@ -681,21 +686,23 @@ const PROVIDER_META = {
             </div>
           </div>
 
-          <!-- Upstream -->
+          <!-- Upstream: latest release (release channel) or commit (edge) -->
           <div class="sm:text-right">
-            <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Upstream</div>
+            <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              {{ versionInfo?.channel === 'edge' ? 'Latest commit' : 'Latest release' }}
+            </div>
             <div v-if="versionInfo?.upstream" class="mt-0.5">
               <a
-                :href="versionInfo.upstream.commit.html_url"
+                :href="versionInfo.upstream.html_url"
                 target="_blank"
                 rel="noreferrer"
                 class="font-mono text-sm text-accent-700 hover:underline dark:text-accent-400"
-              >{{ versionInfo.upstream.commit.short_sha }} ↗</a>
-              <div class="mt-0.5 max-w-full truncate text-[11px] text-neutral-500 sm:max-w-[260px] dark:text-neutral-400" :title="versionInfo.upstream.commit.message">
-                {{ versionInfo.upstream.commit.message }}
+              >{{ versionInfo.upstream.ref }} ↗</a>
+              <div class="mt-0.5 max-w-full truncate text-[11px] text-neutral-500 sm:max-w-[260px] dark:text-neutral-400" :title="versionInfo.upstream.title">
+                {{ versionInfo.upstream.title }}
               </div>
               <div class="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                {{ fmtAgo(versionInfo.upstream.commit.author_date) }} · checked {{ fmtAgo(versionInfo.upstream.fetched_at) }}
+                {{ fmtAgo(versionInfo.upstream.ref_date) }} · checked {{ fmtAgo(versionInfo.upstream.fetched_at) }}
               </div>
             </div>
             <div v-else-if="versionLoading" class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Checking…</div>

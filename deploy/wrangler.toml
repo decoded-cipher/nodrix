@@ -1,0 +1,70 @@
+# nodrix deploy carrier. The Deploy to Cloudflare button clones only this
+# subdir; the build command pulls the real source from upstream over it. Don't
+# edit by hand — manage the deployment from the Cloudflare dashboard. Keep the
+# bindings in sync with the repo-root wrangler.toml.
+name = "nodrix"
+main = "worker/src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Pulls the latest nodrix release and builds it over this clone.
+# Set NODRIX_DEPLOY_CHANNEL=edge in build vars to track the default branch.
+[build]
+command = "curl -fsSL https://raw.githubusercontent.com/decoded-cipher/nodrix/master/scripts/build-from-upstream.sh | bash"
+
+# run_worker_first is required: without it the SPA fallback serves index.html for
+# unmatched GETs before the Worker runs, swallowing OAuth callbacks.
+[assets]
+directory = "web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nodrix"
+database_id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
+migrations_dir = "worker/src/platform/db/migrations"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "nodrix-telemetry"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
+
+[[durable_objects.bindings]]
+name = "PROJECT_DO"
+class_name = "ProjectDO"
+
+[[durable_objects.bindings]]
+name = "DASHBOARD_DO"
+class_name = "DashboardDO"
+
+[[durable_objects.bindings]]
+name = "SCHEDULER_DO"
+class_name = "SchedulerDO"
+
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "NodrixMcpAgent"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ProjectDO", "DashboardDO", "SchedulerDO", "NodrixMcpAgent"]
+
+[[workflows]]
+name = "nodrix-provision"
+binding = "PROVISION"
+class_name = "Provision"
+
+# Polled by Settings → Version & updates to flag new releases. Override for forks.
+[vars]
+NODRIX_UPSTREAM_REPO = "decoded-cipher/nodrix"
+
+[triggers]
+crons = ["0 0 * * *"]
+
+[observability]
+enabled = true

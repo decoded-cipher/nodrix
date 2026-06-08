@@ -3,20 +3,21 @@ main = "worker/src/index.ts"
 compatibility_date = "2025-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Build pipeline. The Deploy to Cloudflare button creates a clone of this
-# repo in the user's GitHub. Without this hook, the cloned code would be
-# what's deployed forever — code updates pushed to upstream would never
-# reach existing deployments. scripts/build-from-upstream.sh, when running
-# under Workers Builds (detected via WORKERS_CI_COMMIT_SHA), replaces the
-# clone's working tree with upstream HEAD before invoking the build chain.
-# The user's wrangler.toml (with their resource IDs from the Deploy button)
-# is preserved across that overwrite.
+# This is the LOCAL-DEV config. Production deploys use deploy/wrangler.toml —
+# the Deploy to Cloudflare button clones only the deploy/ subdir as the user's
+# repo root (see deploy/wrangler.toml). The two must be kept in sync when
+# bindings change; they can't be symlinked (the subdir must be self-contained).
+#
+# Build pipeline. scripts/build-from-upstream.sh, when running under Workers
+# Builds (detected via WORKERS_CI_COMMIT_SHA), replaces the clone's working
+# tree with upstream source before invoking the build chain. The user's
+# wrangler.toml (resource IDs from the Deploy button) is preserved across it.
 #
 # Locally the same script falls through to the standard build chain, so
 # `bun run build` / `wrangler deploy --dry-run` still work for development.
 #
 # The cd-fallback anchors to repo root regardless of whether wrangler is
-# invoked there (Workers Builds) or from worker/ (local `wrangler dev`).
+# invoked there or from worker/ (local `wrangler dev`).
 [build]
 command = "[ -f scripts/build-from-upstream.sh ] || cd ..; bash scripts/build-from-upstream.sh"
 
@@ -82,9 +83,10 @@ name = "nodrix-provision"
 binding = "PROVISION"
 class_name = "Provision"
 
-# Plaintext vars. Settings → Version & updates polls the upstream repo to
-# tell owners when a new commit is on main. Fork the upstream and override
-# this if you're tracking a different canonical source.
+# Plaintext vars. Settings → Version & updates polls the upstream repo to tell
+# owners when a newer version is available (latest release, or default-branch
+# HEAD on the edge channel). Fork the upstream and override this if you're
+# tracking a different canonical source.
 [vars]
 NODRIX_UPSTREAM_REPO = "decoded-cipher/nodrix"
 

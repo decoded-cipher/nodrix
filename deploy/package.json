@@ -1,0 +1,8 @@
+{
+  "name": "nodrix",
+  "private": true,
+  "packageManager": "bun@1.1.40",
+  "cloudflare": {
+    "label": "nodrix"
+  }
+}
