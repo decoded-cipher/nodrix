@@ -1,54 +1,92 @@
 # nodrix
 
-![status](https://img.shields.io/badge/status-alpha-red) ![not production ready](https://img.shields.io/badge/not_production_ready-do_not_deploy-red)
+**The IoT platform Cloudflare didn't build.** Point your hardware at one endpoint over HTTPS or WebSocket, watch variables appear on their own, build realtime drag-and-drop dashboards, automate, and read it all back through a clean API — entirely on infrastructure you own. nodrix is single-tenant and open source: it deploys into _your_ Cloudflare account on Workers, Durable Objects, D1, and R2.
 
-**The IoT platform Cloudflare didn't build.** Hardware POSTs telemetry over HTTPS to a project's variables, polls for control writes, and streams realtime data to a drag-and-drop dashboard — all running in your own Cloudflare account on Workers, D1, R2, and Durable Objects.
+## Features
 
-> [!CAUTION]
-> ## 🚧 Early development — do not deploy 🚧
->
-> **nodrix is pre-alpha and changing daily.** APIs, database schemas, and on-disk data formats break between commits without migration paths. There is no upgrade story yet.
->
-> - ❌ No stable releases
-> - ❌ No migrations between commits
-> - ❌ No security review
-> - ❌ Not yet recommended for any account you care about
->
-> Setup, deploy, and contribution docs will land once the surface stabilizes. Until then, treat the repo as **read-only source for the curious**.
->
-> ⭐ **Star** and 👀 **Watch** the repo to get notified the moment it's ready to deploy.
-
----
-
-## ✨ Features
-
-- 📡 **HTTPS telemetry ingress** — hardware POSTs JSON to a project's variables (auto-created on first sight); no MQTT broker to operate.
-- 📊 **Realtime dashboards** — drag-and-drop widget grid streams updates over hibernating WebSockets.
-- 🎮 **Control** — dashboard widgets write variable values that hardware picks up via short polls.
-- 🤖 **Automations** — trigger webhooks, code snippets, or service integrations on telemetry events.
-- 🗂️ **Multi-project** — group variables, dashboards, and members by project.
-- 🔑 **Auth** — email + password out of the box; optional Google / GitHub OAuth toggled at runtime.
+- 📡 **Telemetry over HTTPS or WebSocket** — hardware POSTs JSON to a project; variables auto-create on first sight. No schema to define, no MQTT broker to run.
+- 📊 **Realtime dashboards** — a drag-and-drop widget grid streams updates over hibernating WebSockets; share any dashboard read-only by public link.
+- 🧩 **Embeddable widgets** — every widget is a framework-agnostic Web Component you can lift straight into your own app.
+- 🎮 **Two-way control** — toggles, sliders, color pickers, and buttons write values back to hardware via short polls or a control socket.
+- 🤖 **Visual automations** — variable, schedule, sunrise/sunset, and event triggers run conditions and actions: webhooks, code snippets, and service integrations.
+- 🔌 **Integrations** — fan out to HTTP, email, and chat (Slack, Telegram, Discord, and more).
+- 📖 **Clean read API** — latest state, time-series, and variable listings behind one token.
+- 🧠 **Native MCP server** — an owner-gated Model Context Protocol endpoint with a Claude connector for AI clients (off by default).
+- 👥 **Multi-user** — owner / admin / member roles, email invites, and social sign-in (Google, GitHub).
 - 📝 **Audit log** — every privileged action recorded and paginated in the UI.
 
-## 🏗️ Architecture
+## Quick start
 
-- **Worker** ([worker/](worker/)) — single Hono app, three Durable Object classes (Project, Dashboard, Scheduler), one Workflow (provisioning), D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
-- **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder. Built and served as Worker static assets.
-- **Promo site** — Astro static site. Deploys independently to Cloudflare Pages.
+1. **Deploy** to your Cloudflare account — [one click](https://nodrix.live), or `bun run deploy:platform` from a clone.
+2. **Create the owner account** — the first visit prompts a "Create owner account" page; the first signup becomes `owner`.
+3. **Create a project** and mint a project token from the dashboard.
+4. **Send telemetry** — variables are created the moment data arrives:
 
-## 💾 Storage allocation
+   ```bash
+   curl -X POST https://<your-worker>/v1/telemetry \
+     -H "Authorization: Bearer $NODRIX_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"metrics":{"temperature":23.4,"humidity":61}}'
+   ```
+
+5. **Read it back:**
+
+   ```bash
+   curl https://<your-worker>/v1/projects/<project>/state \
+     -H "Authorization: Bearer $NODRIX_TOKEN"
+   ```
+
+## Architecture
+
+- **Worker** ([worker/](worker/)) — a single Hono app. Durable Objects for Project, Dashboard, Scheduler, and the MCP agent; one Workflow for provisioning; D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
+- **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder, built and served as Worker static assets.
+- **Shared** ([shared/](shared/)) — framework-agnostic Web Component widgets, the integration catalog, and automation blocks, consumed by both web and worker so there is a single source of truth.
+- **Deploy** ([deploy/](deploy/)) — the small config carrier behind the one-click Deploy to Cloudflare.
+
+```
+worker/   Cloudflare Worker — API, Durable Objects, Workflow
+web/      Vue 3 admin panel + dashboard builder
+shared/   Web Component widgets, integration catalog, automation blocks
+deploy/   One-click Deploy to Cloudflare config
+scripts/  Build, version, and migration generators
+```
+
+## Storage
 
 | Store | Holds |
 |---|---|
 | Project DO (SQLite) | Latest variable state, recent ring buffer, pending control writes, flush cursor |
 | R2 | Cold telemetry history (NDJSON, partitioned by project + hour) |
 | D1 | Users, sessions, accounts, projects, variables, dashboards, tokens, automations, integrations, audit log, OAuth provider config (metadata only — never any telemetry point) |
-| KV | Cached `/state` responses |
-| Dashboard DO | Per-dashboard subscription + hibernated WebSockets |
+| KV | Cached `/state` responses and JWKS |
+| Dashboard DO | Per-dashboard subscriptions + hibernated WebSockets |
 | Scheduler DO | One alarm at the next schedule/sunset automation fire time |
 
-## 🔐 Authentication
+## Authentication
 
-[Better Auth](https://www.better-auth.com) handles sign-in. Email + password is on by default; Google and GitHub OAuth can be enabled at runtime from **Settings → Sign-in providers** (the owner enters a client ID + secret per provider; the login page shows the corresponding buttons immediately).
+[Better Auth](https://www.better-auth.com) handles sign-in. Email + password is on by default; Google and GitHub OAuth can be enabled at runtime from **Settings → Sign-in providers** (the owner enters a client ID + secret per provider, and the login page shows the matching buttons immediately).
 
-First-time deployments hit a "Create owner account" page on first visit — the first signup becomes role `owner`. After that, registration is closed (RBAC invites land later). Sessions are cookie-based and persist 30 days; each device is a separate session row, listed and revokable from **Users**.
+The first signup on a fresh deployment becomes `owner`. After that, registration is closed: the owner invites people from **Users**, each with an owner / admin / member role. Sessions are cookie-based and persist 30 days; each device is a separate session, listed and revokable from **Users**.
+
+## Development
+
+nodrix uses [Bun](https://bun.sh).
+
+```bash
+bun install
+bun run dev              # worker (wrangler dev)
+bun run dev:web          # web (vite)
+bun run typecheck
+bun run build
+bun run deploy:platform  # build + deploy the worker
+```
+
+## Links
+
+- **Site** — https://nodrix.live
+- **Changelog** — https://nodrix.live/changelog
+- **Roadmap** — https://nodrix.live/roadmap
+
+## License
+
+[MIT](LICENSE) © Arjun Krishna
