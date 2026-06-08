@@ -61,8 +61,8 @@
           "type": "group",
           "showWhen": { "key": "source", "equals": "variable" },
           "fields": [
-            { "key": "latVar", "type": "variable", "placeholder": "Latitude variable", "default": "" },
-            { "key": "lngVar", "type": "variable", "placeholder": "Longitude variable", "default": "" }
+            { "key": "latVar", "type": "variable", "placeholder": "Lat variable", "default": "" },
+            { "key": "lngVar", "type": "variable", "placeholder": "Lng variable", "default": "" }
           ]
         },
         { "key": "label", "type": "string", "placeholder": "label (optional)", "default": "" },

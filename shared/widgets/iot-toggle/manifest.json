@@ -18,8 +18,13 @@
   "fields": [
     { "key": "title", "label": "Title", "type": "string" },
     { "key": "variable", "label": "Variable", "type": "variable" },
-    { "key": "onValue", "label": "On value", "type": "string" },
-    { "key": "offValue", "label": "Off value", "type": "string" }
+    {
+      "type": "group",
+      "fields": [
+        { "key": "onValue", "label": "On value", "type": "string" },
+        { "key": "offValue", "label": "Off value", "type": "string" }
+      ]
+    }
   ],
   "bindings": {
     "attributes": [

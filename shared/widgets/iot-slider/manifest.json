@@ -31,11 +31,16 @@
       "type": "group",
       "fields": [
         { "key": "min", "label": "Min", "type": "number" },
-        { "key": "max", "label": "Max", "type": "number" },
-        { "key": "step", "label": "Step", "type": "number" }
+        { "key": "max", "label": "Max", "type": "number" }
       ]
     },
-    { "key": "unit", "label": "Unit", "type": "string" }
+    {
+      "type": "group",
+      "fields": [
+        { "key": "step", "label": "Step", "type": "number" },
+        { "key": "unit", "label": "Unit", "type": "string" }
+      ]
+    }
   ],
   "bindings": {
     "attributes": [
