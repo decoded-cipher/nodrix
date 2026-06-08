@@ -57,6 +57,8 @@ const TEMPLATE = `
       max-width: 100%;
       max-height: 100%;
       display: block;
+      /* Lift the arc clear of the min/max labels below. */
+      transform: translateY(-5%);
     }
     svg .track {
       stroke: var(--color-border, #e5e5e5);

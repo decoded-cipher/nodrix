@@ -107,16 +107,8 @@ watch(isPhone, () => {
   if (status.value === 'ready') mountGrid();
 });
 
-// Mirror feed health in the favicon while live; skip in embeds.
-watch([status, connection], ([s, c]) => {
-  if (isEmbed.value) return;
-  if (s === 'ready') setFavicon(FAVICON_COLOR[c]);
-  else restoreFavicon();
-});
-
 onBeforeUnmount(() => {
   stopPolling();
-  restoreFavicon();
   document.removeEventListener('visibilitychange', onVisibility);
   document.removeEventListener('fullscreenchange', onFullscreenChange);
 });
@@ -264,35 +256,6 @@ function toggleFullscreen() {
 }
 function onFullscreenChange() {
   isFullscreen.value = document.fullscreenElement != null;
-}
-
-// Status favicon: a coloured dot mirroring connection state. Swaps the static
-// icons for one generated link; restored on unmount.
-const FAVICON_COLOR: Record<'live' | 'stale' | 'offline', string> = {
-  live: '#10b981',
-  stale: '#f59e0b',
-  offline: '#9ca3af',
-};
-let faviconLink: HTMLLinkElement | null = null;
-let stashedIcons: HTMLLinkElement[] = [];
-function setFavicon(color: string): void {
-  if (!faviconLink) {
-    stashedIcons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
-    stashedIcons.forEach((l) => l.remove());
-    faviconLink = document.createElement('link');
-    faviconLink.rel = 'icon';
-    faviconLink.type = 'image/svg+xml';
-    document.head.appendChild(faviconLink);
-  }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="${color}"/></svg>`;
-  faviconLink.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-function restoreFavicon(): void {
-  if (!faviconLink) return;
-  faviconLink.remove();
-  faviconLink = null;
-  stashedIcons.forEach((l) => document.head.appendChild(l));
-  stashedIcons = [];
 }
 
 // Resume immediately when a hidden tab/embed becomes visible again, instead of

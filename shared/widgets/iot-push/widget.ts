@@ -51,7 +51,7 @@ const TEMPLATE = `
       align-items: center;
       justify-content: center;
       gap: clamp(2px, 1cqmin, 6px);
-      width: clamp(60px, min(78cqh, 40cqw), 220px);
+      width: clamp(60px, min(86cqh, 44cqw), 240px);
       aspect-ratio: 1;
       padding: 0;
       border: none;
