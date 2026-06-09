@@ -12,7 +12,8 @@ telemetry.use('*', requireProjectToken);
 const MAX_BODY_BYTES = 256 * 1024;
 
 // Body: { metrics: {…} } or { metric, value }. Stamped server-side (clockless devices send no
-// timestamp); 204 on success. The same ingest also runs over the WS (project-do webSocketMessage).
+// timestamp). The 200 response returns any queued control writes; the same ingest also runs over
+// the WS (project-do webSocketMessage).
 telemetry.post('/', async (c) => {
   const len = Number(c.req.header('content-length') ?? '0');
   if (Number.isFinite(len) && len > MAX_BODY_BYTES) {
@@ -41,7 +42,9 @@ telemetry.post('/', async (c) => {
 
   const { project_id } = c.get('projectToken');
   const stub = projectStub(c.env, project_id);
-  await stub.ingest(project_id, points);
+
+  // Response returns queued control so the device skips the /v1/control poll.
+  const result = await stub.ingest(project_id, points, { wantControl: true });
 
   // Auto-create new variables + bump last_seen off the response path (best-effort).
   const now = Math.floor(Date.now() / 1000);
@@ -49,7 +52,7 @@ telemetry.post('/', async (c) => {
     upsertVariables(c.env, project_id, points.map((p) => p.variable), now)
   );
 
-  return c.body(null, 204);
+  return c.json({ control: result.control ?? [] });
 });
 
 export default telemetry;

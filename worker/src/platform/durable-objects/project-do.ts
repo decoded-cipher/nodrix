@@ -26,6 +26,9 @@ const HIGH_WATER_MARK_ROWS = 500;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
 // doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
 const AUTO_CACHE_TTL_MS = 30_000;
+// Dashboard fan-out is coalesced to at most one notify per this window, so high-rate
+// telemetry doesn't emit one RPC per ingest. Dashboards render at human rates.
+const NOTIFY_MIN_INTERVAL_MS = 1000;
 
 export type IngestPoint = {
   variable: string;
@@ -35,6 +38,12 @@ export type IngestPoint = {
 export type IngestResult = {
   receivedAt: number;
   count: number;
+};
+
+export type PendingControl = {
+  id: string;
+  variable: string;
+  value: unknown;
 };
 
 export type LatestStateRow = {
@@ -57,6 +66,14 @@ export type FlushResult = {
 
 export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
+  // Notify coalescing (NOTIFY_MIN_INTERVAL_MS); buffer lost on eviction — fine,
+  // dashboards reconcile on the next point.
+  private notifyBuffer = new Map<string, { value: unknown; ts: number }>();
+  private notifyScheduled = false;
+  private lastNotifyAt = 0;
+  // Cached subscriber presence so ingest skips the subscriptions read when nobody's
+  // watching. null = not yet read.
+  private hasSubscribers: boolean | null = null;
   private projectId(): string {
     // Stored on first ingest; used as the R2 key prefix.
     const row = this.sql
@@ -71,16 +88,20 @@ export class ProjectDO extends DurableObject<Env> {
     this.initSchema();
   }
 
-  // WS connect calls this so the DO has its project_id for socket-driven ingest —
-  // an all-WS device never POSTs, which is where projectId() otherwise gets set.
-  async setProjectId(projectId: string): Promise<void> {
+  // Stamps project_id for socket-driven ingest (an all-WS device never POSTs, the
+  // other place it gets set). Called from fetch() via the upgrade header.
+  private setProjectId(projectId: string): void {
     this.sql.exec(
       `INSERT INTO flush_meta (k, v) VALUES ('project_id', ?) ON CONFLICT(k) DO NOTHING`,
       projectId
     );
   }
 
-  async ingest(projectId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
+  async ingest(
+    projectId: string,
+    points: IngestPoint[],
+    opts?: { wantControl?: boolean }
+  ): Promise<IngestResult & { control?: PendingControl[] }> {
     const receivedAt = Math.floor(Date.now() / 1000);
 
     // Persist project_id once for the R2 key (idFromName doesn't round-trip cheaply).
@@ -139,11 +160,13 @@ export class ProjectDO extends DurableObject<Env> {
     this.evictRingBuffer(receivedAt);
     await this.ensureAlarmScheduled();
 
-    // Fire-and-forget; failures never block ingest — the device already got its 204.
+    // Fire-and-forget; failures never block ingest — the device already got its response.
     this.notifyDashboards(points, receivedAt);
     this.evaluateVariableTriggers(projectId, points, prev, receivedAt);
 
-    return { receivedAt, count: points.length };
+    // HTTP ingest returns queued control here (the WS path pushes it instead).
+    const control = opts?.wantControl ? await this.listPendingControl() : undefined;
+    return { receivedAt, count: points.length, ...(control ? { control } : {}) };
   }
 
   private evaluateVariableTriggers(
@@ -239,28 +262,73 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM auto_cache WHERE k = 'cached_at'`);
   }
 
+  // Coalesced fan-out: buffer points, emit at most one notifyBatch per dashboard per
+  // window — immediate when idle, trailing (held by waitUntil) during a burst.
   private notifyDashboards(points: IngestPoint[], ts: number): void {
+    if (!this.anyDashboardSubscribed()) return;
+
+    // Latest value per variable wins — a dashboard only needs the current value.
+    for (const p of points) this.notifyBuffer.set(p.variable, { value: p.value, ts });
+
+    const sinceLast = Date.now() - this.lastNotifyAt;
+    if (sinceLast >= NOTIFY_MIN_INTERVAL_MS) {
+      this.flushNotify();
+    } else if (!this.notifyScheduled) {
+      this.notifyScheduled = true;
+      this.ctx.waitUntil(
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            this.notifyScheduled = false;
+            this.flushNotify();
+            resolve();
+          }, NOTIFY_MIN_INTERVAL_MS - sinceLast);
+        })
+      );
+    }
+  }
+
+  private flushNotify(): void {
+    if (this.notifyBuffer.size === 0) return;
+    this.lastNotifyAt = Date.now();
+
     const subs = this.sql
       .exec<{ dashboard_id: string }>(`SELECT dashboard_id FROM subscriptions`)
       .toArray();
-    if (subs.length === 0) return;
+    if (subs.length === 0) {
+      this.hasSubscribers = false;
+      this.notifyBuffer.clear();
+      return;
+    }
 
-    // One RPC per subscribed dashboard, carrying the whole point batch — not one
-    // per (dashboard × point). The Dashboard DO fans each point out to its sockets.
-    const batch = points.map((p) => ({ variable: p.variable, value: p.value }));
+    // One RPC per dashboard carrying the whole coalesced batch; the Dashboard DO
+    // fans each point out to its sockets.
+    let latestTs = 0;
+    const batch = [...this.notifyBuffer].map(([variable, v]) => {
+      if (v.ts > latestTs) latestTs = v.ts;
+      return { variable, value: v.value };
+    });
+    this.notifyBuffer.clear();
 
-    // Don't await: ingest returns to the device immediately.
     this.ctx.waitUntil(
       Promise.all(
         subs.map(async (s) => {
           try {
-            await dashboardStub(this.env, s.dashboard_id).notifyBatch(batch, ts);
+            await dashboardStub(this.env, s.dashboard_id).notifyBatch(batch, latestTs);
           } catch {
             // Best-effort. A wedged Dashboard DO must not break telemetry.
           }
         })
       ).then(() => undefined)
     );
+  }
+
+  // Reads the subscriptions table once, then trusts subscribe/unsubscribe.
+  private anyDashboardSubscribed(): boolean {
+    if (this.hasSubscribers === null) {
+      const row = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM subscriptions`).one();
+      this.hasSubscribers = row.n > 0;
+    }
+    return this.hasSubscribers;
   }
 
   // Combined dashboard read (latest state + chart series) in one DO round trip —
@@ -342,10 +410,13 @@ export class ProjectDO extends DurableObject<Env> {
        ON CONFLICT(dashboard_id) DO NOTHING`,
       dashboardId
     );
+    this.hasSubscribers = true;
   }
 
   async unsubscribeDashboard(dashboardId: string): Promise<void> {
     this.sql.exec(`DELETE FROM subscriptions WHERE dashboard_id = ?`, dashboardId);
+    const row = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM subscriptions`).one();
+    this.hasSubscribers = row.n > 0;
   }
 
   async addControl(id: string, variable: string, value: unknown): Promise<void> {
@@ -367,7 +438,7 @@ export class ProjectDO extends DurableObject<Env> {
     }
   }
 
-  async listPendingControl(): Promise<Array<{ id: string; variable: string; value: unknown }>> {
+  async listPendingControl(): Promise<PendingControl[]> {
     const rows = this.sql
       .exec<{ id: string; variable: string; value: string }>(
         `SELECT id, variable, value FROM pending_control
@@ -411,6 +482,11 @@ export class ProjectDO extends DurableObject<Env> {
     if (upgrade !== 'websocket') {
       return new Response('expected websocket', { status: 426 });
     }
+
+    // Project id rides the upgrade request (no separate setProjectId RPC).
+    const pid = request.headers.get('x-nodrix-project-id');
+    if (pid) this.setProjectId(pid);
+
     const pair = new WebSocketPair();
     const client = pair[0] as WebSocket;
     const server = pair[1] as WebSocket;

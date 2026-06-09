@@ -41,11 +41,16 @@ export async function controlWsHandler(c: Context<{ Bindings: Env }>): Promise<R
   if (!row) return c.text('unauthorized', 401);
 
   c.executionCtx.waitUntil(touchTokenLastUsed(c.env, 'project', row.id));
-  // Hand the DO its project_id before the upgrade resolves, so socket-driven
-  // telemetry/events work even if this device never uses the HTTP ingest path.
-  const stub = projectStub(c.env, row.project_id);
-  await stub.setProjectId(row.project_id);
-  return stub.fetch(c.req.raw);
+  // project_id rides the upgrade request so the DO stamps it without a separate
+  // setProjectId RPC (matters even if the device never uses HTTP ingest).
+  const headers = new Headers(c.req.raw.headers);
+  headers.set('x-nodrix-project-id', row.project_id);
+  const fwd = new Request(c.req.raw.url, {
+    method: c.req.raw.method,
+    headers,
+    body: c.req.raw.body,
+  });
+  return projectStub(c.env, row.project_id).fetch(fwd);
 }
 
 export default control;

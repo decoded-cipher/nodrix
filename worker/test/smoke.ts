@@ -77,7 +77,9 @@ async function main() {
     },
     body: JSON.stringify({ ts: Math.floor(Date.now() / 1000), metrics: { temperature: 22.5 } }),
   });
-  assert(telRes.status === 204, `telemetry returned 204 (got ${telRes.status})`);
+  assert(telRes.status === 200, `telemetry returned 200 (got ${telRes.status})`);
+  const telBody = (await telRes.json()) as { control: unknown[] };
+  assert(Array.isArray(telBody.control), `telemetry response carries a control array`);
 
   // 5. Mint a read token for the public API.
   const tok = await req<{ id: string; token: string }>('POST', '/v1/admin/tokens', {
@@ -184,6 +186,38 @@ async function main() {
   });
   const repollBody = (await repollRes.json()) as { control: unknown[] };
   assert(repollBody.control.length === 0, `re-poll returns no pending control`);
+
+  // 10b. Control rides the telemetry response (no poll needed); the device acks what
+  //      it applied via the dedicated /v1/control/ack.
+  ws.send(JSON.stringify({ type: 'control', req: 'r2', variable: 'temperature', value: 'off' }));
+  await waitForMessage(ws, (m) => m.type === 'ack' && m.req === 'r2', 5000);
+
+  const dlRes = await fetch(`${BASE}/v1/telemetry`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${pt.token}` },
+    body: JSON.stringify({ metrics: { temperature: 24.1 } }),
+  });
+  const dlBody = (await dlRes.json()) as {
+    control: Array<{ id: string; variable: string; value: unknown }>;
+  };
+  assert(
+    dlBody.control.some((c) => c.variable === 'temperature' && c.value === 'off'),
+    `telemetry response carries pending control`
+  );
+  const dlIds = dlBody.control.map((c) => c.id);
+
+  await fetch(`${BASE}/v1/control/ack`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${pt.token}` },
+    body: JSON.stringify({ ids: dlIds }),
+  });
+  const afterAck = await fetch(`${BASE}/v1/telemetry`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${pt.token}` },
+    body: JSON.stringify({ metrics: { temperature: 24.2 } }),
+  });
+  const afterAckBody = (await afterAck.json()) as { control: unknown[] };
+  assert(afterAckBody.control.length === 0, `acked control no longer rides the response`);
 
   // 11. Force the alarm flush; assert keys + cursor advanced.
   const flushRes = await req<{ flushed: number; keys: string[]; newCursor: number }>(
