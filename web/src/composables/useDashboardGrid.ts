@@ -151,6 +151,10 @@ export function useDashboardGrid() {
     }
   }
 
+  function applyUpdates(points: Array<{ variable: string; value: unknown }>, ts: number): void {
+    for (const p of points) applyUpdate({ type: 'update', variable: p.variable, value: p.value, ts });
+  }
+
   function applyReadonly(cell: HTMLElement, type: string, disabled?: boolean): void {
     if (disabled && isControl(type)) {
       cell.style.pointerEvents = 'none';
@@ -167,5 +171,5 @@ export function useDashboardGrid() {
     return undefined;
   }
 
-  return { els, idx, mount, applySnapshot, applyDelta, applyUpdate };
+  return { els, idx, mount, applySnapshot, applyDelta, applyUpdate, applyUpdates };
 }

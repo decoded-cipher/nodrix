@@ -59,7 +59,7 @@ onMounted(async () => {
     if (lastSnapshot) grid.applySnapshot(lay, lastSnapshot.variables, lastSnapshot.series);
   });
 
-  ws = new DashboardWs(dashId, handleMessage);
+  ws = new DashboardWs(dashId, handleMessage, { resumable: true });
   ws.start();
 
   // Listen for command events from any iot-toggle (delegated, document-level
@@ -77,6 +77,10 @@ function handleMessage(msg: WsServerMsg) {
   if (msg.type === 'snapshot') {
     lastSnapshot = msg;
     grid.applySnapshot(renderLayout.value, msg.variables, msg.series);
+  } else if (msg.type === 'delta') {
+    grid.applyDelta(renderLayout.value, msg.variables, msg.series);
+  } else if (msg.type === 'updates') {
+    grid.applyUpdates(msg.points, msg.ts);
   } else if (msg.type === 'update') {
     grid.applyUpdate(msg);
   }

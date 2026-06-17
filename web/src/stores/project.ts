@@ -35,6 +35,14 @@ export const useProjectStore = defineStore('project', () => {
     if (currentProjectId.value === projectId && variables.value.length + dashboards.value.length > 0) {
       return;
     }
+    // Switching projects: drop the previous project's secondary collections so a
+    // guarded hub can't render stale cross-project data. variables + dashboards
+    // reload below; automations/integrations/tokens reload in their hubs.
+    if (currentProjectId.value !== projectId) {
+      automations.value = [];
+      integrations.value = [];
+      projectTokens.value = [];
+    }
     currentProjectId.value = projectId;
     await Promise.all([loadVariables(), loadDashboards()]);
   }

@@ -138,7 +138,7 @@ onMounted(async () => {
     return;
   }
 
-  await project.loadVariables();
+  if (!project.variables.length) await project.loadVariables();
 
   ws = new DashboardWs(dashId, handleMessage);
   ws.start();
@@ -185,7 +185,9 @@ function syncWidgetElements() {
 
 function handleMessage(msg: WsServerMsg) {
   if (msg.type === 'snapshot') applySnapshot(msg);
-  else if (msg.type === 'update') applyUpdate(msg);
+  else if (msg.type === 'updates') {
+    for (const p of msg.points) applyUpdate({ type: 'update', variable: p.variable, value: p.value, ts: msg.ts });
+  } else if (msg.type === 'update') applyUpdate(msg);
 }
 
 function applySnapshot(snap: SnapshotMsg) {

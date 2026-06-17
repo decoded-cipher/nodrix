@@ -7,12 +7,13 @@ const project = useProjectStore();
 const route = useRoute();
 
 // Load everything both tabs need: automations + integrations + variables (for
-// label resolution and the integrations "used by" cross-reference).
+// label resolution and the integrations "used by" cross-reference). Skip what the
+// store already holds so tab switches don't refetch all three.
 onMounted(() => {
   void Promise.all([
-    project.loadAutomations(),
-    project.loadIntegrations(),
-    project.loadVariables(),
+    project.automations.length ? Promise.resolve() : project.loadAutomations(),
+    project.integrations.length ? Promise.resolve() : project.loadIntegrations(),
+    project.variables.length ? Promise.resolve() : project.loadVariables(),
   ]);
 });
 

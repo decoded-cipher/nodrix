@@ -269,10 +269,19 @@ export class ProjectDO extends DurableObject<Env> {
     variables: string[],
     sinceTs: number | null,
     cap?: number
-  ): Promise<{ latest: LatestStateRow[]; series: CompactSeries }> {
+  ): Promise<{ latest: LatestStateRow[]; series: CompactSeries; oldestTs: number | null }> {
     const latest = this.getLatestState();
     const series = this.getSeriesForVariables(variables, sinceTs, cap);
-    return { latest: await latest, series: await series };
+    return { latest: await latest, series: await series, oldestTs: this.ringOldestTs() };
+  }
+
+  // Oldest ts in the ring — the eviction frontier the Dashboard DO checks before
+  // serving a reconnect cursor as a delta.
+  private ringOldestTs(): number | null {
+    const rows = this.sql
+      .exec<{ m: number | null }>(`SELECT MIN(ts) AS m FROM ring_buffer`)
+      .toArray();
+    return rows[0]?.m ?? null;
   }
 
   async getLatestState(): Promise<LatestStateRow[]> {

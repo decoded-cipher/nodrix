@@ -23,11 +23,17 @@ type Snapshot = {
   series: CompactSeries;
 };
 
-type UpdateMsg = {
-  type: 'update';
-  variable: string;
-  value: unknown;
+type UpdatesMsg = {
+  type: 'updates';
   ts: number;
+  points: Array<{ variable: string; value: unknown }>;
+};
+
+type DeltaMsg = {
+  type: 'delta';
+  dashboard: string;
+  variables: Record<string, { value: unknown; received_at: number }>;
+  series: CompactSeries;
 };
 
 type AckMsg = { type: 'ack'; req: string; ok: boolean; reason?: string };
@@ -63,9 +69,13 @@ export class DashboardDO extends DurableObject<Env> {
     const uid = request.headers.get('x-nodrix-uid');
     if (uid) server.serializeAttachment({ userId: uid });
 
-    // Bootstrap (load layout, subscribe, send snapshot) runs in parallel with
+    // Reconnecting clients pass ?since=<last applied ts> to resume with a delta.
+    const rawSince = new URL(request.url).searchParams.get('since');
+    const since = rawSince != null && Number.isFinite(Number(rawSince)) ? Number(rawSince) : null;
+
+    // Bootstrap (load layout, subscribe, send snapshot/delta) runs in parallel with
     // the handshake completing. Any send is queued until the client is ready.
-    this.ctx.waitUntil(this.bootstrapConnection(server));
+    this.ctx.waitUntil(this.bootstrapConnection(server, since));
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -78,20 +88,16 @@ export class DashboardDO extends DurableObject<Env> {
     await this.ctx.storage.deleteAll();
   }
 
-  // One RPC per ingest (not per point): the Project DO sends the whole batch; we
-  // fan each point out to live sockets as individual `update` frames.
+  // One `updates` frame per socket carries the whole batch (not one frame per point).
   async notifyBatch(points: Array<{ variable: string; value: unknown }>, ts: number): Promise<void> {
     const sockets = this.ctx.getWebSockets();
     if (sockets.length === 0 || points.length === 0) return;
-    for (const p of points) {
-      const msg: UpdateMsg = { type: 'update', variable: p.variable, value: p.value, ts };
-      const json = JSON.stringify(msg);
-      for (const ws of sockets) {
-        try {
-          ws.send(json);
-        } catch {
-          // Dead socket; will be cleaned up on webSocketClose.
-        }
+    const json = JSON.stringify({ type: 'updates', ts, points } satisfies UpdatesMsg);
+    for (const ws of sockets) {
+      try {
+        ws.send(json);
+      } catch {
+        // Dead socket; will be cleaned up on webSocketClose.
       }
     }
   }
@@ -127,7 +133,7 @@ export class DashboardDO extends DurableObject<Env> {
     return this.ctx.id.name ?? this.ctx.id.toString();
   }
 
-  private async bootstrapConnection(ws: WebSocket): Promise<void> {
+  private async bootstrapConnection(ws: WebSocket, since: number | null): Promise<void> {
     const dashId = this.dashboardId();
     const row = await this.env.DB
       .prepare(`SELECT id, project_id, layout FROM dashboards WHERE id = ?`)
@@ -167,27 +173,34 @@ export class DashboardDO extends DurableObject<Env> {
     // variables + 1h series for chart variables (not the whole project history).
     const shownVars = new Set(variablesFromLayout(layout));
     const chartVars = chartVariablesFromLayout(layout);
-    // One DO round trip for latest state + chart series (chartVars=[] skips the
-    // series query inside the DO).
-    const { latest, series } = await stub
-      .getDashboardSnapshot(chartVars, Math.floor(Date.now() / 1000) - 60 * 60, SNAPSHOT_SERIES_CAP)
-      .catch(() => ({ latest: [], series: {} as CompactSeries }));
+
+    // A `since` cursor only earns a delta if still within the ring's 1h window;
+    // for a delta, fetch from the cursor without stride-sampling so no point drops.
+    const now = Math.floor(Date.now() / 1000);
+    const sinceTs: number | null = since != null && since >= now - 60 * 60 ? since : null;
+    const fromTs = sinceTs ?? now - 60 * 60;
+    const cap = sinceTs != null ? undefined : SNAPSHOT_SERIES_CAP;
+
+    // One DO round trip (chartVars=[] skips the series query inside the DO).
+    const { latest, series, oldestTs } = await stub
+      .getDashboardSnapshot(chartVars, fromTs, cap)
+      .catch(() => ({ latest: [], series: {} as CompactSeries, oldestTs: null as number | null }));
 
     const variables: Record<string, { value: unknown; received_at: number }> = {};
     for (const r of latest) {
       if (shownVars.has(r.variable)) variables[r.variable] = { value: r.value, received_at: r.received_at };
     }
 
-    const snapshot: Snapshot = {
-      type: 'snapshot',
-      dashboard: dashId,
-      layout,
-      variables,
-      series,
-    };
+    // Delta is safe only if nothing at/after the cursor was evicted. The ring is one
+    // time-ordered buffer, so oldestTs <= since means [since, now] is fully retained;
+    // otherwise send a full snapshot so charts can't develop a hole.
+    const isDelta = sinceTs != null && (oldestTs == null || oldestTs <= sinceTs);
+    const msg: Snapshot | DeltaMsg = isDelta
+      ? { type: 'delta', dashboard: dashId, variables, series }
+      : { type: 'snapshot', dashboard: dashId, layout, variables, series };
 
     try {
-      ws.send(JSON.stringify(snapshot));
+      ws.send(JSON.stringify(msg));
     } catch {
       // Client disconnected during bootstrap.
     }

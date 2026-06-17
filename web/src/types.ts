@@ -258,9 +258,27 @@ export type UpdateMsg = {
   ts: number;
 };
 
+// A whole ingest batch in one frame (shares one `ts`).
+export type UpdatesMsg = {
+  type: 'updates';
+  ts: number;
+  points: Array<{ variable: string; value: unknown }>;
+};
+
+// Reconnect resume: points/state since the client's cursor. No layout — the client
+// keeps the one from its initial snapshot.
+export type DeltaMsg = {
+  type: 'delta';
+  dashboard: string;
+  variables: Record<string, { value: unknown; received_at: number }>;
+  series: CompactSeries;
+};
+
 export type WsServerMsg =
   | SnapshotMsg
   | UpdateMsg
+  | UpdatesMsg
+  | DeltaMsg
   | { type: 'error'; reason: string }
   | { type: 'ack'; req: string; ok: boolean; reason?: string };
 

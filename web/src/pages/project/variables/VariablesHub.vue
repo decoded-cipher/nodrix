@@ -6,9 +6,13 @@ import { useProjectStore } from '../../../stores/project';
 const project = useProjectStore();
 const route = useRoute();
 
-// Load both halves up front so each tab's count badge is correct on arrival.
+// Load both halves up front so each tab's count badge is correct on arrival; skip
+// what the store already holds so tab navigation doesn't refetch.
 onMounted(() => {
-  void Promise.all([project.loadVariables(), project.loadProjectTokens()]);
+  void Promise.all([
+    project.variables.length ? Promise.resolve() : project.loadVariables(),
+    project.projectTokens.length ? Promise.resolve() : project.loadProjectTokens(),
+  ]);
 });
 
 const proj = computed(() => project.currentProjectId ?? '');
