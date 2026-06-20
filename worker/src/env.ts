@@ -5,6 +5,7 @@ import type {
   DurableObjectNamespace,
   Fetcher,
   Workflow,
+  Ai,
 } from '@cloudflare/workers-types';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
@@ -26,6 +27,9 @@ export interface Env {
   // the name the `agents` library expects by default (MCP_OBJECT).
   MCP_OBJECT: DurableObjectNamespace;
   PROVISION: Workflow;
+  // Workers AI — the no-token fallback for the AI chat assistant. Owners can
+  // override with a BYO provider token (see domains/settings/ai-chat.ts).
+  AI: Ai;
 
   // Upstream repo (owner/repo) the Settings → Version & updates page polls
   // to detect new commits. Plaintext var defaulted in wrangler.toml.

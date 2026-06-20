@@ -167,6 +167,86 @@ async function toggleMcpWrite(next: boolean) {
   }
 }
 
+// ─── AI assistant (owner-only, opt-in) ────────────────────────────────────────
+type AiChatStatus = {
+  enabled: boolean;
+  provider: 'anthropic' | 'openai' | 'google' | null;
+  model: string | null;
+  has_token: boolean;
+  token_last4: string | null;
+};
+
+const AI_PROVIDERS = [
+  { value: 'anthropic', label: 'Anthropic (Claude)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'google', label: 'Google Gemini' },
+] as const;
+
+const aiChatEnabled = ref(false);
+const aiChatSaving = ref(false);
+const aiChatProvider = ref<'anthropic' | 'openai' | 'google'>('anthropic');
+const aiChatModel = ref('');
+const aiChatHasToken = ref(false);
+const aiChatTokenLast4 = ref<string | null>(null);
+const aiKeyInput = ref('');
+const aiTokenSaving = ref(false);
+
+function applyAiChat(s: AiChatStatus) {
+  aiChatEnabled.value = s.enabled;
+  if (s.provider) aiChatProvider.value = s.provider;
+  aiChatModel.value = s.model ?? '';
+  aiChatHasToken.value = s.has_token;
+  aiChatTokenLast4.value = s.token_last4;
+}
+
+async function toggleAiChat(next: boolean) {
+  aiChatSaving.value = true;
+  try {
+    applyAiChat(await api.put<AiChatStatus>('/v1/admin/settings/ai-chat', { enabled: next }));
+    toast.success(next ? 'AI assistant enabled' : 'AI assistant disabled');
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    aiChatSaving.value = false;
+  }
+}
+
+async function saveAiToken() {
+  if (!aiKeyInput.value.trim()) {
+    toast.error('Enter an API key.');
+    return;
+  }
+  aiTokenSaving.value = true;
+  try {
+    applyAiChat(
+      await api.put<AiChatStatus>('/v1/admin/settings/ai-chat', {
+        enabled: true,
+        provider: aiChatProvider.value,
+        api_key: aiKeyInput.value.trim(),
+        model: aiChatModel.value.trim() || null,
+      })
+    );
+    aiKeyInput.value = '';
+    toast.success('Provider key saved');
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    aiTokenSaving.value = false;
+  }
+}
+
+async function clearAiToken() {
+  aiTokenSaving.value = true;
+  try {
+    applyAiChat(await api.put<AiChatStatus>('/v1/admin/settings/ai-chat', { enabled: aiChatEnabled.value, clear_token: true }));
+    toast.success('Reverted to Cloudflare Workers AI');
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    aiTokenSaving.value = false;
+  }
+}
+
 // Tracks which field was last copied so the button can flash a checkmark.
 const copiedKey = ref<string | null>(null);
 let copiedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -295,10 +375,26 @@ onMounted(async () => {
       providers.value = [];
     }
     try {
-      const s = await api.get<{ audit_log_enabled: boolean; mcp_enabled: boolean; mcp_write_enabled: boolean }>('/v1/admin/settings');
+      const s = await api.get<{
+        audit_log_enabled: boolean;
+        mcp_enabled: boolean;
+        mcp_write_enabled: boolean;
+        ai_chat_enabled: boolean;
+        ai_chat_provider: 'anthropic' | 'openai' | 'google' | null;
+        ai_chat_model: string | null;
+        ai_chat_has_token: boolean;
+        ai_chat_token_last4: string | null;
+      }>('/v1/admin/settings');
       auditLogEnabled.value = s.audit_log_enabled;
       mcpEnabled.value = s.mcp_enabled;
       mcpWriteEnabled.value = s.mcp_write_enabled;
+      applyAiChat({
+        enabled: s.ai_chat_enabled,
+        provider: s.ai_chat_provider,
+        model: s.ai_chat_model,
+        has_token: s.ai_chat_has_token,
+        token_last4: s.ai_chat_token_last4,
+      });
     } catch { /* ignore */ }
     await refreshVersion();
   }
@@ -885,6 +981,114 @@ const PROVIDER_META = {
             <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 17h.01" /></svg>
             <span>Tip: enable the Audit log below to record MCP-driven changes.</span>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI assistant (owner-only) -->
+    <section v-if="isOwner" class="mb-6 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div class="flex items-start justify-between gap-4 px-4 py-3" :class="aiChatEnabled ? 'border-b border-neutral-100 dark:border-neutral-800' : ''">
+        <div class="flex min-w-0 items-start gap-3">
+          <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-100 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 8V4H8" /><rect x="4" y="8" width="16" height="12" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold">AI assistant</span>
+              <span
+                class="rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                :class="aiChatEnabled
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                  : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'"
+              >{{ aiChatEnabled ? 'On' : 'Off' }}</span>
+            </div>
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+              A floating chat assistant for owners and admins. It can read this deployment's
+              projects and propose operations (automations, dashboards, integrations) that you
+              approve before they run.
+            </div>
+          </div>
+        </div>
+        <Toggle
+          :model-value="aiChatEnabled"
+          :disabled="aiChatSaving"
+          label="AI assistant"
+          class="mt-0.5 shrink-0"
+          @update:model-value="toggleAiChat"
+        />
+      </div>
+
+      <div v-if="aiChatEnabled" class="space-y-4 px-4 py-4 text-sm">
+        <!-- Current source -->
+        <div class="rounded-md bg-neutral-50 px-3 py-2 text-xs dark:bg-neutral-800/40">
+          <template v-if="aiChatHasToken">
+            Using your <span class="font-medium capitalize">{{ aiChatProvider }}</span> key
+            <span class="font-mono">••••{{ aiChatTokenLast4 }}</span>
+            <span v-if="aiChatModel"> · model <span class="font-mono">{{ aiChatModel }}</span></span>
+          </template>
+          <template v-else>
+            Using <span class="font-medium">Cloudflare Workers AI</span> (no token). This is best-effort —
+            add a provider key below for stronger, more reliable operation-building.
+          </template>
+        </div>
+
+        <!-- Provider key form -->
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Provider</span>
+            <select
+              v-model="aiChatProvider"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            >
+              <option v-for="p in AI_PROVIDERS" :key="p.value" :value="p.value">{{ p.label }}</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Model <span class="text-neutral-400">(optional)</span></span>
+            <input
+              v-model="aiChatModel"
+              type="text"
+              placeholder="provider default"
+              class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">API key</span>
+          <input
+            v-model="aiKeyInput"
+            type="password"
+            :placeholder="aiChatHasToken ? 'Enter a new key to replace the stored one' : 'Paste your provider API key'"
+            class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          />
+        </label>
+
+        <div class="flex items-center justify-between gap-2">
+          <button
+            v-if="aiChatHasToken"
+            type="button"
+            class="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            :disabled="aiTokenSaving"
+            @click="clearAiToken"
+          >Remove key (use Workers AI)</button>
+          <span v-else></span>
+          <button
+            type="button"
+            class="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+            :disabled="aiTokenSaving || !aiKeyInput.trim()"
+            @click="saveAiToken"
+          >{{ aiTokenSaving ? 'Saving…' : 'Save key' }}</button>
+        </div>
+
+        <div class="flex items-start gap-1.5 rounded bg-neutral-50 px-2 py-1.5 text-[11px] text-neutral-500 dark:bg-neutral-800/40 dark:text-neutral-400">
+          <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+          <span>
+            With a provider key, conversation and project metadata are sent to that vendor.
+            The assistant never deletes anything and applies changes only after you approve each one.
+          </span>
         </div>
       </div>
     </section>

@@ -29,6 +29,9 @@ export type ActiveSession = {
 export const useSessionStore = defineStore('session', () => {
   const user = ref<User | null>(null);
   const projects = ref<Project[]>([]);
+  // Whether the AI chat assistant is enabled and visible to this user
+  // (owner/admin only — the worker gates this on the role).
+  const aiChatEnabled = ref(false);
   const loading = ref(false);
   const error = ref<{ status: number; reason?: string } | null>(null);
   const auditLog = ref<AuditLogEntry[]>([]);
@@ -44,9 +47,10 @@ export const useSessionStore = defineStore('session', () => {
     loading.value = true;
     error.value = null;
     try {
-      const data = await api.get<{ user: User; projects: Project[] }>('/v1/admin/me');
+      const data = await api.get<{ user: User; projects: Project[]; ai_chat_enabled?: boolean }>('/v1/admin/me');
       user.value = data.user;
       projects.value = data.projects;
+      aiChatEnabled.value = data.ai_chat_enabled === true;
     } catch (e) {
       if (e instanceof ApiError) {
         const body = e.body as { reason?: string } | null;
@@ -199,7 +203,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   return {
-    user, projects, loading, error,
+    user, projects, aiChatEnabled, loading, error,
     auditLog, auditLogPage, auditLogPageSize, auditLogPageCount, auditLogTotal,
     activeSessions, oauthProviders, instanceUsers,
     load, createProject, deleteProject, updateProject, loadAuditLog, updateMe,

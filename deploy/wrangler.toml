@@ -34,6 +34,10 @@ bucket_name = "nodrix-telemetry"
 binding = "KV"
 id = "PLACEHOLDER_FILLED_BY_DEPLOY_OR_WRANGLER"
 
+# Workers AI — no-token fallback for the AI chat assistant.
+[ai]
+binding = "AI"
+
 [[durable_objects.bindings]]
 name = "PROJECT_DO"
 class_name = "ProjectDO"

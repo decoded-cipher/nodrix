@@ -4,6 +4,13 @@ import { requireSession, type UserContextVars } from '../../platform/middleware/
 import { getSetting, setSetting } from '../../platform/lib/deployment-settings';
 import { AUDIT_ENABLED_KEY, recordAudit } from '../../platform/lib/audit';
 import { MCP_ENABLED_KEY, MCP_WRITE_ENABLED_KEY } from '../../mcp/flags';
+import {
+  AI_CHAT_PROVIDERS,
+  type AiChatProvider,
+  aiChatStatus,
+  setAiChatEnabled,
+  setAiChatConfig,
+} from './ai-chat';
 
 // Deployment-wide settings — owner only. The audit-log toggle and the MCP
 // server switches.
@@ -18,15 +25,21 @@ settings.use('*', async (c, next) => {
 
 // GET /v1/admin/settings
 settings.get('/', async (c) => {
-  const [auditEnabled, mcpEnabled, mcpWriteEnabled] = await Promise.all([
+  const [auditEnabled, mcpEnabled, mcpWriteEnabled, aiChat] = await Promise.all([
     getSetting(c.env, AUDIT_ENABLED_KEY),
     getSetting(c.env, MCP_ENABLED_KEY),
     getSetting(c.env, MCP_WRITE_ENABLED_KEY),
+    aiChatStatus(c.env),
   ]);
   return c.json({
     audit_log_enabled: auditEnabled === '1',
     mcp_enabled: mcpEnabled === '1',
     mcp_write_enabled: mcpWriteEnabled === '1',
+    ai_chat_enabled: aiChat.enabled,
+    ai_chat_provider: aiChat.provider,
+    ai_chat_model: aiChat.model,
+    ai_chat_has_token: aiChat.has_token,
+    ai_chat_token_last4: aiChat.token_last4,
   });
 });
 
@@ -101,6 +114,47 @@ settings.put('/mcp-write', async (c) => {
   });
 
   return c.json({ mcp_write_enabled: enabled });
+});
+
+// PUT /v1/admin/settings/ai-chat
+// body: { enabled: boolean, provider?, api_key?, model?, clear_token?: boolean }
+// Master switch for the AI assistant (owner/admin see it; off → chat endpoints
+// 404). Supplying provider + api_key seals a BYO-token config; clear_token drops
+// it so the chat falls back to Workers AI. The raw token is never read back.
+settings.put('/ai-chat', async (c) => {
+  const actor = c.get('user');
+  const body = await c.req.json<{
+    enabled?: boolean;
+    provider?: string;
+    api_key?: string;
+    model?: string | null;
+    clear_token?: boolean;
+  }>();
+  const enabled = body.enabled === true;
+
+  await setAiChatEnabled(c.env, enabled);
+
+  if (body.clear_token === true) {
+    await setAiChatConfig(c.env, null);
+  } else if (body.api_key && body.api_key.trim() !== '') {
+    if (!AI_CHAT_PROVIDERS.includes(body.provider as AiChatProvider)) {
+      return c.json({ error: 'bad_request', reason: 'invalid_provider' }, 400);
+    }
+    await setAiChatConfig(c.env, {
+      provider: body.provider as AiChatProvider,
+      apiKey: body.api_key.trim(),
+      model: body.model?.trim() || undefined,
+    });
+  }
+
+  await recordAudit(c.env, {
+    projectId: null,
+    userId: actor.id,
+    action: enabled ? 'ai_chat.enable' : 'ai_chat.disable',
+    targetType: 'deployment',
+  });
+
+  return c.json(await aiChatStatus(c.env));
 });
 
 export default settings;

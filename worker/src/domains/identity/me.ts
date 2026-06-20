@@ -4,6 +4,7 @@ import { requireSession, type UserContextVars } from '../../platform/middleware/
 import { recordAudit } from '../../platform/lib/audit';
 import { actorFromSession } from '../../platform/lib/service';
 import { listAccessibleProjects } from '../projects/service';
+import { aiChatEnabled } from '../settings/ai-chat';
 
 const me = new Hono<{ Bindings: Env; Variables: UserContextVars }>();
 
@@ -34,7 +35,10 @@ me.get('/', async (c) => {
   // they're assigned to (single source: listAccessibleProjects).
   const projects = await listAccessibleProjects(c.env, actorFromSession(user));
 
-  return c.json({ user: fullUser, projects });
+  // Drives whether the chat widget mounts (owner/admin only, hence read here).
+  const aiChat = (user.role === 'owner' || user.role === 'admin') && (await aiChatEnabled(c.env));
+
+  return c.json({ user: fullUser, projects, ai_chat_enabled: aiChat });
 });
 
 // PATCH /v1/admin/me  body: { first_name?, last_name? }

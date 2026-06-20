@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '../stores/session';
 import { useProjectStore } from '../stores/project';
@@ -7,6 +7,9 @@ import { useUiStore } from '../stores/ui';
 import Sidebar from './Sidebar.vue';
 import Topbar from './Topbar.vue';
 import Spinner from '../components/Spinner.vue';
+
+// Owner/admin-only, opt-in feature — load the bundle only when it's actually shown.
+const ChatWidget = defineAsyncComponent(() => import('../components/chat/ChatWidget.vue'));
 
 const session = useSessionStore();
 const project = useProjectStore();
@@ -88,5 +91,6 @@ watch(
         <RouterView />
       </main>
     </div>
+    <ChatWidget v-if="session.aiChatEnabled" />
   </div>
 </template>
