@@ -136,7 +136,13 @@ export class IotToggleElement extends HTMLElement {
   private offValue(): string { return this.getAttribute('data-off-value') ?? 'off'; }
 
   private isOn(): boolean {
-    return String(this.#current) === this.onValue();
+    const c = this.#current;
+    if (String(c) === this.onValue()) return true;
+    if (String(c) === this.offValue()) return false;
+    if (typeof c === 'boolean') return c;
+    if (typeof c === 'number') return c !== 0;
+    const s = String(c).trim().toLowerCase();
+    return s === 'on' || s === '1' || s === 'true' || s === 'yes';
   }
 
   private toggle() {
