@@ -374,6 +374,8 @@ export class ProjectDO extends DurableObject<Env> {
     for (const ws of this.ctx.getWebSockets()) {
       try { ws.send(payload); } catch { /* dead socket; ignore */ }
     }
+
+    this.notifyDashboards([{ variable, value: value as IngestPoint['value'] }], now);
   }
 
   async listPendingControl(): Promise<Array<{ id: string; variable: string; value: unknown }>> {
