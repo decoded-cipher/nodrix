@@ -6,6 +6,7 @@
 import { Hono } from 'hono';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { oidcProvider, jwt } from 'better-auth/plugins';
 import { APIError } from 'better-auth/api';
 import { drizzle } from 'drizzle-orm/d1';
 import type { Env } from '../../env';
@@ -21,6 +22,10 @@ import { sendInstall } from '../lib/usage-stats';
 // Shared with admin/auth-providers.ts — encryption info string for OAuth
 // client secrets at rest in D1. Changing this invalidates existing rows.
 export const OAUTH_SECRET_ENC_INFO = 'oauth-client-secret-v1';
+
+// The app's OAuth redirect — a verified App Link. Shipped as a default trusted
+// origin + client so app sign-in works on any instance with no per-instance config.
+export const NODRIX_APP_REDIRECT_URI = 'https://nodrix.live/app/auth-callback';
 
 type ProviderRow = {
   kind: 'google' | 'github';
@@ -113,7 +118,10 @@ export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionCont
     baseURL,
     basePath: '/v1/auth',
     secret: signingSecret,
-    trustedOrigins: request ? [new URL(request.url).origin] : undefined,
+    trustedOrigins: [
+      ...(request ? [new URL(request.url).origin] : []),
+      new URL(NODRIX_APP_REDIRECT_URI).origin,
+    ],
     database: drizzleAdapter(db, { provider: 'sqlite' }),
 
     // Without these, Better Auth scopes the session cookie to `Path=/v1/auth`
@@ -147,6 +155,81 @@ export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionCont
     },
 
     socialProviders,
+
+    // OpenID Connect provider for the mobile app: oidcProvider runs Authorization
+    // Code + PKCE against the existing /login page and issues opaque access tokens
+    // (validated in require-access-token); the jwt plugin signs the id_token. The
+    // app is a trusted public client — no consent, no per-instance setup.
+    plugins: [
+      jwt({
+        schema: {
+          jwks: {
+            modelName: 'jwks',
+            fields: {
+              publicKey: 'public_key',
+              privateKey: 'private_key',
+              createdAt: 'created_at',
+              expiresAt: 'expires_at',
+            },
+          },
+        },
+      }),
+      oidcProvider({
+        loginPage: '/login',
+        requirePKCE: true,
+        useJWTPlugin: true,
+        trustedClients: [
+          {
+            clientId: 'nodrix-app',
+            name: 'Nodrix',
+            // 'public' (not 'native') — the token endpoint only treats type
+            // 'public' as a PKCE client with no secret; 'native' is checked as
+            // confidential and would demand a client_secret.
+            type: 'public',
+            redirectUrls: [NODRIX_APP_REDIRECT_URI],
+            disabled: false,
+            skipConsent: true,
+            metadata: {},
+          },
+        ],
+        schema: {
+          oauthApplication: {
+            modelName: 'oauth_applications',
+            fields: {
+              clientId: 'client_id',
+              clientSecret: 'client_secret',
+              redirectUrls: 'redirect_urls',
+              userId: 'user_id',
+              createdAt: 'created_at',
+              updatedAt: 'updated_at',
+            },
+          },
+          oauthAccessToken: {
+            modelName: 'oauth_access_tokens',
+            fields: {
+              accessToken: 'access_token',
+              refreshToken: 'refresh_token',
+              accessTokenExpiresAt: 'access_token_expires_at',
+              refreshTokenExpiresAt: 'refresh_token_expires_at',
+              clientId: 'client_id',
+              userId: 'user_id',
+              createdAt: 'created_at',
+              updatedAt: 'updated_at',
+            },
+          },
+          oauthConsent: {
+            modelName: 'oauth_consents',
+            fields: {
+              clientId: 'client_id',
+              userId: 'user_id',
+              consentGiven: 'consent_given',
+              createdAt: 'created_at',
+              updatedAt: 'updated_at',
+            },
+          },
+        },
+      }),
+    ],
 
     user: {
       modelName: 'users',

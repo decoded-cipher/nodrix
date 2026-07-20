@@ -47,5 +47,16 @@ export const MIGRATIONS: Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL",
       "CREATE TABLE IF NOT EXISTS invite_projects (\n  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,\n  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  PRIMARY KEY (invite_id, project_id)\n)"
     ]
+  },
+  {
+    "name": "0002_oidc",
+    "statements": [
+      "CREATE TABLE IF NOT EXISTS jwks (\n  id          TEXT PRIMARY KEY,\n  public_key  TEXT NOT NULL,\n  private_key TEXT NOT NULL,\n  created_at  INTEGER NOT NULL,\n  expires_at  INTEGER\n)",
+      "CREATE TABLE IF NOT EXISTS oauth_applications (\n  id            TEXT PRIMARY KEY,\n  client_id     TEXT NOT NULL UNIQUE,\n  client_secret TEXT,\n  name          TEXT NOT NULL,\n  icon          TEXT,\n  metadata      TEXT,\n  redirect_urls TEXT NOT NULL,\n  type          TEXT NOT NULL,\n  disabled      INTEGER NOT NULL DEFAULT 0,\n  user_id       TEXT REFERENCES users(id) ON DELETE CASCADE,\n  created_at    INTEGER NOT NULL,\n  updated_at    INTEGER NOT NULL\n)",
+      "CREATE TABLE IF NOT EXISTS oauth_access_tokens (\n  id                       TEXT PRIMARY KEY,\n  access_token             TEXT NOT NULL UNIQUE,\n  refresh_token            TEXT NOT NULL UNIQUE,\n  access_token_expires_at  INTEGER NOT NULL,\n  refresh_token_expires_at INTEGER NOT NULL,\n  client_id                TEXT NOT NULL,\n  user_id                  TEXT REFERENCES users(id) ON DELETE CASCADE,\n  scopes                   TEXT NOT NULL,\n  created_at               INTEGER NOT NULL,\n  updated_at               INTEGER NOT NULL\n)",
+      "CREATE INDEX IF NOT EXISTS idx_oauth_access_tokens_client ON oauth_access_tokens(client_id)",
+      "CREATE INDEX IF NOT EXISTS idx_oauth_access_tokens_user ON oauth_access_tokens(user_id)",
+      "CREATE TABLE IF NOT EXISTS oauth_consents (\n  id            TEXT PRIMARY KEY,\n  client_id     TEXT NOT NULL,\n  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  scopes        TEXT NOT NULL,\n  consent_given INTEGER NOT NULL,\n  created_at    INTEGER NOT NULL,\n  updated_at    INTEGER NOT NULL\n)"
+    ]
   }
 ];

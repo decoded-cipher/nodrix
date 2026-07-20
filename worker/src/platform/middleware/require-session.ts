@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { Env } from '../../env';
 import { buildAuth } from '../auth';
+import { resolveAccessToken } from './require-access-token';
 
 export type SessionUser = {
   id: string;
@@ -33,6 +34,15 @@ export const requireSession = createMiddleware<{
   const auth = await buildAuth(c.env, c.req.raw);
   const result = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!result || !result.user || !result.session) {
+    // No cookie session — try the mobile app's OIDC access token, which is
+    // accepted anywhere the cookie is (admin API + the dashboard WebSocket).
+    const tokenUser = await resolveAccessToken(c.env, c.req.raw);
+    if (tokenUser) {
+      c.set('user', tokenUser);
+      c.set('session', { id: 'oidc', token: '', expires_at: 0 });
+      await next();
+      return;
+    }
     return c.json({ error: 'unauthorized' }, 401);
   }
 

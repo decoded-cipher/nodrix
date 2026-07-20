@@ -27,6 +27,13 @@ export const requireUserToken = createMiddleware<{
     return c.json({ error: 'forbidden' }, 403);
   }
 
+  // A `read` token may only read. Enforced here so any future write route behind
+  // this middleware is safe by default rather than silently open to read tokens.
+  const method = c.req.method;
+  if (row.scope !== 'admin' && method !== 'GET' && method !== 'HEAD') {
+    return c.json({ error: 'forbidden', reason: 'read_scope' }, 403);
+  }
+
   c.set('token', { id: row.id, project_id: row.project_id, scope: row.scope });
   c.executionCtx.waitUntil(touchTokenLastUsed(c.env, 'user', row.id));
 
