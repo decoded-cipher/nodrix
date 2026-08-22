@@ -46,6 +46,26 @@ const building = ref(false);
 const saving = ref(false);
 const buildLog = ref<string[]>([]);
 const buildError = ref('');
+const noAgent = ref(false);
+
+const AGENT_RELEASES = 'https://github.com/decoded-cipher/nodrix-agent/releases/latest';
+
+// Apple silicon and Intel are indistinguishable from the user agent.
+const agentBinary = computed(() => {
+  const ua = navigator.userAgent;
+  if (ua.includes('Win')) return 'nodrix-agent-windows-x64.exe';
+  if (ua.includes('Mac')) return 'nodrix-agent-macos-arm64';
+  return 'nodrix-agent-linux-x64';
+});
+
+const agentSetup = computed(() => [
+  `curl -fsSL -o nodrix-agent ${AGENT_RELEASES}/download/${agentBinary.value}`,
+  'chmod +x nodrix-agent',
+  '',
+  `NODRIX_INSTANCE=${window.location.origin} \\`,
+  'NODRIX_TOKEN=<admin token from Account -> Tokens> \\',
+  './nodrix-agent',
+].join('\n'));
 // The artifact outlives the flash, so the same build can also be kept for OTA.
 const lastBuild = ref('');
 
@@ -66,6 +86,7 @@ async function build(): Promise<string | null> {
   building.value = true;
   buildLog.value = [];
   buildError.value = '';
+  noAgent.value = false;
   lastBuild.value = '';
   try {
     const res = await runBuild(
@@ -75,6 +96,7 @@ async function build(): Promise<string | null> {
     );
     if (!res.ok) {
       buildError.value = res.error;
+      noAgent.value = res.code === 'no_agent';
       return null;
     }
     lastBuild.value = res.build;
@@ -128,6 +150,11 @@ watch(code, (v) => localStorage.setItem(storageKey.value, v));
 async function copy() {
   await navigator.clipboard.writeText(code.value);
   toast.success('Sketch copied');
+}
+
+async function copyAgentSetup() {
+  await navigator.clipboard.writeText(agentSetup.value);
+  toast.success('Commands copied');
 }
 
 function download() {
@@ -207,7 +234,30 @@ function download() {
           Press Flash to build this sketch on your machine. A first build installs the toolchain and takes minutes.
         </p>
         <pre v-if="buildLog.length" class="whitespace-pre-wrap break-all font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ buildLog.join('\n') }}</pre>
-        <p v-if="buildError" class="mt-2 font-mono text-xs text-red-600 dark:text-red-400">{{ buildError }}</p>
+        <p v-if="buildError && !noAgent" class="mt-2 font-mono text-xs text-red-600 dark:text-red-400">{{ buildError }}</p>
+
+        <div v-if="noAgent" class="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">No agent is running</p>
+          <p class="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">
+            Compiling needs a C++ toolchain, which a browser can't run. The nodrix agent does it on
+            your machine and sends the binary back. It never touches the serial port — this page keeps
+            doing the flashing.
+          </p>
+          <pre class="mt-2 overflow-x-auto rounded-md bg-neutral-950 p-3 font-mono text-[11px] leading-relaxed text-neutral-300">{{ agentSetup }}</pre>
+          <div class="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              class="rounded-md border border-amber-400 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/40"
+              @click="copyAgentSetup"
+            >Copy</button>
+            <a :href="AGENT_RELEASES" target="_blank" rel="noopener" class="text-xs font-medium text-amber-900 underline dark:text-amber-200">
+              Other platforms
+            </a>
+            <span class="text-[11px] text-amber-900/70 dark:text-amber-200/70">
+              Also needs arduino-cli, with <code>arduino-cli core install esp32:esp32</code>.
+            </span>
+          </div>
+        </div>
       </div>
 
       <div v-show="tab === 'serial'" class="min-h-0 flex-1 p-3">

@@ -63,7 +63,7 @@ export type SeriesRow = {
 // The artifact goes to R2 on its own route; only its id crosses the DO.
 export type BuildOutcome =
   | { ok: true; build: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
 
 type PendingBuild = { controller: ReadableByteStreamController; lines: number; done: boolean };
 
@@ -475,7 +475,9 @@ export class ProjectDO extends DurableObject<Env> {
       type: 'bytes',
       start: (controller) => {
         const pending: PendingBuild = { controller, lines: 0, done: false };
-        if (!agent) return this.finishBuild(pending, { ok: false, error: 'no agent is connected' });
+        if (!agent) {
+          return this.finishBuild(pending, { ok: false, code: 'no_agent', error: 'no agent is connected' });
+        }
 
         this.pendingBuilds.set(id, pending);
         setTimeout(() => {

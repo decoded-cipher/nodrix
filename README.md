@@ -14,6 +14,7 @@
 - 🧠 **Native MCP server** — an owner-gated Model Context Protocol endpoint with a Claude connector for AI clients (off by default).
 - 👥 **Multi-user** — owner / admin / member roles, email invites, and social sign-in (Google, GitHub).
 - 📝 **Audit log** — every privileged action recorded and paginated in the UI.
+- 🔧 **Write, build and flash from the browser** — a code editor, serial monitor and Web Serial flasher in one page; the [nodrix agent](https://github.com/decoded-cipher/nodrix-agent) compiles on your machine, and the same build ships over the air.
 
 ## Quick start
 
@@ -36,12 +37,30 @@
      -H "Authorization: Bearer $NODRIX_TOKEN"
    ```
 
+## Flashing hardware from the browser
+
+The Code page pairs an editor with a serial monitor and flashes over Web Serial, so a board goes from sketch to running without leaving the browser. Compiling is the one part a browser cannot do — the ESP32 sysroot alone is over 150 MB — so it runs on your own machine via the agent.
+
+```bash
+curl -fsSL -o nodrix-agent \
+  https://github.com/decoded-cipher/nodrix-agent/releases/latest/download/nodrix-agent-macos-arm64
+chmod +x nodrix-agent
+arduino-cli core install esp32:esp32
+
+NODRIX_INSTANCE=https://<your-worker> NODRIX_TOKEN=<admin token> ./nodrix-agent
+```
+
+Other platforms are on the [agent releases](https://github.com/decoded-cipher/nodrix-agent/releases/latest). The agent dials out to your instance, so there is no port to open and no certificate to install; it never touches the serial port, which the browser owns. Flashing needs Chrome, Edge or Opera on desktop, or Chrome on Android — Safari and Firefox have no Web Serial.
+
+Keep a build and it becomes a firmware version you can send to any device over the air.
+
 ## Architecture
 
 - **Worker** ([worker/](worker/)) — a single Hono app. Durable Objects for Project, Dashboard, Scheduler, and the MCP agent; one Workflow for provisioning; D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
 - **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder, built and served as Worker static assets.
 - **Shared** ([shared/](shared/)) — framework-agnostic Web Component widgets, the integration catalog, and automation blocks, consumed by both web and worker so there is a single source of truth.
 - **Deploy** ([deploy/](deploy/)) — the small config carrier behind the one-click Deploy to Cloudflare.
+- **Agent** ([nodrix-agent](https://github.com/decoded-cipher/nodrix-agent)) — an optional CLI on your own machine that runs `arduino-cli` for browser builds. Separate repo, separate release.
 
 ```
 worker/   Cloudflare Worker — API, Durable Objects, Workflow
