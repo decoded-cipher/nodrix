@@ -1,7 +1,7 @@
 // A build is an NDJSON stream: log lines as the toolchain emits them, then one
 // result frame. The HTTP status only reports whether the request was accepted.
 
-export type BuildResult = { ok: true; build: string } | { ok: false; error: string };
+export type BuildResult = { ok: true; build: string } | { ok: false; error: string; code?: string };
 
 type Frame = { type: 'log'; line: string } | ({ type: 'result' } & BuildResult);
 
@@ -46,7 +46,7 @@ export async function runBuild(
         const frame = parseFrame(part);
         if (!frame) continue;
         if (frame.type === 'log') onLine(frame.line);
-        else result = frame.ok ? { ok: true, build: frame.build } : { ok: false, error: frame.error };
+        else result = frame.ok ? { ok: true, build: frame.build } : { ok: false, error: frame.error, code: frame.code };
       }
     }
   } finally {
