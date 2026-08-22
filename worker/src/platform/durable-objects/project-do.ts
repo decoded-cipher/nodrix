@@ -59,8 +59,9 @@ export type SeriesRow = {
   value: unknown;
 };
 
+// The artifact goes to R2 on its own route; only its id crosses the DO.
 export type BuildOutcome =
-  | { ok: true; binary: string; log: string[] }
+  | { ok: true; build: string; log: string[] }
   | { ok: false; error: string; log: string[] };
 
 export type FlushResult = {
@@ -501,9 +502,10 @@ export class ProjectDO extends DurableObject<Env> {
     }
     if (msg['type'] !== 'result') return;
     this.pendingBuilds.delete(build);
+    // The agent uploads before it reports, so ok means the object is already there.
     pending.resolve(
-      msg['ok'] === true && typeof msg['binary'] === 'string'
-        ? { ok: true, binary: msg['binary'], log: pending.log }
+      msg['ok'] === true
+        ? { ok: true, build, log: pending.log }
         : { ok: false, error: String(msg['error'] ?? 'build failed'), log: pending.log }
     );
   }
@@ -662,7 +664,7 @@ export class ProjectDO extends DurableObject<Env> {
     const projectId = this.projectId();
 
     // A prefix added elsewhere and not listed here leaks objects nothing reaches.
-    for (const prefix of [`telemetry/${projectId}/`, `firmware/${projectId}/`]) {
+    for (const prefix of [`telemetry/${projectId}/`, `firmware/${projectId}/`, `builds/${projectId}/`]) {
       let cursor: string | undefined;
       do {
         const list = await this.env.R2.list({ prefix, ...(cursor ? { cursor } : {}) });

@@ -6,13 +6,28 @@ import { lookupUserToken, touchTokenLastUsed } from '../../platform/lib/tokens';
 import { projectStub } from '../../platform/durable-objects/stubs';
 
 const MAX_SKETCH_BYTES = 256 * 1024;
+const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;
 const SAFE_FQBN = /^[A-Za-z0-9_.:-]{1,120}$/;
+const SAFE_BUILD_ID = /^bld_[A-Za-z0-9_-]{12}$/;
+
+const ARTIFACT_MAX_AGE_MS = 60 * 60 * 1000;
+
+function artifactKey(projectId: string, buildId: string): string {
+  return `builds/${projectId}/${buildId}.bin`;
+}
+
+// A build that outran its request still uploads, and nothing will collect it.
+async function pruneArtifacts(env: Env, projectId: string): Promise<void> {
+  const cutoff = Date.now() - ARTIFACT_MAX_AGE_MS;
+  const list = await env.R2.list({ prefix: `builds/${projectId}/` });
+  const stale = list.objects.filter((o) => o.uploaded.getTime() < cutoff).map((o) => o.key);
+  if (stale.length > 0) await env.R2.delete(stale);
+}
 
 // A build runs toolchain work on somebody's physical machine, so not members.
-export async function agentWsHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+async function authoriseAgent(c: Context<{ Bindings: Env }>): Promise<string | Response> {
   const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim();
   if (!token) return c.text('unauthorized', 401);
-  if (c.req.header('upgrade') !== 'websocket') return c.text('expected websocket', 426);
 
   const row = await lookupUserToken(c.env, token);
   if (!row || row.scope !== 'admin') return c.text('unauthorized', 401);
@@ -23,11 +38,38 @@ export async function agentWsHandler(c: Context<{ Bindings: Env }>): Promise<Res
   if (row.project_id && row.project_id !== projectId) return c.text('forbidden', 403);
 
   c.executionCtx.waitUntil(touchTokenLastUsed(c.env, 'user', row.id));
+  return projectId;
+}
+
+export async function agentWsHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  if (c.req.header('upgrade') !== 'websocket') return c.text('expected websocket', 426);
+  const projectId = await authoriseAgent(c);
+  if (projectId instanceof Response) return projectId;
+
   const stub = projectStub(c.env, projectId);
   await stub.setProjectId(projectId);
   return stub.fetch(
     new Request(c.req.raw, { headers: { ...Object.fromEntries(c.req.raw.headers), 'x-nodrix-role': 'agent' } })
   );
+}
+
+// Straight to R2 — the DO is also running ingest for every board in the project.
+export async function agentArtifactHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const projectId = await authoriseAgent(c);
+  if (projectId instanceof Response) return projectId;
+
+  const build = c.req.param('build') ?? '';
+  if (!SAFE_BUILD_ID.test(build)) return c.text('invalid build id', 400);
+
+  const len = Number(c.req.header('content-length') ?? '0');
+  if (!Number.isFinite(len) || len <= 0) return c.text('length required', 411);
+  if (len > MAX_ARTIFACT_BYTES) return c.text('artifact too large', 413);
+  if (!c.req.raw.body) return c.text('empty body', 400);
+
+  await c.env.R2.put(artifactKey(projectId, build), c.req.raw.body, {
+    httpMetadata: { contentType: 'application/octet-stream' },
+  });
+  return c.body(null, 204);
 }
 
 const build = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
@@ -48,9 +90,32 @@ build.post('/', async (c) => {
     return c.json({ error: 'sketch_too_large' }, 413);
   }
 
+  c.executionCtx.waitUntil(pruneArtifacts(c.env, c.get('project').id).catch(() => {}));
+
   // Held open until the agent answers — no wall-clock limit while a client waits.
   const result = await projectStub(c.env, c.get('project').id).requestBuild(fqbn, sketch);
   return c.json(result, result.ok ? 200 : 409);
+});
+
+// One-shot: the browser flashes from memory and a rebuild is cheap.
+build.get('/:id/artifact', async (c) => {
+  const user = c.get('user');
+  if (user.role !== 'owner' && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+
+  const id = c.req.param('id');
+  if (!SAFE_BUILD_ID.test(id)) return c.json({ error: 'invalid_build' }, 400);
+
+  const key = artifactKey(c.get('project').id, id);
+  const object = await c.env.R2.get(key);
+  if (!object) return c.json({ error: 'not_found' }, 404);
+
+  c.executionCtx.waitUntil(c.env.R2.delete(key));
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(object.size),
+    },
+  });
 });
 
 export default build;

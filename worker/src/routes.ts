@@ -21,7 +21,7 @@ import variables from './domains/variables/routes';
 import devicesRouter from './domains/devices/routes';
 import firmware from './domains/firmware/routes';
 import firmwareAdmin from './domains/firmware/admin';
-import build, { agentWsHandler } from './domains/firmware/agent';
+import build, { agentWsHandler, agentArtifactHandler } from './domains/firmware/agent';
 import otaDevice from './domains/firmware/device';
 import { readList, readState, readSeries } from './domains/variables/read';
 import dashboards from './domains/dashboards/routes';
@@ -78,6 +78,7 @@ export function registerRoutes(app: App): void {
   app.route('/v1/ota', otaDevice);
   app.route('/v1/admin/projects/:proj/build', build);
   app.get('/v1/agent/ws', agentWsHandler);
+  app.put('/v1/agent/artifact/:build', agentArtifactHandler);
   app.route('/v1/admin/projects/:proj/dashboards', dashboards);
   app.route('/v1/admin/projects/:proj/automations', automations);
   app.route('/v1/admin/projects/:proj/integrations', integrations);

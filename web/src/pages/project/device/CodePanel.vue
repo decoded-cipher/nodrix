@@ -44,24 +44,23 @@ const building = ref(false);
 const buildLog = ref<string[]>([]);
 const buildError = ref('');
 
-type BuildResult = { ok: boolean; binary?: string; error?: string; log?: string[] };
+type BuildResult = { ok: boolean; build?: string; error?: string; log?: string[] };
 
 async function compileAndFlash() {
   building.value = true;
   buildLog.value = [];
   buildError.value = '';
   try {
-    const res = await api.post<BuildResult>(
-      `/v1/admin/projects/${project.currentProjectId}/build`,
-      { fqbn: fqbn.value, sketch: code.value }
-    );
+    const base = `/v1/admin/projects/${project.currentProjectId}/build`;
+    const res = await api.post<BuildResult>(base, { fqbn: fqbn.value, sketch: code.value });
     buildLog.value = res.log ?? [];
-    if (!res.ok || !res.binary) {
+    if (!res.ok || !res.build) {
       buildError.value = res.error ?? 'Build failed';
       return;
     }
     if (!port.value && !(await request())) return;
-    const bytes = Uint8Array.from(atob(res.binary), (ch) => ch.charCodeAt(0));
+    // The image is served once and deleted, so ask for it only after a port is open.
+    const bytes = new Uint8Array(await api.bytes(`${base}/${res.build}/artifact`));
     const ok = await flash([{ data: bytes, address: 0x10000 }]);
     if (ok) toast.success('Flashed — the board is restarting');
   } catch (e) {
