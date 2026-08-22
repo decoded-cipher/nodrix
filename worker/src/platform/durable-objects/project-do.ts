@@ -18,8 +18,8 @@ import { migrateSchema, type SchemaStep } from './schema';
 
 const RING_BUFFER_MAX_ROWS = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
-// Multi-row inserts bind 3 columns/row; this keeps a chunk under MAX_BOUND_PARAMS.
-const ROWS_PER_3COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 3);
+// Multi-row inserts bind 4 columns/row; this keeps a chunk under MAX_BOUND_PARAMS.
+const ROWS_PER_4COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 4);
 // Eviction (age + overflow DELETE + COUNT) runs at most this often instead of on
 // every ingest — a single cheap last_evict_at lookup gates the actual work.
 const EVICT_INTERVAL_SECONDS = 30;
@@ -40,6 +40,7 @@ export type IngestResult = {
 };
 
 export type LatestStateRow = {
+  device_id: string;
   variable: string;
   value: unknown;
   received_at: number;
@@ -105,6 +106,32 @@ const SCHEMA: SchemaStep[] = [
       );
     `);
   },
+  // '' is the default device. NULL can't serve: SQLite treats NULLs as distinct
+  // in a unique key, so the upsert would duplicate on every write.
+  (sql) => {
+    sql.exec(`
+      CREATE TABLE latest_state_new (
+        device_id   TEXT NOT NULL DEFAULT '',
+        variable    TEXT NOT NULL,
+        value       TEXT NOT NULL,
+        received_at INTEGER NOT NULL,
+        PRIMARY KEY (device_id, variable)
+      );
+    `);
+    sql.exec(`
+      INSERT INTO latest_state_new (device_id, variable, value, received_at)
+      SELECT '', variable, value, received_at FROM latest_state;
+    `);
+    sql.exec(`DROP TABLE latest_state;`);
+    sql.exec(`ALTER TABLE latest_state_new RENAME TO latest_state;`);
+
+    sql.exec(`ALTER TABLE ring_buffer ADD COLUMN device_id TEXT NOT NULL DEFAULT '';`);
+    sql.exec(`DROP INDEX IF EXISTS idx_ring_buffer_var_ts;`);
+    sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_dev_var_ts ON ring_buffer(device_id, variable, ts);`);
+
+    // NULL device still broadcasts.
+    sql.exec(`ALTER TABLE pending_control ADD COLUMN device_id TEXT;`);
+  },
 ];
 
 export class ProjectDO extends DurableObject<Env> {
@@ -132,7 +159,7 @@ export class ProjectDO extends DurableObject<Env> {
     );
   }
 
-  async ingest(projectId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
+  async ingest(projectId: string, points: IngestPoint[], deviceId = ''): Promise<IngestResult> {
     const receivedAt = Math.floor(Date.now() / 1000);
 
     // Persist project_id once for the R2 key (idFromName doesn't round-trip cheaply).
@@ -152,7 +179,8 @@ export class ProjectDO extends DurableObject<Env> {
       const placeholders = part.map(() => '?').join(',');
       const rows = this.sql
         .exec<{ variable: string; value: string }>(
-          `SELECT variable, value FROM latest_state WHERE variable IN (${placeholders})`,
+          `SELECT variable, value FROM latest_state WHERE device_id = ? AND variable IN (${placeholders})`,
+          deviceId,
           ...part
         )
         .toArray();
@@ -163,28 +191,28 @@ export class ProjectDO extends DurableObject<Env> {
     // can't have two VALUES rows hit the same conflict target).
     const latestByVar = new Map<string, unknown>();
     for (const p of points) latestByVar.set(p.variable, p.value);
-    for (const part of chunk([...latestByVar], ROWS_PER_3COL_INSERT)) {
-      const rows = part.map(() => '(?, ?, ?)').join(', ');
+    for (const part of chunk([...latestByVar], ROWS_PER_4COL_INSERT)) {
+      const rows = part.map(() => '(?, ?, ?, ?)').join(', ');
       const binds: unknown[] = [];
       for (const [variable, value] of part) {
-        binds.push(variable, JSON.stringify(value), receivedAt);
+        binds.push(deviceId, variable, JSON.stringify(value), receivedAt);
       }
       this.sql.exec(
-        `INSERT INTO latest_state (variable, value, received_at)
+        `INSERT INTO latest_state (device_id, variable, value, received_at)
          VALUES ${rows}
-         ON CONFLICT(variable) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
+         ON CONFLICT(device_id, variable) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
         ...binds
       );
     }
 
     // ring_buffer: append every point.
-    for (const part of chunk(points, ROWS_PER_3COL_INSERT)) {
-      const rows = part.map(() => '(?, ?, ?)').join(', ');
+    for (const part of chunk(points, ROWS_PER_4COL_INSERT)) {
+      const rows = part.map(() => '(?, ?, ?, ?)').join(', ');
       const binds: unknown[] = [];
       for (const p of part) {
-        binds.push(receivedAt, p.variable, JSON.stringify(p.value));
+        binds.push(receivedAt, deviceId, p.variable, JSON.stringify(p.value));
       }
-      this.sql.exec(`INSERT INTO ring_buffer (ts, variable, value) VALUES ${rows}`, ...binds);
+      this.sql.exec(`INSERT INTO ring_buffer (ts, device_id, variable, value) VALUES ${rows}`, ...binds);
     }
 
     // Eviction is independent of the flush cursor (copy-not-move).
@@ -338,11 +366,13 @@ export class ProjectDO extends DurableObject<Env> {
 
   async getLatestState(): Promise<LatestStateRow[]> {
     const rows = this.sql
-      .exec<{ variable: string; value: string; received_at: number }>(
-        `SELECT variable, value, received_at FROM latest_state ORDER BY variable ASC`
+      .exec<{ device_id: string; variable: string; value: string; received_at: number }>(
+        `SELECT device_id, variable, value, received_at FROM latest_state
+         ORDER BY device_id ASC, variable ASC`
       )
       .toArray();
     return rows.map((r) => ({
+      device_id: r.device_id,
       variable: r.variable,
       value: safeParse(r.value),
       received_at: r.received_at,
@@ -354,18 +384,21 @@ export class ProjectDO extends DurableObject<Env> {
   async getSeriesForVariables(
     variables: string[],
     sinceTs: number | null,
-    cap?: number
+    cap?: number,
+    deviceId?: string | null
   ): Promise<CompactSeries> {
     if (variables.length === 0) return {};
     const cutoff = sinceTs ?? 0;
     const placeholders = variables.map(() => '?').join(',');
+    const scoped = deviceId != null;
     const rows = this.sql
       .exec<{ ts: number; variable: string; value: string }>(
         `SELECT ts, variable, value FROM ring_buffer
-         WHERE variable IN (${placeholders}) AND ts >= ?
+         WHERE variable IN (${placeholders}) AND ts >= ?${scoped ? ' AND device_id = ?' : ''}
          ORDER BY ts ASC`,
         ...variables,
-        cutoff
+        cutoff,
+        ...(scoped ? [deviceId] : [])
       )
       .toArray();
     return toCompactSeries(
@@ -374,26 +407,24 @@ export class ProjectDO extends DurableObject<Env> {
     );
   }
 
-  async getSeries(variable: string | null, sinceTs: number | null): Promise<SeriesRow[]> {
+  async getSeries(
+    variable: string | null,
+    sinceTs: number | null,
+    deviceId?: string | null
+  ): Promise<SeriesRow[]> {
     const cutoff = sinceTs ?? 0;
-    const rows = variable
-      ? this.sql
-          .exec<{ ts: number; variable: string; value: string }>(
-            `SELECT ts, variable, value FROM ring_buffer
-             WHERE variable = ? AND ts >= ?
-             ORDER BY ts ASC`,
-            variable,
-            cutoff
-          )
-          .toArray()
-      : this.sql
-          .exec<{ ts: number; variable: string; value: string }>(
-            `SELECT ts, variable, value FROM ring_buffer
-             WHERE ts >= ?
-             ORDER BY ts ASC`,
-            cutoff
-          )
-          .toArray();
+    const where = ['ts >= ?'];
+    const binds: unknown[] = [cutoff];
+    if (variable) { where.push('variable = ?'); binds.push(variable); }
+    if (deviceId != null) { where.push('device_id = ?'); binds.push(deviceId); }
+    const rows = this.sql
+      .exec<{ ts: number; variable: string; value: string }>(
+        `SELECT ts, variable, value FROM ring_buffer
+         WHERE ${where.join(' AND ')}
+         ORDER BY ts ASC`,
+        ...binds
+      )
+      .toArray();
     return rows.map((r) => ({ ts: r.ts, variable: r.variable, value: safeParse(r.value) }));
   }
 
@@ -456,10 +487,16 @@ export class ProjectDO extends DurableObject<Env> {
 
   // Drops hot state for a variable. Cold R2 history (partitioned by project+hour)
   // is left in place — orphaned but harmless.
-  async deleteVariable(variable: string): Promise<void> {
-    this.sql.exec(`DELETE FROM latest_state WHERE variable = ?`, variable);
-    this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ?`, variable);
-    this.sql.exec(`DELETE FROM pending_control WHERE variable = ?`, variable);
+  async deleteVariable(variable: string, deviceId?: string | null): Promise<void> {
+    if (deviceId == null) {
+      this.sql.exec(`DELETE FROM latest_state WHERE variable = ?`, variable);
+      this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ?`, variable);
+      this.sql.exec(`DELETE FROM pending_control WHERE variable = ?`, variable);
+      return;
+    }
+    this.sql.exec(`DELETE FROM latest_state WHERE variable = ? AND device_id = ?`, variable, deviceId);
+    this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ? AND device_id = ?`, variable, deviceId);
+    this.sql.exec(`DELETE FROM pending_control WHERE variable = ? AND device_id IS ?`, variable, deviceId);
   }
 
   async flushNow(): Promise<FlushResult> {
@@ -614,8 +651,8 @@ export class ProjectDO extends DurableObject<Env> {
   private async runFlush(): Promise<FlushResult> {
     const cursor = this.getFlushCursor();
     const rows = this.sql
-      .exec<{ rowid: number; ts: number; variable: string; value: string }>(
-        `SELECT rowid, ts, variable, value FROM ring_buffer WHERE rowid > ? ORDER BY rowid ASC`,
+      .exec<{ rowid: number; ts: number; device_id: string; variable: string; value: string }>(
+        `SELECT rowid, ts, device_id, variable, value FROM ring_buffer WHERE rowid > ? ORDER BY rowid ASC`,
         cursor
       )
       .toArray();
@@ -639,7 +676,7 @@ export class ProjectDO extends DurableObject<Env> {
       const key = `telemetry/${projectId}/${bucket}/r-${lastRowid.toString().padStart(12, '0')}.ndjson`;
       const body = bucketRows
         .map((r) =>
-          JSON.stringify({ ts: r.ts, variable: r.variable, value: safeParse(r.value) })
+          JSON.stringify({ ts: r.ts, device: r.device_id || null, variable: r.variable, value: safeParse(r.value) })
         )
         .join('\n') + '\n';
 
