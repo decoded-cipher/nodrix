@@ -167,3 +167,23 @@ export async function forgetDevice(env: Env, projectId: string, id: string): Pro
   forgetCachedDevice(projectId, row.device_key);
   await projectStub(env, projectId).deleteDevice(id);
 }
+
+export async function recordDeviceSeen(
+  env: Env,
+  id: string,
+  chip?: string,
+  firmware?: string
+): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB
+    .prepare(
+      `UPDATE devices
+          SET last_seen = ?,
+              first_seen = COALESCE(first_seen, ?),
+              chip = COALESCE(?, chip),
+              firmware_version = COALESCE(?, firmware_version)
+        WHERE id = ?`
+    )
+    .bind(now, now, chip ?? null, firmware ?? null, id)
+    .run();
+}

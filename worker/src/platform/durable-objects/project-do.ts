@@ -10,7 +10,7 @@ import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
-import { defaultDeviceId } from '../../domains/devices/service';
+import { defaultDeviceId, normaliseDeviceKey, resolveDevice, recordDeviceSeen } from '../../domains/devices/service';
 import { migrateSchema, type SchemaStep } from './schema';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
@@ -440,21 +440,23 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM subscriptions WHERE dashboard_id = ?`, dashboardId);
   }
 
-  async addControl(id: string, variable: string, value: unknown): Promise<void> {
+  async addControl(id: string, variable: string, value: unknown, deviceId: string | null = null): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
     this.sql.exec(
-      `INSERT INTO pending_control (id, variable, value, created_at, delivered_at)
-       VALUES (?, ?, ?, ?, NULL)`,
+      `INSERT INTO pending_control (id, variable, value, created_at, delivered_at, device_id)
+       VALUES (?, ?, ?, ?, NULL, ?)`,
       id,
       variable,
       JSON.stringify(value),
-      now
+      now,
+      deviceId
     );
 
-    // Push to any connected hardware WS clients. If offline, the write stays in
-    // pending_control and is flushed on next connect.
+    // Push to connected hardware. If offline, the write stays in pending_control
+    // and is flushed on next connect.
     const payload = JSON.stringify({ type: 'control', id, variable, value });
     for (const ws of this.ctx.getWebSockets()) {
+      if (deviceId !== null && this.deviceOf(ws) !== deviceId) continue;
       try { ws.send(payload); } catch { /* dead socket; ignore */ }
     }
 
@@ -499,6 +501,28 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM pending_control WHERE variable = ? AND device_id IS ?`, variable, deviceId);
   }
 
+  // Survives hibernation, unlike anything held in memory.
+  private deviceOf(ws: WebSocket): string {
+    const att = ws.deserializeAttachment() as { device?: string } | null;
+    return typeof att?.device === 'string' ? att.device : '';
+  }
+
+  private sendPending(ws: WebSocket, where: string, ...binds: unknown[]): void {
+    const rows = this.sql
+      .exec<{ id: string; variable: string; value: string }>(
+        `SELECT id, variable, value FROM pending_control
+          WHERE delivered_at IS NULL AND ${where}
+          ORDER BY created_at ASC`,
+        ...binds
+      )
+      .toArray();
+    for (const cmd of rows) {
+      try {
+        ws.send(JSON.stringify({ type: 'control', id: cmd.id, variable: cmd.variable, value: safeParse(cmd.value) }));
+      } catch { /* dead socket; ignore */ }
+    }
+  }
+
   async deleteDevice(deviceId: string): Promise<void> {
     this.sql.exec(`DELETE FROM latest_state WHERE device_id = ?`, deviceId);
     this.sql.exec(`DELETE FROM ring_buffer WHERE device_id = ?`, deviceId);
@@ -522,26 +546,9 @@ export class ProjectDO extends DurableObject<Env> {
     const server = pair[1] as WebSocket;
     this.ctx.acceptWebSocket(server);
 
-    // Flush any pending (undelivered) control writes on connect so a device
-    // that missed messages while offline catches up immediately. The device
-    // acks them via `{type:'ack', ids:[...]}` once processed.
-    const pending = this.sql
-      .exec<{ id: string; variable: string; value: string }>(
-        `SELECT id, variable, value FROM pending_control
-          WHERE delivered_at IS NULL
-          ORDER BY created_at ASC`
-      )
-      .toArray();
-    for (const cmd of pending) {
-      try {
-        server.send(JSON.stringify({
-          type: 'control',
-          id: cmd.id,
-          variable: cmd.variable,
-          value: safeParse(cmd.value),
-        }));
-      } catch { /* ignore */ }
-    }
+    // Until a hello arrives the socket counts as the default device.
+    server.serializeAttachment({ device: '' });
+    this.sendPending(server, `(device_id IS NULL OR device_id = '')`);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -552,12 +559,22 @@ export class ProjectDO extends DurableObject<Env> {
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
     const msg = parseDeviceMessage(raw);
     switch (msg.kind) {
+      case 'hello': {
+        const pid = this.projectId();
+        const key = normaliseDeviceKey(msg.device);
+        const device = key ? await resolveDevice(this.env, pid, key, Math.floor(Date.now() / 1000)) : null;
+        if (!device || !device.storageId) return;
+        ws.serializeAttachment({ device: device.storageId });
+        this.ctx.waitUntil(recordDeviceSeen(this.env, device.id, msg.chip, msg.firmware));
+        this.sendPending(ws, `device_id = ?`, device.storageId);
+        return;
+      }
       case 'ack':
         if (msg.ids.length > 0) await this.ackControl(msg.ids);
         return;
       case 'telemetry': {
         const pid = this.projectId();
-        await this.ingest(pid, msg.points);
+        await this.ingest(pid, msg.points, this.deviceOf(ws));
         const now = Math.floor(Date.now() / 1000);
         this.ctx.waitUntil(
           defaultDeviceId(this.env, pid).then((deviceId) =>
