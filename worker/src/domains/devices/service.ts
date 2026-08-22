@@ -15,6 +15,8 @@ export type DeviceSummary = {
   is_default: number;
   first_seen: number | null;
   last_seen: number | null;
+  desired_firmware_id: string | null;
+  ota_status: string | null;
 };
 
 const MAX_DEVICES_PER_PROJECT = 100;
@@ -126,7 +128,8 @@ export async function storageIdOf(env: Env, projectId: string, deviceId: string)
 export async function listDevices(env: Env, projectId: string): Promise<DeviceSummary[]> {
   const rows = await env.DB
     .prepare(
-      `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen
+      `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen,
+              desired_firmware_id, ota_status
          FROM devices WHERE project_id = ? ORDER BY is_default DESC, name ASC`
     )
     .bind(projectId)
@@ -151,7 +154,8 @@ export async function renameDevice(
   if (res.meta.changes === 0) throw new ServiceError('not_found', 'no such device', 'unknown_device');
   const row = await env.DB
     .prepare(
-      `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen
+      `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen,
+              desired_firmware_id, ota_status
          FROM devices WHERE id = ?`
     )
     .bind(id)

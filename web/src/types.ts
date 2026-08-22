@@ -78,6 +78,18 @@ export type Device = {
   is_default: number;
   first_seen: number | null;
   last_seen: number | null;
+  desired_firmware_id: string | null;
+  ota_status: string | null;
+};
+
+export type Firmware = {
+  id: string;
+  version: string;
+  target: string | null;
+  size: number;
+  sha256: string;
+  notes: string | null;
+  created_at: number;
 };
 
 export type FirmwareEntry = { example: string; target: string; file: string; size: number };

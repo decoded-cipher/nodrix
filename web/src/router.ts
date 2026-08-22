@@ -48,6 +48,7 @@ const routes: RouteRecordRaw[] = [
             component: () => import('./pages/project/device/DeviceHub.vue'),
             children: [
               { path: '', name: 'devices', component: () => import('./pages/project/device/DevicesList.vue'), meta: { title: 'Devices' } },
+              { path: 'firmware', name: 'device-firmware', component: () => import('./pages/project/device/FirmwarePanel.vue'), meta: { title: 'Firmware' } },
               { path: 'flash', name: 'device-flash', component: () => import('./pages/project/device/FlashPanel.vue'), meta: { title: 'Flash' } },
               { path: 'console', name: 'serial-console', component: () => import('./pages/project/device/SerialConsole.vue'), meta: { title: 'Console' } },
             ],
