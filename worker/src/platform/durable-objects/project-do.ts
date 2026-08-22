@@ -10,7 +10,7 @@ import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
-import { defaultDeviceId, normaliseDeviceKey, resolveDevice, recordDeviceSeen } from '../../domains/devices/service';
+import { defaultDeviceId, normaliseDeviceKey, resolveDevice, recordDeviceSeen, touchDevice } from '../../domains/devices/service';
 import { reconcile } from '../../domains/firmware/ota';
 import { migrateSchema } from './schema';
 import { PROJECT_SCHEMA } from './project-schema';
@@ -514,6 +514,11 @@ export class ProjectDO extends DurableObject<Env> {
     return typeof att?.device === 'string' ? att.device : '';
   }
 
+  // The attachment holds a storage id; '' has to become a real D1 id.
+  private async d1DeviceId(ws: WebSocket, projectId: string): Promise<string | null> {
+    return this.deviceOf(ws) || (await defaultDeviceId(this.env, projectId));
+  }
+
   private sendPending(ws: WebSocket, where: string, ...binds: unknown[]): void {
     const rows = this.sql
       .exec<{ id: string; variable: string; value: string }>(
@@ -619,8 +624,13 @@ export class ProjectDO extends DurableObject<Env> {
         await this.ingest(pid, msg.points, this.deviceOf(ws));
         const now = Math.floor(Date.now() / 1000);
         this.ctx.waitUntil(
-          defaultDeviceId(this.env, pid).then((deviceId) =>
-            deviceId ? upsertVariables(this.env, pid, deviceId, msg.points.map((p) => p.variable), now) : undefined
+          this.d1DeviceId(ws, pid).then((id) =>
+            id
+              ? Promise.all([
+                  upsertVariables(this.env, pid, id, msg.points.map((p) => p.variable), now),
+                  touchDevice(this.env, id),
+                ])
+              : undefined
           )
         );
         return;

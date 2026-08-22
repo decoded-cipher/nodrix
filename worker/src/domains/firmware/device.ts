@@ -1,22 +1,25 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
-import { normaliseDeviceKey, resolveDevice } from '../devices/service';
+import { normaliseDeviceKey, resolveDevice, touchDevice } from '../devices/service';
 import { offerFor, openImage } from './ota';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { storageIdOf } from '../devices/service';
+
+type OtaContext = Context<{ Bindings: Env; Variables: ProjectTokenContextVars }>;
 
 const ota = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
 ota.use('*', requireProjectToken);
 
-async function deviceIdFor(c: { env: Env; req: { header: (n: string) => string | undefined } }, projectId: string) {
+async function deviceIdFor(c: OtaContext, projectId: string) {
   const device = await resolveDevice(
     c.env,
     projectId,
     normaliseDeviceKey(c.req.header('x-nodrix-device')),
     Math.floor(Date.now() / 1000)
   );
+  if (device) c.executionCtx.waitUntil(touchDevice(c.env, device.id));
   return device?.id ?? null;
 }
 

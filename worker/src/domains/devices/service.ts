@@ -182,6 +182,30 @@ export async function forgetDevice(env: Env, projectId: string, id: string): Pro
   await projectStub(env, projectId).deleteDevice(id);
 }
 
+const SEEN_THROTTLE_MS = 60_000;
+const seenWrites = new Map<string, number>();
+
+// Ingest is hot and last_seen only needs to be roughly right.
+export async function touchDevice(env: Env, id: string): Promise<void> {
+  const nowMs = Date.now();
+  const prev = seenWrites.get(id);
+  if (prev !== undefined && nowMs - prev < SEEN_THROTTLE_MS) return;
+  seenWrites.set(id, nowMs);
+  if (seenWrites.size > 10_000) {
+    const cutoff = nowMs - SEEN_THROTTLE_MS;
+    for (const [k, t] of seenWrites) if (t < cutoff) seenWrites.delete(k);
+  }
+  const now = Math.floor(nowMs / 1000);
+  try {
+    await env.DB
+      .prepare(`UPDATE devices SET last_seen = ?, first_seen = COALESCE(first_seen, ?) WHERE id = ?`)
+      .bind(now, now, id)
+      .run();
+  } catch {
+    seenWrites.delete(id);
+  }
+}
+
 export async function recordDeviceSeen(
   env: Env,
   id: string,

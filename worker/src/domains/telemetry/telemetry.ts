@@ -4,7 +4,7 @@ import { requireProjectToken, type ProjectTokenContextVars } from '../../platfor
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { parseTelemetryBody, MAX_POINTS, MAX_KEY_LEN, MAX_STRING_VALUE } from './validate';
 import { upsertVariables } from './variables';
-import { normaliseDeviceKey, resolveDevice } from '../devices/service';
+import { normaliseDeviceKey, resolveDevice, touchDevice } from '../devices/service';
 
 const telemetry = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
@@ -51,7 +51,10 @@ telemetry.post('/', async (c) => {
   // Auto-create new variables + bump last_seen off the response path (best-effort).
   if (device) {
     c.executionCtx.waitUntil(
-      upsertVariables(c.env, project_id, device.id, points.map((p) => p.variable), now)
+      Promise.all([
+        upsertVariables(c.env, project_id, device.id, points.map((p) => p.variable), now),
+        touchDevice(c.env, device.id),
+      ])
     );
   }
 

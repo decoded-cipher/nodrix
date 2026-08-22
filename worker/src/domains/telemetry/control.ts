@@ -3,7 +3,7 @@ import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { lookupProjectToken, touchTokenLastUsed } from '../../platform/lib/tokens';
 import { projectStub } from '../../platform/durable-objects/stubs';
-import { normaliseDeviceKey, resolveDevice } from '../devices/service';
+import { normaliseDeviceKey, resolveDevice, touchDevice } from '../devices/service';
 
 const control = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
@@ -19,6 +19,7 @@ control.get('/', async (c) => {
     normaliseDeviceKey(c.req.header('x-nodrix-device')),
     Math.floor(Date.now() / 1000)
   );
+  if (device) c.executionCtx.waitUntil(touchDevice(c.env, device.id));
   const stub = projectStub(c.env, project_id);
   const pending = await stub.listPendingControl(device?.storageId ?? '');
   return c.json({ control: pending });
