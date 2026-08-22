@@ -10,6 +10,7 @@ import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
+import { defaultDeviceId } from '../../domains/devices/service';
 import { migrateSchema, type SchemaStep } from './schema';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
@@ -515,7 +516,11 @@ export class ProjectDO extends DurableObject<Env> {
         const pid = this.projectId();
         await this.ingest(pid, msg.points);
         const now = Math.floor(Date.now() / 1000);
-        this.ctx.waitUntil(upsertVariables(this.env, pid, msg.points.map((p) => p.variable), now));
+        this.ctx.waitUntil(
+          defaultDeviceId(this.env, pid).then((deviceId) =>
+            deviceId ? upsertVariables(this.env, pid, deviceId, msg.points.map((p) => p.variable), now) : undefined
+          )
+        );
         return;
       }
       case 'event':

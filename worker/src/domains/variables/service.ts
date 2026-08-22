@@ -4,6 +4,7 @@ import { recordAudit } from '../../platform/lib/audit';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
+import { defaultDeviceId } from '../devices/service';
 
 export type VariableSummary = {
   id: string;
@@ -68,13 +69,17 @@ export async function createVariable(
 
   const id = newId('variable');
   const now = Math.floor(Date.now() / 1000);
+  // Hand-declared variables belong to the default device; a board that reports
+  // the same key under its own identity gets its own row.
+  const deviceId = await defaultDeviceId(env, projectId);
+  if (!deviceId) throw new ServiceError('not_found', 'project has no default device', 'no_default_device');
   try {
     await env.DB
       .prepare(
-        `INSERT INTO project_variables (id, project_id, key, unit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO project_variables (id, project_id, device_id, key, unit, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, projectId, key, input.unit ?? null, now, now)
+      .bind(id, projectId, deviceId, key, input.unit ?? null, now, now)
       .run();
   } catch {
     throw new ServiceError('conflict', 'a variable with this key already exists', 'duplicate_key');

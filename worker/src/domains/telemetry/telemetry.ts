@@ -4,6 +4,7 @@ import { requireProjectToken, type ProjectTokenContextVars } from '../../platfor
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { parseTelemetryBody, MAX_POINTS, MAX_KEY_LEN, MAX_STRING_VALUE } from './validate';
 import { upsertVariables } from './variables';
+import { normaliseDeviceKey, resolveDevice } from '../devices/service';
 
 const telemetry = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
@@ -40,14 +41,19 @@ telemetry.post('/', async (c) => {
   const points = parsed.points;
 
   const { project_id } = c.get('projectToken');
+  const now = Math.floor(Date.now() / 1000);
+  const deviceKey = normaliseDeviceKey(c.req.header('x-nodrix-device'));
+  const deviceId = await resolveDevice(c.env, project_id, deviceKey, now);
+
   const stub = projectStub(c.env, project_id);
   await stub.ingest(project_id, points);
 
   // Auto-create new variables + bump last_seen off the response path (best-effort).
-  const now = Math.floor(Date.now() / 1000);
-  c.executionCtx.waitUntil(
-    upsertVariables(c.env, project_id, points.map((p) => p.variable), now)
-  );
+  if (deviceId) {
+    c.executionCtx.waitUntil(
+      upsertVariables(c.env, project_id, deviceId, points.map((p) => p.variable), now)
+    );
+  }
 
   return c.body(null, 204);
 });

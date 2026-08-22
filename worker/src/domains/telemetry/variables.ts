@@ -12,8 +12,8 @@ const MAX_VARIABLES_PER_PROJECT = 250;
 const LAST_SEEN_THROTTLE_MS = 60_000;
 const lastSeenWrites = new Map<string, number>();
 
-function dueForLastSeen(projectId: string, key: string, nowMs: number): boolean {
-  const k = `${projectId}:${key}`;
+function dueForLastSeen(deviceId: string, key: string, nowMs: number): boolean {
+  const k = `${deviceId}:${key}`;
   const prev = lastSeenWrites.get(k);
   if (prev !== undefined && nowMs - prev < LAST_SEEN_THROTTLE_MS) return false;
   lastSeenWrites.set(k, nowMs);
@@ -27,11 +27,12 @@ function dueForLastSeen(projectId: string, key: string, nowMs: number): boolean 
 export async function upsertVariables(
   env: Env,
   projectId: string,
+  deviceId: string,
   keys: string[],
   now: number
 ): Promise<void> {
   const nowMs = Date.now();
-  const due = [...new Set(keys)].filter((key) => dueForLastSeen(projectId, key, nowMs));
+  const due = [...new Set(keys)].filter((key) => dueForLastSeen(deviceId, key, nowMs));
   if (due.length === 0) return;
   try {
     // Existing keys only refresh last_seen; new keys count against the cap. Chunk the
@@ -40,8 +41,8 @@ export async function upsertVariables(
     for (const part of chunk(due, MAX_BOUND_PARAMS - 1)) {
       const placeholders = part.map(() => '?').join(',');
       const rows = await env.DB
-        .prepare(`SELECT key FROM project_variables WHERE project_id = ? AND key IN (${placeholders})`)
-        .bind(projectId, ...part)
+        .prepare(`SELECT key FROM project_variables WHERE device_id = ? AND key IN (${placeholders})`)
+        .bind(deviceId, ...part)
         .all<{ key: string }>();
       for (const r of rows.results) existing.add(r.key);
     }
@@ -61,15 +62,15 @@ export async function upsertVariables(
       keysToWrite.map((key) =>
         env.DB
           .prepare(
-            `INSERT INTO project_variables (id, project_id, key, created_at, updated_at, last_seen)
-             VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT(project_id, key) DO UPDATE SET last_seen = excluded.last_seen`
+            `INSERT INTO project_variables (id, project_id, device_id, key, created_at, updated_at, last_seen)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(project_id, device_id, key) DO UPDATE SET last_seen = excluded.last_seen`
           )
-          .bind(newId('variable'), projectId, key, now, now, now)
+          .bind(newId('variable'), projectId, deviceId, key, now, now, now)
       )
     );
   } catch {
     // Best-effort — never fail telemetry on it. Clear stamps so a failed write retries next ingest.
-    for (const key of due) lastSeenWrites.delete(`${projectId}:${key}`);
+    for (const key of due) lastSeenWrites.delete(`${deviceId}:${key}`);
   }
 }

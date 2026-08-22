@@ -51,8 +51,9 @@ export const MIGRATIONS: Migration[] = [
   {
     "name": "0002_devices",
     "statements": [
-      "CREATE TABLE IF NOT EXISTS devices (\n  id               TEXT PRIMARY KEY,\n  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name             TEXT NOT NULL,\n  chip             TEXT,\n  firmware_version TEXT,\n  is_default       INTEGER NOT NULL DEFAULT 0,\n  first_seen       INTEGER,\n  last_seen        INTEGER,\n  created_at       INTEGER NOT NULL\n)",
+      "CREATE TABLE IF NOT EXISTS devices (\n  id               TEXT PRIMARY KEY,\n  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name             TEXT NOT NULL,\n  device_key       TEXT,\n  chip             TEXT,\n  firmware_version TEXT,\n  is_default       INTEGER NOT NULL DEFAULT 0,\n  first_seen       INTEGER,\n  last_seen        INTEGER,\n  created_at       INTEGER NOT NULL\n)",
       "CREATE INDEX IF NOT EXISTS idx_devices_project ON devices(project_id)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_key\n  ON devices(project_id, device_key) WHERE device_key IS NOT NULL",
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_default\n  ON devices(project_id) WHERE is_default = 1",
       "INSERT INTO devices (id, project_id, name, is_default, created_at)\nSELECT 'dev_' || substr(p.id, 5), p.id, 'Default', 1, p.created_at\nFROM projects p\nWHERE NOT EXISTS (SELECT 1 FROM devices d WHERE d.project_id = p.id AND d.is_default = 1)",
       "CREATE TABLE project_variables_new (\n  id          TEXT PRIMARY KEY,\n  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  device_id   TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,\n  key         TEXT NOT NULL,\n  unit        TEXT,\n  created_at  INTEGER NOT NULL,\n  updated_at  INTEGER NOT NULL,\n  last_seen   INTEGER\n)",

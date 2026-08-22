@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS devices (
   id               TEXT PRIMARY KEY,
   project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name             TEXT NOT NULL,
+  device_key       TEXT,
   chip             TEXT,
   firmware_version TEXT,
   is_default       INTEGER NOT NULL DEFAULT 0,
@@ -11,6 +12,11 @@ CREATE TABLE IF NOT EXISTS devices (
   created_at       INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_devices_project ON devices(project_id);
+
+-- What the board calls itself, kept apart from the id so renaming is free and a
+-- MAC never leaks into anything a user reads. NULL on the default device.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_key
+  ON devices(project_id, device_key) WHERE device_key IS NOT NULL;
 
 -- Exactly one default per project, enforced rather than assumed.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_default
