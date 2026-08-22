@@ -6,6 +6,7 @@ import { toast } from '../../../lib/toast';
 import CodeEditor from '../../../components/CodeEditor.vue';
 import { useEspFlasher } from '../../../composables/useEspFlasher';
 import { useSerialPort } from '../../../composables/useSerialPort';
+import { runBuild } from '../../../composables/useAgentBuild';
 import type { FirmwareCatalog } from '../../../types';
 
 const project = useProjectStore();
@@ -44,23 +45,22 @@ const building = ref(false);
 const buildLog = ref<string[]>([]);
 const buildError = ref('');
 
-type BuildResult = { ok: boolean; build?: string; error?: string; log?: string[] };
-
 async function compileAndFlash() {
   building.value = true;
   buildLog.value = [];
   buildError.value = '';
   try {
-    const base = `/v1/admin/projects/${project.currentProjectId}/build`;
-    const res = await api.post<BuildResult>(base, { fqbn: fqbn.value, sketch: code.value });
-    buildLog.value = res.log ?? [];
-    if (!res.ok || !res.build) {
-      buildError.value = res.error ?? 'Build failed';
+    const pid = project.currentProjectId ?? '';
+    const res = await runBuild(pid, { fqbn: fqbn.value, sketch: code.value }, (line) => {
+      buildLog.value.push(line);
+    });
+    if (!res.ok) {
+      buildError.value = res.error;
       return;
     }
     if (!port.value && !(await request())) return;
     // The image is served once and deleted, so ask for it only after a port is open.
-    const bytes = new Uint8Array(await api.bytes(`${base}/${res.build}/artifact`));
+    const bytes = new Uint8Array(await api.bytes(`/v1/admin/projects/${pid}/build/${res.build}/artifact`));
     const ok = await flash([{ data: bytes, address: 0x10000 }]);
     if (ok) toast.success('Flashed — the board is restarting');
   } catch (e) {

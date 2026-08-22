@@ -93,8 +93,9 @@ build.post('/', async (c) => {
   c.executionCtx.waitUntil(pruneArtifacts(c.env, c.get('project').id).catch(() => {}));
 
   // Held open until the agent answers — no wall-clock limit while a client waits.
-  const result = await projectStub(c.env, c.get('project').id).requestBuild(fqbn, sketch);
-  return c.json(result, result.ok ? 200 : 409);
+  // The outcome is the last frame of the stream, so this is a 200 either way.
+  const stream = await projectStub(c.env, c.get('project').id).requestBuild(fqbn, sketch);
+  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson' } });
 });
 
 // One-shot: the browser flashes from memory and a rebuild is cheap.
