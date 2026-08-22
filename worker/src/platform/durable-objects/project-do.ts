@@ -631,22 +631,21 @@ export class ProjectDO extends DurableObject<Env> {
     // Same as close: nothing to do.
   }
 
-  // Wipes all data owned by this project — DO SQLite + R2 telemetry history.
+  // Wipes all data owned by this project — DO SQLite + everything it owns in R2.
   async destroy(): Promise<void> {
     const projectId = this.projectId();
 
-    // Delete every R2 object under telemetry/{projectId}/ (paginated).
-    let cursor: string | undefined;
-    do {
-      const list = await this.env.R2.list({
-        prefix: `telemetry/${projectId}/`,
-        ...(cursor ? { cursor } : {}),
-      });
-      if (list.objects.length > 0) {
-        await this.env.R2.delete(list.objects.map((o) => o.key));
-      }
-      cursor = list.truncated ? list.cursor : undefined;
-    } while (cursor);
+    // A prefix added elsewhere and not listed here leaks objects nothing reaches.
+    for (const prefix of [`telemetry/${projectId}/`, `firmware/${projectId}/`]) {
+      let cursor: string | undefined;
+      do {
+        const list = await this.env.R2.list({ prefix, ...(cursor ? { cursor } : {}) });
+        if (list.objects.length > 0) {
+          await this.env.R2.delete(list.objects.map((o) => o.key));
+        }
+        cursor = list.truncated ? list.cursor : undefined;
+      } while (cursor);
+    }
 
     // Cancel any scheduled flush + wipe SQLite storage entirely.
     await this.ctx.storage.deleteAlarm();
