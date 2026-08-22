@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useProjectStore } from '../../../stores/project';
 import { confirm } from '../../../lib/confirm';
 import { toast } from '../../../lib/toast';
 import { relativeTime, formatAbsolute } from '../../../lib/time';
 import Spinner from '../../../components/Spinner.vue';
+import Dropdown from '../../../components/Dropdown.vue';
 
 const project = useProjectStore();
 const loading = ref(true);
@@ -57,6 +58,10 @@ async function saveName(id: string) {
 function buildLabel(f: { version: string; created_at: number }): string {
   return `${f.version.replace(/^bld_/, '').slice(0, 6)} · ${relativeTime(f.created_at)}`;
 }
+
+const firmwareOptions = computed(() =>
+  project.firmware.map((f) => ({ value: f.id, label: buildLabel(f) }))
+);
 
 async function assign(deviceId: string, firmwareId: string) {
   try {
@@ -137,14 +142,14 @@ async function forget(id: string, name: string) {
             {{ d.firmware_version ? d.firmware_version.replace(/^bld_/, '').slice(0, 6) : '—' }}
           </td>
           <td class="px-4 py-2.5">
-            <select
-              :value="d.desired_firmware_id ?? ''"
-              class="w-full max-w-[13rem] rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-950"
-              @change="assign(d.id, ($event.target as HTMLSelectElement).value)"
-            >
-              <option value="">Nothing pending</option>
-              <option v-for="f in project.firmware" :key="f.id" :value="f.id">{{ buildLabel(f) }}</option>
-            </select>
+            <Dropdown
+              :model-value="d.desired_firmware_id ?? ''"
+              :options="firmwareOptions"
+              placeholder="Nothing pending"
+              size="sm"
+              class="max-w-[13rem]"
+              @update:model-value="(v) => assign(d.id, String(v))"
+            />
             <span v-if="otaState(d)" class="mt-1 block text-[10px] text-neutral-500">{{ otaState(d) }}</span>
           </td>
           <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400" :title="d.last_seen ? formatAbsolute(d.last_seen) : ''">

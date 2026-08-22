@@ -5,14 +5,13 @@ import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
 import CodeEditor from '../../../components/CodeEditor.vue';
 import SerialMonitor from '../../../components/SerialMonitor.vue';
+import Dropdown from '../../../components/Dropdown.vue';
 import { useEspFlasher } from '../../../composables/useEspFlasher';
 import { useSerialPort } from '../../../composables/useSerialPort';
 import { runBuild } from '../../../composables/useAgentBuild';
-import type { FirmwareCatalog } from '../../../types';
 
 const project = useProjectStore();
 
-const SDK_REPO = 'decoded-cipher/nodrix-sdk';
 const STARTER = `#include <Nodrix.h>
 
 void setup() {
@@ -39,10 +38,7 @@ const FQBNS = [
 const { flash, phase, progress } = useEspFlasher();
 const { supported, port, request } = useSerialPort();
 
-const catalog = ref<FirmwareCatalog>({ tag: null, entries: [] });
-const example = ref('');
 const code = ref('');
-const loading = ref(false);
 
 const fqbn = ref(FQBNS[0]!.value);
 const flashOffset = computed(() => FQBNS.find((b) => b.value === fqbn.value)?.offset ?? 0x10000);
@@ -121,35 +117,13 @@ async function saveForOta() {
   }
 }
 
-// The catalogue lists one binary per chip, so names repeat.
-const examples = computed(() => [...new Set(catalog.value.entries.map((e) => e.example))]);
-
 const storageKey = computed(() => `nodrix:sketch:${project.currentProjectId ?? 'none'}`);
 
-onMounted(async () => {
+onMounted(() => {
   code.value = localStorage.getItem(storageKey.value) ?? STARTER;
-  try {
-    catalog.value = await api.get<FirmwareCatalog>('/v1/admin/firmware/catalog');
-  } catch { /* no published release yet */ }
 });
 
 watch(code, (v) => localStorage.setItem(storageKey.value, v));
-
-// Same tag the binaries were built at, so this is what a published image is.
-async function loadExample() {
-  if (!example.value || !catalog.value.tag) return;
-  loading.value = true;
-  try {
-    const url = `https://raw.githubusercontent.com/${SDK_REPO}/${catalog.value.tag}/examples/${example.value}/${example.value}.ino`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Could not load that example');
-    code.value = await res.text();
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    loading.value = false;
-  }
-}
 
 async function copy() {
   await navigator.clipboard.writeText(code.value);
@@ -182,27 +156,9 @@ function download() {
         @click="saveForOta"
       >{{ saving ? 'Saving…' : 'Save for OTA' }}</button>
 
-      <select
-        v-model="fqbn"
-        class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950"
-      >
-        <option v-for="b in FQBNS" :key="b.value" :value="b.value">{{ b.label }}</option>
-      </select>
+      <Dropdown v-model="fqbn" :options="FQBNS" size="sm" class="w-44" />
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <select
-          v-model="example"
-          class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-950"
-        >
-          <option value="">Example…</option>
-          <option v-for="e in examples" :key="e" :value="e">{{ e }}</option>
-        </select>
-        <button
-          type="button"
-          :disabled="!example || loading"
-          class="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          @click="loadExample"
-        >{{ loading ? 'Loading…' : 'Load' }}</button>
         <button
           type="button"
           class="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"

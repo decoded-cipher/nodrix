@@ -4,6 +4,7 @@ import { useSerialPort, BAUD_RATES } from '../composables/useSerialPort';
 import { useSerialLog, type LogEntry } from '../composables/useSerialLog';
 import { useSerialDiagnosis } from '../composables/useSerialDiagnosis';
 import { toast } from '../lib/toast';
+import Dropdown from './Dropdown.vue';
 
 const { supported, port, state, lastError, request, startMonitor, stopMonitor, setBaud } = useSerialPort();
 const { entries, paused, garbled, setPaused, clear, toText } = useSerialLog();
@@ -12,6 +13,7 @@ const diagnosis = useSerialDiagnosis();
 const viewport = ref<HTMLElement | null>(null);
 const stuckToBottom = ref(true);
 const baud = ref(115200);
+const baudOptions = BAUD_RATES.map((b) => ({ value: b, label: String(b) }));
 
 const connected = computed(() => state.value === 'open');
 const busy = computed(() => state.value === 'opening' || state.value === 'busy');
@@ -99,13 +101,13 @@ function stamp(at: number) {
 
       <label class="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
         Baud
-        <select
-          v-model.number="baud"
-          class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-          @change="changeBaud"
-        >
-          <option v-for="b in BAUD_RATES" :key="b" :value="b">{{ b }}</option>
-        </select>
+        <Dropdown
+          :model-value="baud"
+          :options="baudOptions"
+          size="sm"
+          class="w-28"
+          @update:model-value="(v) => { baud = Number(v); changeBaud(); }"
+        />
       </label>
 
       <div class="ml-auto flex items-center gap-2">

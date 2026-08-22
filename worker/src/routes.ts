@@ -19,7 +19,6 @@ import publicInvite from './domains/identity/public-invite';
 import projects from './domains/projects/routes';
 import variables from './domains/variables/routes';
 import devicesRouter from './domains/devices/routes';
-import firmware from './domains/firmware/routes';
 import firmwareAdmin from './domains/firmware/admin';
 import build, { agentWsHandler, agentArtifactHandler } from './domains/firmware/agent';
 import otaDevice from './domains/firmware/device';
@@ -73,7 +72,6 @@ export function registerRoutes(app: App): void {
   app.route('/v1/admin/projects', projects);
   app.route('/v1/admin/projects/:proj/variables', variables);
   app.route('/v1/admin/projects/:proj/devices', devicesRouter);
-  app.route('/v1/admin/firmware', firmware);
   app.route('/v1/admin/projects/:proj/firmware', firmwareAdmin);
   app.route('/v1/ota', otaDevice);
   app.route('/v1/admin/projects/:proj/build', build);
