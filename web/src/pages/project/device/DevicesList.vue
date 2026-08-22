@@ -27,6 +27,13 @@ function startEdit(id: string, name: string) {
   draftName.value = name;
 }
 
+// Derived: a device that stops reporting never writes, so no stored flag would flip.
+const OFFLINE_AFTER_SECONDS = 5 * 60;
+
+function online(lastSeen: number | null): boolean {
+  return !!lastSeen && Math.floor(Date.now() / 1000) - lastSeen < OFFLINE_AFTER_SECONDS;
+}
+
 // A template ref inside v-for collects into an array, so focus on mount instead.
 function focusName(el: Element | null) {
   if (el instanceof HTMLInputElement) {
@@ -93,7 +100,14 @@ async function forget(id: string, name: string) {
               @keyup.esc="editingId = null"
               @blur="saveName(d.id)"
             />
-            <span v-else class="font-medium">{{ d.name }}</span>
+            <span v-else class="inline-flex items-center gap-2 font-medium">
+              <span
+                class="h-1.5 w-1.5 shrink-0 rounded-full"
+                :class="online(d.last_seen) ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600'"
+                :title="online(d.last_seen) ? 'Reporting' : 'Not reporting'"
+              />
+              {{ d.name }}
+            </span>
             <span
               v-if="d.is_default && editingId !== d.id"
               class="ml-2 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
