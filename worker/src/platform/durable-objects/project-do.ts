@@ -221,7 +221,7 @@ export class ProjectDO extends DurableObject<Env> {
 
     // Fire-and-forget; failures never block ingest — the device already got its 204.
     this.notifyDashboards(points, receivedAt);
-    this.evaluateVariableTriggers(projectId, points, prev, receivedAt);
+    this.evaluateVariableTriggers(projectId, points, prev, receivedAt, deviceId);
 
     return { receivedAt, count: points.length };
   }
@@ -230,7 +230,8 @@ export class ProjectDO extends DurableObject<Env> {
     projectId: string,
     points: IngestPoint[],
     prev: Map<string, unknown>,
-    ts: number
+    ts: number,
+    deviceId: string
   ): void {
     this.ctx.waitUntil(
       (async () => {
@@ -238,16 +239,23 @@ export class ProjectDO extends DurableObject<Env> {
           const autos = await this.getVariableAutomations(projectId);
           if (autos.length === 0) return;
 
+          // Triggers name devices by their D1 id; storage calls the default one ''.
+          const triggerDevice = deviceId || (await defaultDeviceId(this.env, projectId)) || '';
+
+          // Both stay on the device that triggered: an automation that reacts to one
+          // greenhouse shouldn't read or switch another's.
           const setVariable = (variable: string, value: unknown): Promise<void> =>
-            this.addControl(newId('control'), variable, value);
-          // Condition nodes read live values; serve them from this DO's own state.
+            this.addControl(newId('control'), variable, value, deviceId);
           const getVariable = async (variable: string): Promise<unknown> =>
-            (await this.getLatestState()).find((r) => r.variable === variable)?.value;
+            (await this.getLatestState())
+              .find((r) => r.device_id === deviceId && r.variable === variable)?.value;
 
           for (const a of autos) {
             for (const node of triggerNodes(toGraph(a))) {
               if (node.kind !== 'variable') continue;
               const cfg = node.config as VariableTriggerConfig;
+
+              if (cfg.device && cfg.device !== triggerDevice) continue;
 
               const point = points.find((p) => p.variable === cfg.variable);
               if (!point) continue;
@@ -259,6 +267,7 @@ export class ProjectDO extends DurableObject<Env> {
                 ts,
                 variable: cfg.variable,
                 value: point.value,
+                device: triggerDevice,
                 depth: 0,
                 entryNodeId: node.id,
               };
@@ -463,26 +472,30 @@ export class ProjectDO extends DurableObject<Env> {
     this.notifyDashboards([{ variable, value: value as IngestPoint['value'] }], now);
   }
 
-  async listPendingControl(): Promise<Array<{ id: string; variable: string; value: unknown }>> {
+  // A device sees broadcasts and its own writes, never another device's.
+  async listPendingControl(deviceId = ''): Promise<Array<{ id: string; variable: string; value: unknown }>> {
     const rows = this.sql
       .exec<{ id: string; variable: string; value: string }>(
         `SELECT id, variable, value FROM pending_control
-         WHERE delivered_at IS NULL
-         ORDER BY created_at ASC`
+         WHERE delivered_at IS NULL AND (device_id IS NULL OR device_id = ?)
+         ORDER BY created_at ASC`,
+        deviceId
       )
       .toArray();
     return rows.map((r) => ({ id: r.id, variable: r.variable, value: safeParse(r.value) }));
   }
 
-  async ackControl(ids: string[]): Promise<{ acked: number }> {
+  async ackControl(ids: string[], deviceId = ''): Promise<{ acked: number }> {
     if (ids.length === 0) return { acked: 0 };
     const now = Math.floor(Date.now() / 1000);
     const placeholders = ids.map(() => '?').join(',');
     const cursor = this.sql.exec(
       `UPDATE pending_control SET delivered_at = ?
-        WHERE id IN (${placeholders}) AND delivered_at IS NULL`,
+        WHERE id IN (${placeholders}) AND delivered_at IS NULL
+          AND (device_id IS NULL OR device_id = ?)`,
       now,
-      ...ids
+      ...ids,
+      deviceId
     );
     return { acked: cursor.rowsWritten };
   }
@@ -570,7 +583,7 @@ export class ProjectDO extends DurableObject<Env> {
         return;
       }
       case 'ack':
-        if (msg.ids.length > 0) await this.ackControl(msg.ids);
+        if (msg.ids.length > 0) await this.ackControl(msg.ids, this.deviceOf(ws));
         return;
       case 'telemetry': {
         const pid = this.projectId();

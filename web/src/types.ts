@@ -187,6 +187,7 @@ export type VariableOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'changed'
 
 export type VariableTriggerConfig = {
   variable: string;                   // variable key
+  device?: string | null;             // device id; absent/empty = any device
   operator: VariableOperator;
   value?: number | string | boolean;  // omitted for 'changed'
   mode?: 'edge' | 'always';           // edge = fire once on entry (default)
