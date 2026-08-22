@@ -71,10 +71,18 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
       inputSchema: {
         project,
         variable: z.string().describe('Variable key.'),
+        device: z.string().optional().describe("Device id. Omit for the project's default device."),
         value: z.any().describe('Value to send (number, boolean, string, or JSON).'),
       },
     },
-    (args) => run(() => setVariableControl(env, actor(), scopeProjectId(props, args.project), { variable: args.variable, value: args.value }))
+    (args) =>
+      run(() =>
+        setVariableControl(env, actor(), scopeProjectId(props, args.project), {
+          variable: args.variable,
+          value: args.value,
+          device: args.device ?? null,
+        })
+      )
   );
 
   server.registerTool(

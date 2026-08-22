@@ -4,7 +4,7 @@ import { recordAudit } from '../../platform/lib/audit';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
-import { defaultDeviceId, listDevices } from '../devices/service';
+import { defaultDeviceId, listDevices, storageIdOf } from '../devices/service';
 
 export type VariableSummary = {
   id: string;
@@ -56,7 +56,8 @@ export async function getSeries(
   env: Env,
   projectId: string,
   variable: string,
-  windowStr: string
+  windowStr: string,
+  deviceId?: string | null
 ): Promise<{ window: string; points: unknown[] }> {
   const now = Math.floor(Date.now() / 1000);
   const m = /^(\d+)([smh])$/.exec(windowStr);
@@ -65,7 +66,9 @@ export async function getSeries(
     const n = Number(m[1]);
     seconds = m[2] === 'h' ? n * 3600 : m[2] === 'm' ? n * 60 : n;
   }
-  const points = await projectStub(env, projectId).getSeries(variable, now - seconds);
+  // No device reads the whole project — what a single-device instance always did.
+  const storageId = deviceId ? await storageIdOf(env, projectId, deviceId) : null;
+  const points = await projectStub(env, projectId).getSeries(variable, now - seconds, storageId);
   return { window: m ? windowStr : '1h', points };
 }
 
@@ -148,22 +151,24 @@ export async function setVariableControl(
   env: Env,
   actor: Actor,
   projectId: string,
-  input: { variable: string; value: unknown }
+  input: { variable: string; value: unknown; device?: string | null }
 ): Promise<{ id: string; variable: string; value: unknown }> {
   await assertProjectAccess(env, actor, projectId);
   const variable = (input.variable ?? '').trim();
   if (!variable) throw new ServiceError('bad_request', 'variable is required', 'missing_variable');
+  const deviceId = input.device ?? (await defaultDeviceId(env, projectId));
 
   // The variable must already exist in the project (mirrors the dashboard
   // control path, which refuses variable_not_in_project).
   const exists = await env.DB
-    .prepare(`SELECT 1 AS ok FROM project_variables WHERE project_id = ? AND key = ?`)
-    .bind(projectId, variable)
+    .prepare(`SELECT 1 AS ok FROM project_variables WHERE project_id = ? AND device_id = ? AND key = ?`)
+    .bind(projectId, deviceId, variable)
     .first<{ ok: number }>();
   if (!exists) throw new ServiceError('not_found', 'variable not in project', 'variable_not_in_project');
 
   const id = newId('control');
-  await projectStub(env, projectId).addControl(id, variable, input.value ?? null);
+  const storageId = await storageIdOf(env, projectId, deviceId!);
+  await projectStub(env, projectId).addControl(id, variable, input.value ?? null, storageId);
 
   await recordAudit(env, {
     projectId,
