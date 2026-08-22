@@ -22,47 +22,47 @@ function r2Key(projectId: string, firmwareId: string): string {
   return `firmware/${projectId}/${firmwareId}.bin`;
 }
 
-export async function uploadFirmware(
+// The image is already in R2 under builds/; this gives it a row and retention.
+export async function publishBuild(
   env: Env,
   projectId: string,
   userId: string,
-  input: { version: string; target?: string | null; notes?: string | null; body: ArrayBuffer }
+  buildId: string,
+  notes: string | null
 ): Promise<FirmwareRow> {
-  const version = input.version.trim();
-  if (!SAFE_VERSION.test(version)) {
-    throw new ServiceError('bad_request', 'version must be alphanumeric', 'invalid_version');
-  }
-  if (input.body.byteLength === 0) {
-    throw new ServiceError('bad_request', 'image is empty', 'empty_image');
-  }
-  if (input.body.byteLength > MAX_IMAGE_BYTES) {
-    throw new ServiceError('bad_request', 'image is too large', 'image_too_large');
-  }
+  const source = await env.R2.get(`builds/${projectId}/${buildId}.bin`);
+  if (!source) throw new ServiceError('not_found', 'that build has expired', 'unknown_build');
 
-  const digest = await crypto.subtle.digest('SHA-256', input.body);
+  const body = await source.arrayBuffer();
+  if (body.byteLength === 0) throw new ServiceError('bad_request', 'the build is empty', 'empty_image');
+  if (body.byteLength > MAX_IMAGE_BYTES) throw new ServiceError('bad_request', 'the build is too large', 'image_too_large');
+  // The board reports the build id it was compiled with, so this always matches.
+  if (!SAFE_VERSION.test(buildId)) throw new ServiceError('bad_request', 'bad build id', 'invalid_version');
+
+  const digest = await crypto.subtle.digest('SHA-256', body);
   const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
   const id = newId('firmware');
   const key = r2Key(projectId, id);
   const now = Math.floor(Date.now() / 1000);
 
-  await env.R2.put(key, input.body, { httpMetadata: { contentType: 'application/octet-stream' } });
+  await env.R2.put(key, body, { httpMetadata: { contentType: 'application/octet-stream' } });
   try {
     await env.DB
       .prepare(
         `INSERT INTO firmware (id, project_id, version, target, size, sha256, r2_key, notes, created_by, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, projectId, version, input.target ?? null, input.body.byteLength, sha256, key, input.notes ?? null, userId, now)
+      .bind(id, projectId, buildId, null, body.byteLength, sha256, key, notes, userId, now)
       .run();
   } catch {
     // Don't leave an image in R2 that no row points at.
     await env.R2.delete(key).catch(() => {});
-    throw new ServiceError('conflict', 'that version already exists', 'duplicate_version');
+    throw new ServiceError('conflict', 'that build is already saved', 'duplicate_version');
   }
 
   await prune(env, projectId).catch(() => {});
-  return { id, version, target: input.target ?? null, size: input.body.byteLength, sha256, notes: input.notes ?? null, created_at: now };
+  return { id, version: buildId, target: null, size: body.byteLength, sha256, notes, created_at: now };
 }
 
 // Spares anything a device runs or is waiting to run; deleting those strands a

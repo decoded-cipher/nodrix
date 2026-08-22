@@ -4,7 +4,7 @@ import { requireSession } from '../../platform/middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../../platform/middleware/resolve-project';
 import { recordAudit } from '../../platform/lib/audit';
 import { serviceErrorResponse } from '../../platform/lib/service';
-import { uploadFirmware, listFirmware, deleteFirmware, assignFirmware } from './ota';
+import { listFirmware, deleteFirmware, assignFirmware } from './ota';
 
 const admin = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
 
@@ -14,30 +14,6 @@ admin.use('*', resolveProject);
 admin.get('/', async (c) => {
   const project = c.get('project');
   return c.json({ firmware: await listFirmware(c.env, project.id) });
-});
-
-// Raw body — the image can't ride in JSON.
-admin.post('/', async (c) => {
-  const project = c.get('project');
-  try {
-    const row = await uploadFirmware(c.env, project.id, c.get('user').id, {
-      version: c.req.query('version') ?? '',
-      target: c.req.query('target') ?? null,
-      notes: c.req.query('notes') ?? null,
-      body: await c.req.arrayBuffer(),
-    });
-    await recordAudit(c.env, {
-      projectId: project.id,
-      userId: c.get('user').id,
-      action: 'firmware.upload',
-      targetType: 'firmware',
-      targetId: row.id,
-      metadata: { version: row.version, size: row.size },
-    });
-    return c.json({ firmware: row }, 201);
-  } catch (e) {
-    return serviceErrorResponse(c, e);
-  }
 });
 
 admin.delete('/:id', async (c) => {

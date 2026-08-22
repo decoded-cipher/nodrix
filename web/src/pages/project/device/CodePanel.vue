@@ -44,11 +44,15 @@ const fqbn = ref(FQBNS[0]!.value);
 const building = ref(false);
 const buildLog = ref<string[]>([]);
 const buildError = ref('');
+// The artifact outlives the flash, so the same build can also be kept for OTA.
+const lastBuild = ref('');
+const saving = ref(false);
 
-async function compileAndFlash() {
+async function build(): Promise<string | null> {
   building.value = true;
   buildLog.value = [];
   buildError.value = '';
+  lastBuild.value = '';
   try {
     const pid = project.currentProjectId ?? '';
     const res = await runBuild(pid, { fqbn: fqbn.value, sketch: code.value }, (line) => {
@@ -56,16 +60,42 @@ async function compileAndFlash() {
     });
     if (!res.ok) {
       buildError.value = res.error;
-      return;
+      return null;
     }
-    if (!port.value && !(await request())) return;
-    const bytes = new Uint8Array(await api.bytes(`/v1/admin/projects/${pid}/build/${res.build}/artifact`));
-    const ok = await flash([{ data: bytes, address: 0x10000 }]);
-    if (ok) toast.success('Flashed — the board is restarting');
+    lastBuild.value = res.build;
+    return res.build;
   } catch (e) {
     buildError.value = (e as Error).message;
+    return null;
   } finally {
     building.value = false;
+  }
+}
+
+async function compileAndFlash() {
+  const id = await build();
+  if (!id) return;
+  try {
+    if (!port.value && !(await request())) return;
+    const pid = project.currentProjectId ?? '';
+    const bytes = new Uint8Array(await api.bytes(`/v1/admin/projects/${pid}/build/${id}/artifact`));
+    if (await flash([{ data: bytes, address: 0x10000 }])) toast.success('Flashed — the board is restarting');
+  } catch (e) {
+    buildError.value = (e as Error).message;
+  }
+}
+
+async function saveForOta() {
+  const id = lastBuild.value || (await build());
+  if (!id) return;
+  saving.value = true;
+  try {
+    await project.publishBuild(id);
+    toast.success('Saved — pick it on any device to send it over the air');
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -170,6 +200,12 @@ function reset() {
           class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
           @click="compileAndFlash"
         >{{ building ? 'Building…' : 'Compile and flash' }}</button>
+        <button
+          type="button"
+          :disabled="building || saving"
+          class="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          @click="saveForOta"
+        >{{ saving ? 'Saving…' : 'Save for OTA' }}</button>
         <p v-if="!supported" class="text-xs text-neutral-500">
           Flashing needs Web Serial — Chrome, Edge or Opera on desktop, or Chrome on Android.
         </p>

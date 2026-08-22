@@ -4,6 +4,9 @@ import { requireSession } from '../../platform/middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../../platform/middleware/resolve-project';
 import { lookupUserToken, touchTokenLastUsed } from '../../platform/lib/tokens';
 import { projectStub } from '../../platform/durable-objects/stubs';
+import { recordAudit } from '../../platform/lib/audit';
+import { serviceErrorResponse } from '../../platform/lib/service';
+import { publishBuild } from './ota';
 
 const MAX_SKETCH_BYTES = 256 * 1024;
 const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;
@@ -117,6 +120,32 @@ build.get('/:id/artifact', async (c) => {
       'Content-Length': String(object.size),
     },
   });
+});
+
+// Saving is what makes a build shippable; flashing leaves no trace by design.
+build.post('/:id/firmware', async (c) => {
+  const user = c.get('user');
+  if (user.role !== 'owner' && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+
+  const id = c.req.param('id');
+  if (!SAFE_BUILD_ID.test(id)) return c.json({ error: 'invalid_build' }, 400);
+
+  const body = await c.req.json<{ notes?: string }>().catch(() => ({}) as { notes?: string });
+  const project = c.get('project');
+  try {
+    const row = await publishBuild(c.env, project.id, user.id, id, body.notes?.trim() || null);
+    await recordAudit(c.env, {
+      projectId: project.id,
+      userId: user.id,
+      action: 'firmware.publish',
+      targetType: 'firmware',
+      targetId: row.id,
+      metadata: { version: row.version, size: row.size },
+    });
+    return c.json({ firmware: row }, 201);
+  } catch (e) {
+    return serviceErrorResponse(c, e);
+  }
 });
 
 export default build;
