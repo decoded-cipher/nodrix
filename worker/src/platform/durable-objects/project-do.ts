@@ -499,6 +499,12 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM pending_control WHERE variable = ? AND device_id IS ?`, variable, deviceId);
   }
 
+  async deleteDevice(deviceId: string): Promise<void> {
+    this.sql.exec(`DELETE FROM latest_state WHERE device_id = ?`, deviceId);
+    this.sql.exec(`DELETE FROM ring_buffer WHERE device_id = ?`, deviceId);
+    this.sql.exec(`DELETE FROM pending_control WHERE device_id = ?`, deviceId);
+  }
+
   async flushNow(): Promise<FlushResult> {
     return this.runFlush();
   }

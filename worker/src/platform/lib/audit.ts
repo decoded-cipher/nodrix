@@ -21,6 +21,7 @@ export async function isAuditEnabled(env: Env): Promise<boolean> {
 export type AuditTargetType =
   | 'project'
   | 'variable'
+  | 'device'
   | 'project_token'
   | 'dashboard'
   | 'token'

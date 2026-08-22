@@ -43,15 +43,15 @@ telemetry.post('/', async (c) => {
   const { project_id } = c.get('projectToken');
   const now = Math.floor(Date.now() / 1000);
   const deviceKey = normaliseDeviceKey(c.req.header('x-nodrix-device'));
-  const deviceId = await resolveDevice(c.env, project_id, deviceKey, now);
+  const device = await resolveDevice(c.env, project_id, deviceKey, now);
 
   const stub = projectStub(c.env, project_id);
-  await stub.ingest(project_id, points);
+  await stub.ingest(project_id, points, device?.storageId ?? '');
 
   // Auto-create new variables + bump last_seen off the response path (best-effort).
-  if (deviceId) {
+  if (device) {
     c.executionCtx.waitUntil(
-      upsertVariables(c.env, project_id, deviceId, points.map((p) => p.variable), now)
+      upsertVariables(c.env, project_id, device.id, points.map((p) => p.variable), now)
     );
   }
 

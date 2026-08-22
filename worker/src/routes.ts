@@ -18,6 +18,7 @@ import publicInvite from './domains/identity/public-invite';
 // projects / variables / dashboards / automations / integrations
 import projects from './domains/projects/routes';
 import variables from './domains/variables/routes';
+import devicesRouter from './domains/devices/routes';
 import { readList, readState, readSeries } from './domains/variables/read';
 import dashboards from './domains/dashboards/routes';
 import publicDashboards from './domains/dashboards/public';
@@ -67,6 +68,7 @@ export function registerRoutes(app: App): void {
   app.route('/v1/admin/invites', invitesRouter);
   app.route('/v1/admin/projects', projects);
   app.route('/v1/admin/projects/:proj/variables', variables);
+  app.route('/v1/admin/projects/:proj/devices', devicesRouter);
   app.route('/v1/admin/projects/:proj/dashboards', dashboards);
   app.route('/v1/admin/projects/:proj/automations', automations);
   app.route('/v1/admin/projects/:proj/integrations', integrations);

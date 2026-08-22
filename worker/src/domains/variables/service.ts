@@ -4,7 +4,7 @@ import { recordAudit } from '../../platform/lib/audit';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
-import { defaultDeviceId } from '../devices/service';
+import { defaultDeviceId, listDevices } from '../devices/service';
 
 export type VariableSummary = {
   id: string;
@@ -28,13 +28,27 @@ export async function listVariables(env: Env, projectId: string): Promise<Variab
 }
 
 export type StateEntry = { value: unknown; received_at: number };
+export type DeviceState = { id: string; name: string; variables: Record<string, StateEntry> };
 
-// Latest value of every variable. Mirrors GET /v1/projects/:proj/state.
-export async function getState(env: Env, projectId: string): Promise<Record<string, StateEntry>> {
-  const latest = await projectStub(env, projectId).getLatestState();
-  const out: Record<string, StateEntry> = {};
-  for (const r of latest) out[r.variable] = { value: r.value, received_at: r.received_at };
-  return out;
+// Mirrors GET /v1/projects/:proj/state. Grouped by device because two of them
+// may report the same key, and a flat map would drop one.
+export async function getState(env: Env, projectId: string): Promise<DeviceState[]> {
+  const [latest, devices] = await Promise.all([
+    projectStub(env, projectId).getLatestState(),
+    listDevices(env, projectId),
+  ]);
+  const fallback = devices.find((d) => d.is_default)?.id;
+  const byDevice = new Map<string, DeviceState>();
+  for (const d of devices) byDevice.set(d.id, { id: d.id, name: d.name, variables: {} });
+
+  for (const r of latest) {
+    // The DO marks the default device '' so it never had to backfill.
+    const id = r.device_id || fallback;
+    if (!id) continue;
+    const bucket = byDevice.get(id);
+    if (bucket) bucket.variables[r.variable] = { value: r.value, received_at: r.received_at };
+  }
+  return [...byDevice.values()];
 }
 
 // Recent points from the Project DO ring buffer (never R2). Mirrors
@@ -69,8 +83,7 @@ export async function createVariable(
 
   const id = newId('variable');
   const now = Math.floor(Date.now() / 1000);
-  // Hand-declared variables belong to the default device; a board that reports
-  // the same key under its own identity gets its own row.
+  // Hand-declared variables belong to the default device.
   const deviceId = await defaultDeviceId(env, projectId);
   if (!deviceId) throw new ServiceError('not_found', 'project has no default device', 'no_default_device');
   try {
