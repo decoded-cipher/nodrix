@@ -1,8 +1,8 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
-import { normaliseDeviceKey, resolveDevice, touchDevice } from '../devices/service';
-import { offerFor, openImage } from './ota';
+import { normaliseDeviceKey, recordDeviceSeen, resolveDevice, touchDevice } from '../devices/service';
+import { offerFor, openImage, reconcile } from './ota';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { storageIdOf } from '../devices/service';
 
@@ -12,23 +12,33 @@ const ota = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
 ota.use('*', requireProjectToken);
 
-async function deviceIdFor(c: OtaContext, projectId: string) {
+async function deviceIdFor(c: OtaContext, projectId: string, seen = true) {
   const device = await resolveDevice(
     c.env,
     projectId,
     normaliseDeviceKey(c.req.header('x-nodrix-device')),
     Math.floor(Date.now() / 1000)
   );
-  if (device) c.executionCtx.waitUntil(touchDevice(c.env, device.id));
+  if (device && seen) c.executionCtx.waitUntil(touchDevice(c.env, device.id));
   return device?.id ?? null;
 }
 
 // null means the board is already where it should be.
 ota.get('/', async (c) => {
   const { project_id } = c.get('projectToken');
-  const deviceId = await deviceIdFor(c, project_id);
+  // An HTTP-mode board has no hello frame, so this is where it reports what it
+  // runs — without it a finished update is offered again forever.
+  const firmware = c.req.header('x-nodrix-firmware') ?? null;
+  const deviceId = await deviceIdFor(c, project_id, !firmware);
   if (!deviceId) return c.json({ update: null });
-  return c.json({ update: await offerFor(c.env, project_id, deviceId) });
+
+  if (firmware) {
+    c.executionCtx.waitUntil(
+      recordDeviceSeen(c.env, deviceId, c.req.header('x-nodrix-chip'), firmware)
+        .then(() => reconcile(c.env, deviceId, firmware))
+    );
+  }
+  return c.json({ update: await offerFor(c.env, project_id, deviceId, firmware) });
 });
 
 ota.get('/image', async (c) => {

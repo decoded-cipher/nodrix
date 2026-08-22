@@ -142,7 +142,14 @@ export async function assignFirmware(
 export type UpdateOffer = { version: string; size: number; sha256: string; url: string } | null;
 
 // Reported vs desired is the whole reconciliation; there is no job to track.
-export async function offerFor(env: Env, projectId: string, deviceId: string): Promise<UpdateOffer> {
+// A version the board claims in this request beats the stored one, which may not
+// have caught up with the update it just applied.
+export async function offerFor(
+  env: Env,
+  projectId: string,
+  deviceId: string,
+  reported?: string | null
+): Promise<UpdateOffer> {
   const row = await env.DB
     .prepare(
       `SELECT f.version AS version, f.size AS size, f.sha256 AS sha256, d.firmware_version AS current
@@ -151,7 +158,7 @@ export async function offerFor(env: Env, projectId: string, deviceId: string): P
     )
     .bind(deviceId, projectId)
     .first<{ version: string; size: number; sha256: string; current: string | null }>();
-  if (!row || row.current === row.version) return null;
+  if (!row || (reported ?? row.current) === row.version) return null;
   return { version: row.version, size: row.size, sha256: row.sha256, url: '/v1/ota/image' };
 }
 
