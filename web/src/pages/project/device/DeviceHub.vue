@@ -10,6 +10,7 @@ const proj = computed(() => project.currentProjectId ?? '');
 
 const tabs = computed(() => [
   { name: 'devices', label: 'Devices', to: `/p/${proj.value}/device`, count: project.devices.length },
+  { name: 'device-code', label: 'Code', to: `/p/${proj.value}/device/code` },
   { name: 'device-flash', label: 'Flash', to: `/p/${proj.value}/device/flash` },
   { name: 'device-firmware', label: 'Firmware', to: `/p/${proj.value}/device/firmware` },
   { name: 'serial-console', label: 'Console', to: `/p/${proj.value}/device/console` },
