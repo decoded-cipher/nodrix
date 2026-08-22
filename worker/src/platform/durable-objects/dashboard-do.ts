@@ -4,6 +4,7 @@ import { projectStub } from './stubs';
 import { validateLayout, variablesFromLayout, chartVariablesFromLayout, type Layout } from '../lib/layout';
 import { newId } from '../lib/ids';
 import { userCanAccessProject } from '../lib/roles';
+import { storageIdOf } from '../../domains/devices/service';
 import type { CompactSeries } from '../lib/series';
 import { migrateSchema, type SchemaStep } from './schema';
 
@@ -179,6 +180,9 @@ export class DashboardDO extends DurableObject<Env> {
     await this.subscribe(row.project_id).catch(() => undefined);
 
     const stub = projectStub(this.env, row.project_id);
+    const snapshotDevice = layout.device
+      ? await storageIdOf(this.env, row.project_id, layout.device)
+      : '';
 
     // Only ship what this dashboard renders: latest state for referenced
     // variables + 1h series for chart variables (not the whole project history).
@@ -195,7 +199,7 @@ export class DashboardDO extends DurableObject<Env> {
     // One DO round trip (chartVars=[] skips the series query inside the DO).
     const { latest, series, oldestTs } = await stub
       // Widgets bind to a bare key, so a second device would merge into the chart.
-      .getDashboardSnapshot(chartVars, fromTs, cap, '')
+      .getDashboardSnapshot(chartVars, fromTs, cap, snapshotDevice)
       .catch(() => ({ latest: [], series: {} as CompactSeries, oldestTs: null as number | null }));
 
     const variables: Record<string, { value: unknown; received_at: number }> = {};

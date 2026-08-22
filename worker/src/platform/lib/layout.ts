@@ -30,6 +30,9 @@ export type Layout = {
   mobile?: { items: MobilePlacement[] } | null;
   // Public-view auto-refresh cadence in seconds (server-clamped).
   refresh?: number;
+  // Which device this dashboard reads. Absent means the project's default,
+  // which is what every dashboard did before devices existed.
+  device?: string | null;
 };
 
 // Public-view refresh bounds: floor matches the /state edge-cache TTL (polling
@@ -90,6 +93,12 @@ export function validateLayout(input: unknown): { ok: true; value: Layout } | { 
     refresh = Math.min(Math.max(Math.round(r), REFRESH_MIN), REFRESH_MAX);
   }
 
+  const d = input['device'];
+  if (d !== undefined && d !== null && typeof d !== 'string') {
+    return { ok: false, reason: 'layout.device must be a string or null' };
+  }
+  const device = typeof d === 'string' && d.trim() ? d.trim() : null;
+
   return {
     ok: true,
     value: {
@@ -97,6 +106,7 @@ export function validateLayout(input: unknown): { ok: true; value: Layout } | { 
       items: items as WidgetInstance[],
       ...(mobile !== undefined ? { mobile } : {}),
       ...(refresh !== undefined ? { refresh } : {}),
+      ...(device !== null ? { device } : {}),
     },
   };
 }
