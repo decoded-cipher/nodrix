@@ -287,10 +287,11 @@ export class ProjectDO extends DurableObject<Env> {
   async getDashboardSnapshot(
     variables: string[],
     sinceTs: number | null,
-    cap?: number
+    cap?: number,
+    deviceId = ''
   ): Promise<{ latest: LatestStateRow[]; series: CompactSeries; oldestTs: number | null }> {
-    const latest = this.getLatestState();
-    const series = this.getSeriesForVariables(variables, sinceTs, cap);
+    const latest = this.getLatestState(deviceId);
+    const series = this.getSeriesForVariables(variables, sinceTs, cap, deviceId);
     return { latest: await latest, series: await series, oldestTs: this.ringOldestTs() };
   }
 
@@ -303,11 +304,13 @@ export class ProjectDO extends DurableObject<Env> {
     return rows[0]?.m ?? null;
   }
 
-  async getLatestState(): Promise<LatestStateRow[]> {
+  async getLatestState(deviceId?: string | null): Promise<LatestStateRow[]> {
     const rows = this.sql
       .exec<{ device_id: string; variable: string; value: string; received_at: number }>(
         `SELECT device_id, variable, value, received_at FROM latest_state
-         ORDER BY device_id ASC, variable ASC`
+         ${deviceId != null ? 'WHERE device_id = ?' : ''}
+         ORDER BY device_id ASC, variable ASC`,
+        ...(deviceId != null ? [deviceId] : [])
       )
       .toArray();
     return rows.map((r) => ({

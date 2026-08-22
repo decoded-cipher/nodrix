@@ -194,7 +194,8 @@ export class DashboardDO extends DurableObject<Env> {
 
     // One DO round trip (chartVars=[] skips the series query inside the DO).
     const { latest, series, oldestTs } = await stub
-      .getDashboardSnapshot(chartVars, fromTs, cap)
+      // Widgets bind to a bare key, so a second device would merge into the chart.
+      .getDashboardSnapshot(chartVars, fromTs, cap, '')
       .catch(() => ({ latest: [], series: {} as CompactSeries, oldestTs: null as number | null }));
 
     const variables: Record<string, { value: unknown; received_at: number }> = {};
