@@ -11,9 +11,6 @@ const proj = computed(() => project.currentProjectId ?? '');
 const tabs = computed(() => [
   { name: 'devices', label: 'Devices', to: `/p/${proj.value}/device`, count: project.devices.length },
   { name: 'device-code', label: 'Code', to: `/p/${proj.value}/device/code` },
-  { name: 'device-flash', label: 'Flash', to: `/p/${proj.value}/device/flash` },
-  { name: 'device-firmware', label: 'Firmware', to: `/p/${proj.value}/device/firmware` },
-  { name: 'serial-console', label: 'Console', to: `/p/${proj.value}/device/console` },
 ]);
 </script>
 
@@ -22,7 +19,7 @@ const tabs = computed(() => [
     <header class="mb-5">
       <h1 class="text-xl font-semibold tracking-tight">Device</h1>
       <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-        Talk to a board over USB — watch what it prints, and see why it isn't connecting.
+        Write a sketch, build it on your machine, and put it on a board over USB or the air.
       </p>
     </header>
 

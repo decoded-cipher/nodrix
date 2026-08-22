@@ -21,6 +21,8 @@ onMounted(() => {
         basicSetup,
         cpp(),
         oneDark,
+        // Fills the pane rather than growing with the sketch.
+        EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) emit('update:modelValue', u.state.doc.toString());
         }),
@@ -42,5 +44,5 @@ onBeforeUnmount(() => view?.destroy());
 </script>
 
 <template>
-  <div ref="host" class="overflow-hidden rounded-xl border border-neutral-200 text-sm dark:border-neutral-800" />
+  <div ref="host" class="h-full overflow-hidden rounded-xl border border-neutral-200 text-sm dark:border-neutral-800" />
 </template>

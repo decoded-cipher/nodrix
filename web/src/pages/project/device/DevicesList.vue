@@ -11,7 +11,7 @@ const loading = ref(true);
 
 onMounted(async () => {
   try {
-    await project.loadDevices();
+    await Promise.all([project.loadDevices(), project.loadFirmware()]);
   } catch (e) {
     toast.error((e as Error).message);
   } finally {
@@ -53,6 +53,24 @@ async function saveName(id: string) {
   }
 }
 
+// Build ids are the version, so a saved build needs a human-sized handle.
+function buildLabel(f: { version: string; created_at: number }): string {
+  return `${f.version.replace(/^bld_/, '').slice(0, 6)} · ${relativeTime(f.created_at)}`;
+}
+
+async function assign(deviceId: string, firmwareId: string) {
+  try {
+    await project.assignFirmware(deviceId, firmwareId || null);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
+}
+
+function otaState(d: { desired_firmware_id: string | null; ota_status: string | null }): string {
+  if (!d.desired_firmware_id) return '';
+  return d.ota_status === 'ok' ? '' : 'waiting for the board';
+}
+
 async function forget(id: string, name: string) {
   const ok = await confirm({
     title: `Forget ${name}?`,
@@ -83,7 +101,8 @@ async function forget(id: string, name: string) {
         <tr>
           <th class="px-4 py-2.5 font-medium">Name</th>
           <th class="px-4 py-2.5 font-medium">Chip</th>
-          <th class="px-4 py-2.5 font-medium">Firmware</th>
+          <th class="px-4 py-2.5 font-medium">Running</th>
+          <th class="px-4 py-2.5 font-medium">Update to</th>
           <th class="px-4 py-2.5 font-medium">Last seen</th>
           <th class="px-4 py-2.5" />
         </tr>
@@ -114,7 +133,20 @@ async function forget(id: string, name: string) {
             >default</span>
           </td>
           <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400">{{ d.chip ?? '—' }}</td>
-          <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400">{{ d.firmware_version ?? '—' }}</td>
+          <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400">
+            {{ d.firmware_version ? d.firmware_version.replace(/^bld_/, '').slice(0, 6) : '—' }}
+          </td>
+          <td class="px-4 py-2.5">
+            <select
+              :value="d.desired_firmware_id ?? ''"
+              class="w-full max-w-[13rem] rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-950"
+              @change="assign(d.id, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">Nothing pending</option>
+              <option v-for="f in project.firmware" :key="f.id" :value="f.id">{{ buildLabel(f) }}</option>
+            </select>
+            <span v-if="otaState(d)" class="mt-1 block text-[10px] text-neutral-500">{{ otaState(d) }}</span>
+          </td>
           <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400" :title="d.last_seen ? formatAbsolute(d.last_seen) : ''">
             {{ d.last_seen ? relativeTime(d.last_seen) : 'Never' }}
           </td>
@@ -133,7 +165,7 @@ async function forget(id: string, name: string) {
           </td>
         </tr>
         <tr v-if="!project.devices.length">
-          <td colspan="5" class="px-4 py-8 text-center text-sm text-neutral-500">
+          <td colspan="6" class="px-4 py-8 text-center text-sm text-neutral-500">
             No devices yet. A board appears here the first time it reports.
           </td>
         </tr>

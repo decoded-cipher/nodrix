@@ -32,6 +32,7 @@ const HIGH_WATER_MARK_ROWS = 500;
 const OTA_DOWNLOADS_PER_HOUR = 6;
 // A cold toolchain install can take minutes; a warm build is seconds.
 const BUILD_TIMEOUT_MS = 5 * 60_000;
+const MAX_BUILD_LOG_LINES = 500;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
 // doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
 const AUTO_CACHE_TTL_MS = 30_000;
@@ -61,8 +62,10 @@ export type SeriesRow = {
 
 // The artifact goes to R2 on its own route; only its id crosses the DO.
 export type BuildOutcome =
-  | { ok: true; build: string; log: string[] }
-  | { ok: false; error: string; log: string[] };
+  | { ok: true; build: string }
+  | { ok: false; error: string };
+
+type PendingBuild = { controller: ReadableByteStreamController; lines: number; done: boolean };
 
 export type FlushResult = {
   flushed: number;
@@ -74,7 +77,7 @@ export type FlushResult = {
 export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
   // Held only while a browser waits on the response, so hibernation can't strand one.
-  private pendingBuilds = new Map<string, { resolve: (r: BuildOutcome) => void; log: string[] }>();
+  private pendingBuilds = new Map<string, PendingBuild>();
 
   private projectId(): string {
     // Stored on first ingest; used as the R2 key prefix.
@@ -461,28 +464,49 @@ export class ProjectDO extends DurableObject<Env> {
     return (ws.deserializeAttachment() as { role?: string } | null)?.role === 'agent';
   }
 
-  // Nothing is queued for an agent that isn't connected.
-  async requestBuild(fqbn: string, sketch: string): Promise<BuildOutcome> {
-    const agent = this.ctx.getWebSockets().find((ws) => this.isAgent(ws));
-    if (!agent) return { ok: false, error: 'no_agent', log: [] };
-
+  // NDJSON as the build happens: a cold toolchain install is minutes long, and a
+  // console that prints nothing until the end reads as a hang. RPC carries byte
+  // streams only, hence type: 'bytes'.
+  requestBuild(fqbn: string, sketch: string): ReadableStream<Uint8Array> {
     const id = newId('build');
-    const log: string[] = [];
-    return new Promise<BuildOutcome>((resolve) => {
-      this.pendingBuilds.set(id, { resolve, log });
-      setTimeout(() => {
-        const pending = this.pendingBuilds.get(id);
-        if (!pending) return;
-        this.pendingBuilds.delete(id);
-        pending.resolve({ ok: false, error: 'timed out', log: pending.log });
-      }, BUILD_TIMEOUT_MS);
-      try {
-        agent.send(JSON.stringify({ type: 'build', id, fqbn, sketch }));
-      } catch {
-        this.pendingBuilds.delete(id);
-        resolve({ ok: false, error: 'agent went away', log: [] });
-      }
+    const agent = this.ctx.getWebSockets().find((ws) => this.isAgent(ws));
+
+    return new ReadableStream({
+      type: 'bytes',
+      start: (controller) => {
+        const pending: PendingBuild = { controller, lines: 0, done: false };
+        if (!agent) return this.finishBuild(pending, { ok: false, error: 'no agent is connected' });
+
+        this.pendingBuilds.set(id, pending);
+        setTimeout(() => {
+          if (this.pendingBuilds.delete(id)) this.finishBuild(pending, { ok: false, error: 'timed out' });
+        }, BUILD_TIMEOUT_MS);
+        try {
+          agent.send(JSON.stringify({ type: 'build', id, fqbn, sketch }));
+        } catch {
+          this.pendingBuilds.delete(id);
+          this.finishBuild(pending, { ok: false, error: 'the agent went away' });
+        }
+      },
     });
+  }
+
+  private writeBuildFrame(p: PendingBuild, frame: unknown): void {
+    if (p.done) return;
+    try {
+      p.controller.enqueue(new TextEncoder().encode(`${JSON.stringify(frame)}\n`));
+    } catch {
+      p.done = true;
+    }
+  }
+
+  private finishBuild(p: PendingBuild, result: BuildOutcome): void {
+    if (p.done) return;
+    this.writeBuildFrame(p, { type: 'result', ...result });
+    p.done = true;
+    try {
+      p.controller.close();
+    } catch { /* the reader went away */ }
   }
 
   private handleAgentFrame(raw: string): void {
@@ -497,16 +521,15 @@ export class ProjectDO extends DurableObject<Env> {
     if (!pending) return;
 
     if (msg['type'] === 'log' && typeof msg['line'] === 'string') {
-      if (pending.log.length < 500) pending.log.push(msg['line']);
+      if (pending.lines++ < MAX_BUILD_LOG_LINES) this.writeBuildFrame(pending, { type: 'log', line: msg['line'] });
       return;
     }
     if (msg['type'] !== 'result') return;
     this.pendingBuilds.delete(build);
     // The agent uploads before it reports, so ok means the object is already there.
-    pending.resolve(
-      msg['ok'] === true
-        ? { ok: true, build, log: pending.log }
-        : { ok: false, error: String(msg['error'] ?? 'build failed'), log: pending.log }
+    this.finishBuild(
+      pending,
+      msg['ok'] === true ? { ok: true, build } : { ok: false, error: String(msg['error'] ?? 'build failed') }
     );
   }
 

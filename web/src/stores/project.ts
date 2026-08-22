@@ -86,22 +86,9 @@ export const useProjectStore = defineStore('project', () => {
     firmware.value = data.firmware;
   }
 
-  async function uploadFirmware(input: { version: string; target?: string; notes?: string; body: ArrayBuffer }): Promise<void> {
+  async function publishBuild(buildId: string): Promise<void> {
     const pid = requireProjectId();
-    const q = new URLSearchParams({ version: input.version });
-    if (input.target) q.set('target', input.target);
-    if (input.notes) q.set('notes', input.notes);
-    // Raw body, so this bypasses the JSON api helper.
-    const res = await fetch(`/v1/admin/projects/${pid}/firmware?${q}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: input.body,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { error?: string };
-      throw new Error(err.error ?? `Upload failed (${res.status})`);
-    }
+    await api.post(`/v1/admin/projects/${pid}/build/${buildId}/firmware`);
     await loadFirmware();
   }
 
@@ -452,7 +439,7 @@ export const useProjectStore = defineStore('project', () => {
     switchTo,
     loadDevices,
     loadFirmware,
-    uploadFirmware,
+    publishBuild,
     deleteFirmware,
     assignFirmware,
     renameDevice,

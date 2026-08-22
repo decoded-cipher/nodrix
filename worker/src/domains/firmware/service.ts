@@ -7,10 +7,6 @@ const FRESH_SECONDS = 15 * 60;
 
 // Assets are named <Example>-<target>.bin by the SDK's compile workflow.
 const ASSET_NAME = /^([A-Za-z0-9_]+)-([A-Za-z0-9_]+)\.bin$/;
-// Anything reaching the download URL is built from these, so they decide whether
-// this is a firmware proxy or an open one.
-const SAFE_TAG = /^[A-Za-z0-9._-]{1,64}$/;
-const SAFE_NAME = /^[A-Za-z0-9._-]{1,128}\.bin$/;
 
 export type FirmwareEntry = { example: string; target: string; file: string; size: number };
 export type FirmwareCatalog = { tag: string | null; entries: FirmwareEntry[] };
@@ -66,20 +62,4 @@ export async function getCatalog(env: Env): Promise<FirmwareCatalog> {
 
 function put(env: Env, value: Cached): Promise<void> {
   return env.KV.put(CACHE_KEY, JSON.stringify(value)).catch(() => {});
-}
-
-// The client passes parts, never a URL. '..' is rejected separately because the
-// charset allows dots, and ../ would climb out of the release path.
-export function binaryUrl(tag: string, file: string): string | null {
-  if (!SAFE_TAG.test(tag) || !SAFE_NAME.test(file)) return null;
-  if (tag.includes('..') || file.includes('..')) return null;
-  return `https://github.com/${SDK_REPO}/releases/download/${tag}/${file}`;
-}
-
-// Release assets carry no CORS headers, so the browser can't fetch one itself.
-export async function fetchBinary(tag: string, file: string): Promise<Response | null> {
-  const url = binaryUrl(tag, file);
-  if (!url) return null;
-  const res = await fetch(url, { headers: { 'User-Agent': 'nodrix-firmware-proxy' } });
-  return res.ok ? res : null;
 }
