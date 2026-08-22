@@ -22,9 +22,9 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        // og.png is only for social scrapers — no need to precache it offline.
-        // ~630 kB between them, and both need hardware or the network anyway.
-        globIgnores: ['**/og.png', '**/FlashPanel-*.js', '**/CodePanel-*.js'],
+        // og.png is for social scrapers; the Code chunk is ~630 kB of CodeMirror
+        // and esptool-js that needs hardware anyway.
+        globIgnores: ['**/og.png', '**/CodePanel-*.js'],
         navigateFallback: '/index.html',
         // Never hijack worker-rendered routes with the SPA fallback.
         navigateFallbackDenylist: [/^\/v1/, /^\/ws/, /^\/authorize/, /^\/\.well-known\//],

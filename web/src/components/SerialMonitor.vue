@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { useSerialPort, BAUD_RATES } from '../../../composables/useSerialPort';
-import { useSerialLog, type LogEntry } from '../../../composables/useSerialLog';
-import { useSerialDiagnosis } from '../../../composables/useSerialDiagnosis';
-import { toast } from '../../../lib/toast';
+import { useSerialPort, BAUD_RATES } from '../composables/useSerialPort';
+import { useSerialLog, type LogEntry } from '../composables/useSerialLog';
+import { useSerialDiagnosis } from '../composables/useSerialDiagnosis';
+import { toast } from '../lib/toast';
 
 const { supported, port, state, lastError, request, startMonitor, stopMonitor, setBaud } = useSerialPort();
 const { entries, paused, garbled, setPaused, clear, toText } = useSerialLog();
@@ -76,7 +76,7 @@ function stamp(at: number) {
 </script>
 
 <template>
-  <div v-if="!supported" class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
+  <div v-if="!supported" class="p-4">
     <h2 class="text-sm font-semibold">This browser can't talk to serial devices</h2>
     <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
       The console uses the Web Serial API, which needs Chrome, Edge or Opera on desktop, or Chrome on
@@ -87,7 +87,7 @@ function stamp(at: number) {
     </p>
   </div>
 
-  <div v-else class="space-y-3">
+  <div v-else class="flex h-full flex-col gap-2">
     <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
@@ -140,7 +140,7 @@ function stamp(at: number) {
 
     <div
       ref="viewport"
-      class="h-[26rem] overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-950 p-3 font-mono text-xs leading-relaxed dark:border-neutral-800"
+      class="min-h-0 flex-1 overflow-y-auto rounded-lg bg-neutral-950 p-3 font-mono text-xs leading-relaxed"
       @scroll="onScroll"
     >
       <p v-if="!entries.length" class="text-neutral-500">
