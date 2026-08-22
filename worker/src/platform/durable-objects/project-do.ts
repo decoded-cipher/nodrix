@@ -18,7 +18,8 @@ import { PROJECT_SCHEMA } from './project-schema';
 // Project Durable Object (one per project id, SQLite-backed): latest variable
 // state, recent ring buffer, pending control writes, and the R2 flush cursor.
 
-const RING_BUFFER_MAX_ROWS = 1000;
+// Shared across devices this would silently thin every chart as hardware is added.
+const RING_BUFFER_MAX_ROWS_PER_DEVICE = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
 // Multi-row inserts bind 4 columns/row; this keeps a chunk under MAX_BOUND_PARAMS.
 const ROWS_PER_4COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 4);
@@ -699,16 +700,20 @@ export class ProjectDO extends DurableObject<Env> {
     const ageCutoff = now - RING_BUFFER_MAX_AGE_SECONDS;
     this.sql.exec(`DELETE FROM ring_buffer WHERE ts < ?`, ageCutoff);
 
-    const row = this.sql
-      .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM ring_buffer`)
-      .one();
-    if (row.count > RING_BUFFER_MAX_ROWS) {
-      const overflow = row.count - RING_BUFFER_MAX_ROWS;
+    const over = this.sql
+      .exec<{ device_id: string; count: number }>(
+        `SELECT device_id, COUNT(*) AS count FROM ring_buffer
+          GROUP BY device_id HAVING count > ?`,
+        RING_BUFFER_MAX_ROWS_PER_DEVICE
+      )
+      .toArray();
+    for (const d of over) {
       this.sql.exec(
         `DELETE FROM ring_buffer WHERE rowid IN (
-           SELECT rowid FROM ring_buffer ORDER BY rowid ASC LIMIT ?
+           SELECT rowid FROM ring_buffer WHERE device_id = ? ORDER BY rowid ASC LIMIT ?
          )`,
-        overflow
+        d.device_id,
+        d.count - RING_BUFFER_MAX_ROWS_PER_DEVICE
       );
     }
 
