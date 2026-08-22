@@ -10,6 +10,7 @@ import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
+import { migrateSchema, type SchemaStep } from './schema';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
 // state, recent ring buffer, pending control writes, and the R2 flush cursor.
@@ -55,6 +56,56 @@ export type FlushResult = {
   newCursor: number;
 };
 
+const SCHEMA: SchemaStep[] = [
+  (sql) => {
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS latest_state (
+        variable    TEXT PRIMARY KEY,
+        value       TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      );
+    `);
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS ring_buffer (
+        rowid    INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts       INTEGER NOT NULL,
+        variable TEXT NOT NULL,
+        value    TEXT NOT NULL
+      );
+    `);
+    sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_ts ON ring_buffer(ts);`);
+    // Serves the per-variable series reads (chart snapshots + delta polls); the
+    // ts-only index above stays for age-based eviction.
+    sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_var_ts ON ring_buffer(variable, ts);`);
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS pending_control (
+        id           TEXT PRIMARY KEY,
+        variable     TEXT NOT NULL,
+        value        TEXT NOT NULL,
+        created_at   INTEGER NOT NULL,
+        delivered_at INTEGER
+      );
+    `);
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS flush_meta (
+        k TEXT PRIMARY KEY,
+        v TEXT
+      );
+    `);
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        dashboard_id TEXT PRIMARY KEY
+      );
+    `);
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS auto_cache (
+        k TEXT PRIMARY KEY,
+        v TEXT
+      );
+    `);
+  },
+];
+
 export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private projectId(): string {
@@ -68,7 +119,7 @@ export class ProjectDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
-    this.initSchema();
+    migrateSchema(ctx, SCHEMA);
   }
 
   // WS connect calls this so the DO has its project_id for socket-driven ingest —
@@ -599,56 +650,6 @@ export class ProjectDO extends DurableObject<Env> {
 
     // Flush NEVER deletes ring_buffer rows. Eviction owns that.
     return { flushed: rows.length, keys, newCursor };
-  }
-
-  private initSchema(): void {
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS latest_state (
-        variable    TEXT PRIMARY KEY,
-        value       TEXT NOT NULL,
-        received_at INTEGER NOT NULL
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS ring_buffer (
-        rowid    INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts       INTEGER NOT NULL,
-        variable TEXT NOT NULL,
-        value    TEXT NOT NULL
-      );
-    `);
-    this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_ts ON ring_buffer(ts);`);
-    // Serves the per-variable series reads (chart snapshots + delta polls); the
-    // ts-only index above stays for age-based eviction.
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_ring_buffer_var_ts ON ring_buffer(variable, ts);`
-    );
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS pending_control (
-        id           TEXT PRIMARY KEY,
-        variable     TEXT NOT NULL,
-        value        TEXT NOT NULL,
-        created_at   INTEGER NOT NULL,
-        delivered_at INTEGER
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS flush_meta (
-        k TEXT PRIMARY KEY,
-        v TEXT
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS subscriptions (
-        dashboard_id TEXT PRIMARY KEY
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS auto_cache (
-        k TEXT PRIMARY KEY,
-        v TEXT
-      );
-    `);
   }
 
   private evictRingBuffer(now: number): void {

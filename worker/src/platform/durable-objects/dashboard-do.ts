@@ -5,6 +5,7 @@ import { validateLayout, variablesFromLayout, chartVariablesFromLayout, type Lay
 import { newId } from '../lib/ids';
 import { userCanAccessProject } from '../lib/roles';
 import type { CompactSeries } from '../lib/series';
+import { migrateSchema, type SchemaStep } from './schema';
 
 // Cap on points per chart series in the bootstrap snapshot (mirrors the public
 // /state full snapshot). Dense ingest is stride-sampled to this.
@@ -41,13 +42,23 @@ type AckMsg = { type: 'ack'; req: string; ok: boolean; reason?: string };
 type ClientMsg =
   | { type: 'control'; req?: string; variable: string; value?: unknown };
 
+const SCHEMA: SchemaStep[] = [
+  (sql) => {
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS subscribed_project (
+        project_id TEXT PRIMARY KEY
+      );
+    `);
+  },
+];
+
 export class DashboardDO extends DurableObject<Env> {
   private sql: SqlStorage;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
-    this.initSchema();
+    migrateSchema(ctx, SCHEMA);
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -274,13 +285,5 @@ export class DashboardDO extends DurableObject<Env> {
       })
     );
     this.sql.exec(`DELETE FROM subscribed_project`);
-  }
-
-  private initSchema(): void {
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS subscribed_project (
-        project_id TEXT PRIMARY KEY
-      );
-    `);
   }
 }
