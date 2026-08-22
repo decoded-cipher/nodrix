@@ -26,6 +26,8 @@ const ROWS_PER_4COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 4);
 const EVICT_INTERVAL_SECONDS = 30;
 const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
+// Roughly a megabyte a call, and a boot-looping board would pull it forever.
+const OTA_DOWNLOADS_PER_HOUR = 6;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
 // doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
 const AUTO_CACHE_TTL_MS = 30_000;
@@ -132,6 +134,16 @@ const SCHEMA: SchemaStep[] = [
 
     // NULL device still broadcasts.
     sql.exec(`ALTER TABLE pending_control ADD COLUMN device_id TEXT;`);
+  },
+  (sql) => {
+    sql.exec(`
+      CREATE TABLE IF NOT EXISTS ota_quota (
+        device_id TEXT NOT NULL,
+        window    INTEGER NOT NULL,
+        count     INTEGER NOT NULL,
+        PRIMARY KEY (device_id, window)
+      );
+    `);
   },
 ];
 
@@ -535,6 +547,23 @@ export class ProjectDO extends DurableObject<Env> {
         ws.send(JSON.stringify({ type: 'control', id: cmd.id, variable: cmd.variable, value: safeParse(cmd.value) }));
       } catch { /* dead socket; ignore */ }
     }
+  }
+
+  // In DO SQLite, not KV: an eventually consistent counter can be outrun.
+  async consumeOtaQuota(deviceId: string): Promise<boolean> {
+    const window = Math.floor(Date.now() / 1000 / 3600);
+    this.sql.exec(`DELETE FROM ota_quota WHERE window < ?`, window);
+    const row = this.sql
+      .exec<{ count: number }>(`SELECT count FROM ota_quota WHERE device_id = ? AND window = ?`, deviceId, window)
+      .toArray()[0];
+    if ((row?.count ?? 0) >= OTA_DOWNLOADS_PER_HOUR) return false;
+    this.sql.exec(
+      `INSERT INTO ota_quota (device_id, window, count) VALUES (?, ?, 1)
+       ON CONFLICT(device_id, window) DO UPDATE SET count = count + 1`,
+      deviceId,
+      window
+    );
+    return true;
   }
 
   // A nudge, not a push: the device still decides whether to pull.

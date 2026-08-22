@@ -3,6 +3,8 @@ import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { normaliseDeviceKey, resolveDevice } from '../devices/service';
 import { offerFor, openImage } from './ota';
+import { projectStub } from '../../platform/durable-objects/stubs';
+import { storageIdOf } from '../devices/service';
 
 const ota = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
@@ -30,6 +32,11 @@ ota.get('/image', async (c) => {
   const { project_id } = c.get('projectToken');
   const deviceId = await deviceIdFor(c, project_id);
   if (!deviceId) return c.json({ error: 'not_found' }, 404);
+  const storageId = await storageIdOf(c.env, project_id, deviceId);
+  if (!(await projectStub(c.env, project_id).consumeOtaQuota(storageId))) {
+    return c.json({ error: 'too_many_requests' }, 429, { 'retry-after': '3600' });
+  }
+
   const object = await openImage(c.env, project_id, deviceId);
   if (!object) return c.json({ error: 'not_found' }, 404);
   return new Response(object.body, {
