@@ -30,6 +30,8 @@ const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
 // Roughly a megabyte a call, and a boot-looping board would pull it forever.
 const OTA_DOWNLOADS_PER_HOUR = 6;
+// A cold toolchain install can take minutes; a warm build is seconds.
+const BUILD_TIMEOUT_MS = 5 * 60_000;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
 // doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
 const AUTO_CACHE_TTL_MS = 30_000;
@@ -57,6 +59,10 @@ export type SeriesRow = {
   value: unknown;
 };
 
+export type BuildOutcome =
+  | { ok: true; binary: string; log: string[] }
+  | { ok: false; error: string; log: string[] };
+
 export type FlushResult = {
   flushed: number;
   keys: string[];
@@ -66,6 +72,9 @@ export type FlushResult = {
 
 export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
+  // Held only while a browser waits on the response, so hibernation can't strand one.
+  private pendingBuilds = new Map<string, { resolve: (r: BuildOutcome) => void; log: string[] }>();
+
   private projectId(): string {
     // Stored on first ingest; used as the R2 key prefix.
     const row = this.sql
@@ -447,6 +456,58 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM pending_control WHERE variable = ? AND device_id IS ?`, variable, deviceId);
   }
 
+  private isAgent(ws: WebSocket): boolean {
+    return (ws.deserializeAttachment() as { role?: string } | null)?.role === 'agent';
+  }
+
+  // Nothing is queued for an agent that isn't connected.
+  async requestBuild(fqbn: string, sketch: string): Promise<BuildOutcome> {
+    const agent = this.ctx.getWebSockets().find((ws) => this.isAgent(ws));
+    if (!agent) return { ok: false, error: 'no_agent', log: [] };
+
+    const id = newId('build');
+    const log: string[] = [];
+    return new Promise<BuildOutcome>((resolve) => {
+      this.pendingBuilds.set(id, { resolve, log });
+      setTimeout(() => {
+        const pending = this.pendingBuilds.get(id);
+        if (!pending) return;
+        this.pendingBuilds.delete(id);
+        pending.resolve({ ok: false, error: 'timed out', log: pending.log });
+      }, BUILD_TIMEOUT_MS);
+      try {
+        agent.send(JSON.stringify({ type: 'build', id, fqbn, sketch }));
+      } catch {
+        this.pendingBuilds.delete(id);
+        resolve({ ok: false, error: 'agent went away', log: [] });
+      }
+    });
+  }
+
+  private handleAgentFrame(raw: string): void {
+    let msg: Record<string, unknown>;
+    try {
+      msg = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    const build = typeof msg['build'] === 'string' ? msg['build'] : '';
+    const pending = this.pendingBuilds.get(build);
+    if (!pending) return;
+
+    if (msg['type'] === 'log' && typeof msg['line'] === 'string') {
+      if (pending.log.length < 500) pending.log.push(msg['line']);
+      return;
+    }
+    if (msg['type'] !== 'result') return;
+    this.pendingBuilds.delete(build);
+    pending.resolve(
+      msg['ok'] === true && typeof msg['binary'] === 'string'
+        ? { ok: true, binary: msg['binary'], log: pending.log }
+        : { ok: false, error: String(msg['error'] ?? 'build failed'), log: pending.log }
+    );
+  }
+
   // Survives hibernation, unlike anything held in memory.
   private deviceOf(ws: WebSocket): string {
     const att = ws.deserializeAttachment() as { device?: string } | null;
@@ -518,6 +579,11 @@ export class ProjectDO extends DurableObject<Env> {
     const server = pair[1] as WebSocket;
     this.ctx.acceptWebSocket(server);
 
+    if (request.headers.get('x-nodrix-role') === 'agent') {
+      server.serializeAttachment({ role: 'agent' });
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
     // Until a hello arrives the socket counts as the default device.
     server.serializeAttachment({ device: '' });
     this.sendPending(server, `(device_id IS NULL OR device_id = '')`);
@@ -529,6 +595,7 @@ export class ProjectDO extends DurableObject<Env> {
   // parser. Invalid input → error frame; unknown/garbage → dropped.
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    if (this.isAgent(ws)) return this.handleAgentFrame(raw);
     const msg = parseDeviceMessage(raw);
     switch (msg.kind) {
       case 'hello': {

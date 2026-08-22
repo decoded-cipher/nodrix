@@ -4,6 +4,8 @@ import { api } from '../../../api';
 import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
 import CodeEditor from '../../../components/CodeEditor.vue';
+import { useEspFlasher } from '../../../composables/useEspFlasher';
+import { useSerialPort } from '../../../composables/useSerialPort';
 import type { FirmwareCatalog } from '../../../types';
 
 const project = useProjectStore();
@@ -27,6 +29,47 @@ const catalog = ref<FirmwareCatalog>({ tag: null, entries: [] });
 const example = ref('');
 const code = ref('');
 const loading = ref(false);
+
+const FQBNS = [
+  { value: 'esp32:esp32:esp32', label: 'ESP32' },
+  { value: 'esp32:esp32:esp32s3', label: 'ESP32-S3' },
+  { value: 'esp32:esp32:esp32c3', label: 'ESP32-C3' },
+  { value: 'esp8266:esp8266:nodemcuv2', label: 'ESP8266 (NodeMCU)' },
+];
+
+const { flash } = useEspFlasher();
+const { port, request } = useSerialPort();
+const fqbn = ref(FQBNS[0]!.value);
+const building = ref(false);
+const buildLog = ref<string[]>([]);
+const buildError = ref('');
+
+type BuildResult = { ok: boolean; binary?: string; error?: string; log?: string[] };
+
+async function compileAndFlash() {
+  building.value = true;
+  buildLog.value = [];
+  buildError.value = '';
+  try {
+    const res = await api.post<BuildResult>(
+      `/v1/admin/projects/${project.currentProjectId}/build`,
+      { fqbn: fqbn.value, sketch: code.value }
+    );
+    buildLog.value = res.log ?? [];
+    if (!res.ok || !res.binary) {
+      buildError.value = res.error ?? 'Build failed';
+      return;
+    }
+    if (!port.value && !(await request())) return;
+    const bytes = Uint8Array.from(atob(res.binary), (ch) => ch.charCodeAt(0));
+    const ok = await flash([{ data: bytes, address: 0x10000 }]);
+    if (ok) toast.success('Flashed — the board is restarting');
+  } catch (e) {
+    buildError.value = (e as Error).message;
+  } finally {
+    building.value = false;
+  }
+}
 
 // The catalogue lists one binary per chip, so names repeat.
 const examples = computed(() => [...new Set(catalog.value.entries.map((e) => e.example))]);
@@ -115,13 +158,30 @@ function reset() {
 
     <CodeEditor v-model="code" />
 
-    <div class="rounded-xl border border-dashed border-neutral-300 p-4 text-sm dark:border-neutral-700">
-      <p class="font-medium">Compiling needs the nodrix agent</p>
-      <p class="mt-1 text-neutral-600 dark:text-neutral-400">
-        A browser can't run a C++ toolchain — the ESP32 sysroot alone is over 150 MB. The agent runs on
-        your machine, builds with your own Arduino toolchain, and sends the binary back here to flash.
-        Until it's installed, download the sketch and build it in the Arduino IDE.
-      </p>
+    <div class="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+      <div class="flex flex-wrap items-center gap-2">
+        <select
+          v-model="fqbn"
+          class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+        >
+          <option v-for="b in FQBNS" :key="b.value" :value="b.value">{{ b.label }}</option>
+        </select>
+        <button
+          type="button"
+          :disabled="building"
+          class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+          @click="compileAndFlash"
+        >{{ building ? 'Building…' : 'Compile and flash' }}</button>
+        <p class="text-xs text-neutral-500">
+          Builds on your machine via the nodrix agent. A first build installs the toolchain and takes minutes.
+        </p>
+      </div>
+
+      <p v-if="buildError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ buildError }}</p>
+      <pre
+        v-if="buildLog.length"
+        class="mt-3 max-h-56 overflow-auto rounded-md bg-neutral-950 p-3 font-mono text-xs text-neutral-300"
+      >{{ buildLog.join('\n') }}</pre>
     </div>
   </div>
 </template>
