@@ -205,9 +205,11 @@ function defaultEmitEvent(env: Env): ActionDeps['emitEvent'] {
   };
 }
 
+// Schedule, sunset and manual runs carry no device; without this the first by
+// sort order wins.
 function defaultGetVariable(env: Env, projectId: string): (variable: string) => Promise<unknown> {
   return async (variable) => {
-    const rows = await projectStub(env, projectId).getLatestState();
+    const rows = await projectStub(env, projectId).getLatestState('');
     return rows.find((r) => r.variable === variable)?.value;
   };
 }

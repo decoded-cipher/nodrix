@@ -7,6 +7,8 @@ import { nanoid } from 'nanoid';
 // tok_xxx  token       ctl_xxx  control write
 // aut_xxx  automation  itg_xxx  integration
 // wid_xxx  widget instance (inside a dashboard layout)
+// dev_xxx  device      fwr_xxx  firmware image
+// bld_xxx  agent build
 // dly_xxx  delay continuation (pending automation resume)
 
 const PREFIXES = {
@@ -20,6 +22,9 @@ const PREFIXES = {
   integration: 'itg',
   widget: 'wid',
   delay: 'dly',
+  device: 'dev',
+  firmware: 'fwr',
+  build: 'bld',
 } as const;
 
 export type IdKind = keyof typeof PREFIXES;

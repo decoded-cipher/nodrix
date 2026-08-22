@@ -1,7 +1,8 @@
-# nodrix deploy carrier. The Deploy to Cloudflare button clones only this
-# subdir; the build command pulls the real source from upstream over it. Don't
-# edit by hand — manage the deployment from the Cloudflare dashboard. Keep the
-# bindings in sync with the repo-root wrangler.toml.
+# nodrix deploy carrier. The Deploy to Cloudflare button clones only this subdir;
+# the build command pulls the real source from upstream over it and rebuilds the
+# deployment's wrangler.toml from this file, keeping only its Worker name,
+# account, routes, resource IDs and vars. Everything else here reaches every
+# existing deployment on its next build — keep it in sync with the root config.
 name = "nodrix"
 main = "worker/src/index.ts"
 compatibility_date = "2025-05-01"

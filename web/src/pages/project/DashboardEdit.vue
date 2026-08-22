@@ -115,6 +115,12 @@ function setViewMode(mode: 'desktop' | 'mobile') {
 }
 
 // Revert the phone layout to the auto-derived arrangement.
+// Empty means the default device, so a dashboard made before devices existed
+// keeps reading what it always did.
+function setDevice(id: string) {
+  layout.value = { ...layout.value, device: id || null };
+}
+
 function resetMobileLayout() {
   if (!layout.value.mobile) return;
   layout.value = { ...layout.value, mobile: null };
@@ -139,6 +145,7 @@ onMounted(async () => {
   }
 
   if (!project.variables.length) await project.loadVariables();
+  if (!project.devices.length) await project.loadDevices();
 
   ws = new DashboardWs(dashId, handleMessage);
   ws.start();
@@ -357,6 +364,15 @@ function exitToView() {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 lg:hidden"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8" /><path d="M3 3v5h5" /></svg>
           <span class="hidden lg:inline">Reset layout</span>
         </button>
+        <select
+          v-if="project.devices.length > 1"
+          :value="layout.device ?? ''"
+          class="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+          title="Which device this dashboard reads"
+          @change="setDevice(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="d in project.devices" :key="d.id" :value="d.is_default ? '' : d.id">{{ d.name }}</option>
+        </select>
         <button
           class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           @click="exitToView"

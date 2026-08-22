@@ -70,6 +70,31 @@ export type Variable = {
   last_seen: number | null;
 };
 
+export type Device = {
+  id: string;
+  name: string;
+  chip: string | null;
+  firmware_version: string | null;
+  is_default: number;
+  first_seen: number | null;
+  last_seen: number | null;
+  desired_firmware_id: string | null;
+  ota_status: string | null;
+};
+
+export type Firmware = {
+  id: string;
+  version: string;
+  target: string | null;
+  size: number;
+  sha256: string;
+  notes: string | null;
+  created_at: number;
+};
+
+export type FirmwareEntry = { example: string; target: string; file: string; size: number };
+export type FirmwareCatalog = { tag: string | null; entries: FirmwareEntry[] };
+
 export type ProjectToken = {
   id: string;
   name?: string | null;
@@ -111,6 +136,8 @@ export type MobilePlacement = { id: string; x: number; y: number; w: number; h: 
 export type Layout = {
   grid: { columns: number };
   items: WidgetInstance[];
+  // Which device the widgets' variable keys belong to. Absent => the default.
+  device?: string | null;
   // Phone layout override, nested in the same layout JSON (no separate column).
   // Absent/null => auto-derive the phone layout from the desktop items.
   mobile?: { items: MobilePlacement[] } | null;
@@ -177,6 +204,7 @@ export type VariableOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'changed'
 
 export type VariableTriggerConfig = {
   variable: string;                   // variable key
+  device?: string | null;             // device id; absent/empty = any device
   operator: VariableOperator;
   value?: number | string | boolean;  // omitted for 'changed'
   mode?: 'edge' | 'always';           // edge = fire once on entry (default)

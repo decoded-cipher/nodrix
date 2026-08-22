@@ -22,7 +22,7 @@ const hasProject = computed(() => projId.value !== '');
 
 type IconName =
   | 'home' | 'folder' | 'dashboards' | 'variable' | 'bolt'
-  | 'integrations' | 'users' | 'key' | 'settings' | 'audit';
+  | 'integrations' | 'users' | 'key' | 'settings' | 'audit' | 'device';
 
 type NavItem = {
   label: string;
@@ -57,6 +57,13 @@ const projectScoped = computed<NavItem[]>(() => {
       disabled: !hasProject.value,
       matchPath: (path) =>
         path === `/p/${id}/dashboards` || path.startsWith(`/p/${id}/d/`),
+    },
+    {
+      label: 'Device',
+      to: `/p/${id}/device`,
+      icon: 'device',
+      disabled: !hasProject.value,
+      matchPath: (path) => path.startsWith(`/p/${id}/device`),
     },
     {
       label: 'Automations',
@@ -105,6 +112,7 @@ const ICON_PATHS: Record<IconName, string> = {
   key: 'M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z',
   settings: 'M4.5 12a7.5 7.5 0 0 0 .104 1.243l-1.32 1.02a.75.75 0 0 0-.176.957l1.5 2.598a.75.75 0 0 0 .912.328l1.561-.624a7.45 7.45 0 0 0 2.155 1.244l.236 1.66a.75.75 0 0 0 .742.643h3a.75.75 0 0 0 .742-.643l.237-1.66a7.45 7.45 0 0 0 2.154-1.244l1.561.624a.75.75 0 0 0 .912-.328l1.5-2.598a.75.75 0 0 0-.176-.957l-1.32-1.02A7.51 7.51 0 0 0 19.5 12c0-.42-.035-.832-.103-1.232l1.319-1.02a.75.75 0 0 0 .176-.958l-1.5-2.598a.75.75 0 0 0-.912-.327l-1.561.624A7.46 7.46 0 0 0 14.764 5.245l-.236-1.66A.75.75 0 0 0 13.786 3h-3a.75.75 0 0 0-.742.643l-.237 1.66a7.45 7.45 0 0 0-2.154 1.244l-1.561-.624a.75.75 0 0 0-.912.327l-1.5 2.598a.75.75 0 0 0 .176.958l1.32 1.02C4.535 11.168 4.5 11.58 4.5 12Zm10.5 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   audit: 'M9 5h6m-6 0H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 1 1 6 0M9 12h6m-6 4h4',
+  device: 'M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z',
 };
 
 function iconFor(name: IconName): FunctionalComponent {

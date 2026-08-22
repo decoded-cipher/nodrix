@@ -7,6 +7,7 @@ export type VariableOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'changed'
 
 export type VariableTriggerConfig = {
   variable: string;                    // variable key
+  device?: string | null;              // device id; absent/null = any device
   operator: VariableOperator;
   value?: number | string | boolean;   // omitted for 'changed'
   mode?: 'edge' | 'always';            // edge (default): fire once on entry
@@ -49,6 +50,7 @@ export type AutomationContext = {
   ts: number;                          // unix seconds
   variable?: string;
   value?: unknown;
+  device?: string;                     // storage id of the device that triggered
   event?: string;
   payload?: Record<string, unknown>;
   depth: number;                       // emit_event recursion depth

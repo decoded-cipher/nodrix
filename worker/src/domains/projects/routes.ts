@@ -4,6 +4,7 @@ import { requireSession, type UserContextVars } from '../../platform/middleware/
 import { recordAudit } from '../../platform/lib/audit';
 import { userCanAccessProject } from '../../platform/lib/roles';
 import { projectStub } from '../../platform/durable-objects/stubs';
+import { exportProject } from './export';
 import { createProject, updateProject, listAccessibleProjects } from './service';
 import { actorFromSession, serviceErrorResponse } from '../../platform/lib/service';
 
@@ -50,6 +51,29 @@ projects.post('/:proj/flush', async (c) => {
 
   const result = await projectStub(c.env, projId).flushNow();
   return c.json(result);
+});
+
+// Everything the project owns, as NDJSON. Streamed — a project with a year of
+// history is far too big to assemble in memory. Carries no secrets.
+projects.get('/:proj/export', async (c) => {
+  const projId = c.req.param('proj');
+  const user = c.get('user');
+  if (!(await userCanAccessProject(c.env, user.id, projId))) return c.json({ error: 'forbidden' }, 403);
+
+  await recordAudit(c.env, {
+    projectId: projId,
+    userId: user.id,
+    action: 'project.export',
+    targetType: 'project',
+    targetId: projId,
+  });
+
+  return new Response(exportProject(c.env, projId), {
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Content-Disposition': `attachment; filename="${projId}.ndjson"`,
+    },
+  });
 });
 
 // Cascade: wipes the project's Project DO (which owns R2 telemetry history, not

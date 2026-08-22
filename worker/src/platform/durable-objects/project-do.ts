@@ -10,19 +10,28 @@ import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
+import { defaultDeviceId, normaliseDeviceKey, resolveDevice, recordDeviceSeen, touchDevice } from '../../domains/devices/service';
+import { reconcile } from '../../domains/firmware/ota';
+import { migrateSchema } from './schema';
+import { PROJECT_SCHEMA } from './project-schema';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
 // state, recent ring buffer, pending control writes, and the R2 flush cursor.
 
-const RING_BUFFER_MAX_ROWS = 1000;
+// Shared across devices this would silently thin every chart as hardware is added.
+const RING_BUFFER_MAX_ROWS_PER_DEVICE = 1000;
 const RING_BUFFER_MAX_AGE_SECONDS = 60 * 60; // 1 hour
-// Multi-row inserts bind 3 columns/row; this keeps a chunk under MAX_BOUND_PARAMS.
-const ROWS_PER_3COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 3);
+// Multi-row inserts bind 4 columns/row; this keeps a chunk under MAX_BOUND_PARAMS.
+const ROWS_PER_4COL_INSERT = Math.floor(MAX_BOUND_PARAMS / 4);
 // Eviction (age + overflow DELETE + COUNT) runs at most this often instead of on
 // every ingest — a single cheap last_evict_at lookup gates the actual work.
 const EVICT_INTERVAL_SECONDS = 30;
 const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
+// Roughly a megabyte a call, and a boot-looping board would pull it forever.
+const OTA_DOWNLOADS_PER_HOUR = 6;
+// A cold toolchain install can take minutes; a warm build is seconds.
+const BUILD_TIMEOUT_MS = 5 * 60_000;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
 // doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
 const AUTO_CACHE_TTL_MS = 30_000;
@@ -38,6 +47,7 @@ export type IngestResult = {
 };
 
 export type LatestStateRow = {
+  device_id: string;
   variable: string;
   value: unknown;
   received_at: number;
@@ -49,14 +59,23 @@ export type SeriesRow = {
   value: unknown;
 };
 
+// The artifact goes to R2 on its own route; only its id crosses the DO.
+export type BuildOutcome =
+  | { ok: true; build: string; log: string[] }
+  | { ok: false; error: string; log: string[] };
+
 export type FlushResult = {
   flushed: number;
   keys: string[];
   newCursor: number;
 };
 
+
 export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
+  // Held only while a browser waits on the response, so hibernation can't strand one.
+  private pendingBuilds = new Map<string, { resolve: (r: BuildOutcome) => void; log: string[] }>();
+
   private projectId(): string {
     // Stored on first ingest; used as the R2 key prefix.
     const row = this.sql
@@ -68,7 +87,7 @@ export class ProjectDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
-    this.initSchema();
+    migrateSchema(ctx, PROJECT_SCHEMA);
   }
 
   // WS connect calls this so the DO has its project_id for socket-driven ingest —
@@ -80,7 +99,7 @@ export class ProjectDO extends DurableObject<Env> {
     );
   }
 
-  async ingest(projectId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
+  async ingest(projectId: string, points: IngestPoint[], deviceId = ''): Promise<IngestResult> {
     const receivedAt = Math.floor(Date.now() / 1000);
 
     // Persist project_id once for the R2 key (idFromName doesn't round-trip cheaply).
@@ -100,7 +119,8 @@ export class ProjectDO extends DurableObject<Env> {
       const placeholders = part.map(() => '?').join(',');
       const rows = this.sql
         .exec<{ variable: string; value: string }>(
-          `SELECT variable, value FROM latest_state WHERE variable IN (${placeholders})`,
+          `SELECT variable, value FROM latest_state WHERE device_id = ? AND variable IN (${placeholders})`,
+          deviceId,
           ...part
         )
         .toArray();
@@ -111,28 +131,28 @@ export class ProjectDO extends DurableObject<Env> {
     // can't have two VALUES rows hit the same conflict target).
     const latestByVar = new Map<string, unknown>();
     for (const p of points) latestByVar.set(p.variable, p.value);
-    for (const part of chunk([...latestByVar], ROWS_PER_3COL_INSERT)) {
-      const rows = part.map(() => '(?, ?, ?)').join(', ');
+    for (const part of chunk([...latestByVar], ROWS_PER_4COL_INSERT)) {
+      const rows = part.map(() => '(?, ?, ?, ?)').join(', ');
       const binds: unknown[] = [];
       for (const [variable, value] of part) {
-        binds.push(variable, JSON.stringify(value), receivedAt);
+        binds.push(deviceId, variable, JSON.stringify(value), receivedAt);
       }
       this.sql.exec(
-        `INSERT INTO latest_state (variable, value, received_at)
+        `INSERT INTO latest_state (device_id, variable, value, received_at)
          VALUES ${rows}
-         ON CONFLICT(variable) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
+         ON CONFLICT(device_id, variable) DO UPDATE SET value = excluded.value, received_at = excluded.received_at`,
         ...binds
       );
     }
 
     // ring_buffer: append every point.
-    for (const part of chunk(points, ROWS_PER_3COL_INSERT)) {
-      const rows = part.map(() => '(?, ?, ?)').join(', ');
+    for (const part of chunk(points, ROWS_PER_4COL_INSERT)) {
+      const rows = part.map(() => '(?, ?, ?, ?)').join(', ');
       const binds: unknown[] = [];
       for (const p of part) {
-        binds.push(receivedAt, p.variable, JSON.stringify(p.value));
+        binds.push(receivedAt, deviceId, p.variable, JSON.stringify(p.value));
       }
-      this.sql.exec(`INSERT INTO ring_buffer (ts, variable, value) VALUES ${rows}`, ...binds);
+      this.sql.exec(`INSERT INTO ring_buffer (ts, device_id, variable, value) VALUES ${rows}`, ...binds);
     }
 
     // Eviction is independent of the flush cursor (copy-not-move).
@@ -141,7 +161,7 @@ export class ProjectDO extends DurableObject<Env> {
 
     // Fire-and-forget; failures never block ingest — the device already got its 204.
     this.notifyDashboards(points, receivedAt);
-    this.evaluateVariableTriggers(projectId, points, prev, receivedAt);
+    this.evaluateVariableTriggers(projectId, points, prev, receivedAt, deviceId);
 
     return { receivedAt, count: points.length };
   }
@@ -150,7 +170,8 @@ export class ProjectDO extends DurableObject<Env> {
     projectId: string,
     points: IngestPoint[],
     prev: Map<string, unknown>,
-    ts: number
+    ts: number,
+    deviceId: string
   ): void {
     this.ctx.waitUntil(
       (async () => {
@@ -158,16 +179,23 @@ export class ProjectDO extends DurableObject<Env> {
           const autos = await this.getVariableAutomations(projectId);
           if (autos.length === 0) return;
 
+          // Triggers name devices by their D1 id; storage calls the default one ''.
+          const triggerDevice = deviceId || (await defaultDeviceId(this.env, projectId)) || '';
+
+          // Both stay on the device that triggered: an automation that reacts to one
+          // greenhouse shouldn't read or switch another's.
           const setVariable = (variable: string, value: unknown): Promise<void> =>
-            this.addControl(newId('control'), variable, value);
-          // Condition nodes read live values; serve them from this DO's own state.
+            this.addControl(newId('control'), variable, value, deviceId);
           const getVariable = async (variable: string): Promise<unknown> =>
-            (await this.getLatestState()).find((r) => r.variable === variable)?.value;
+            (await this.getLatestState())
+              .find((r) => r.device_id === deviceId && r.variable === variable)?.value;
 
           for (const a of autos) {
             for (const node of triggerNodes(toGraph(a))) {
               if (node.kind !== 'variable') continue;
               const cfg = node.config as VariableTriggerConfig;
+
+              if (cfg.device && cfg.device !== triggerDevice) continue;
 
               const point = points.find((p) => p.variable === cfg.variable);
               if (!point) continue;
@@ -179,6 +207,7 @@ export class ProjectDO extends DurableObject<Env> {
                 ts,
                 variable: cfg.variable,
                 value: point.value,
+                device: triggerDevice,
                 depth: 0,
                 entryNodeId: node.id,
               };
@@ -268,10 +297,11 @@ export class ProjectDO extends DurableObject<Env> {
   async getDashboardSnapshot(
     variables: string[],
     sinceTs: number | null,
-    cap?: number
+    cap?: number,
+    deviceId = ''
   ): Promise<{ latest: LatestStateRow[]; series: CompactSeries; oldestTs: number | null }> {
-    const latest = this.getLatestState();
-    const series = this.getSeriesForVariables(variables, sinceTs, cap);
+    const latest = this.getLatestState(deviceId);
+    const series = this.getSeriesForVariables(variables, sinceTs, cap, deviceId);
     return { latest: await latest, series: await series, oldestTs: this.ringOldestTs() };
   }
 
@@ -284,13 +314,17 @@ export class ProjectDO extends DurableObject<Env> {
     return rows[0]?.m ?? null;
   }
 
-  async getLatestState(): Promise<LatestStateRow[]> {
+  async getLatestState(deviceId?: string | null): Promise<LatestStateRow[]> {
     const rows = this.sql
-      .exec<{ variable: string; value: string; received_at: number }>(
-        `SELECT variable, value, received_at FROM latest_state ORDER BY variable ASC`
+      .exec<{ device_id: string; variable: string; value: string; received_at: number }>(
+        `SELECT device_id, variable, value, received_at FROM latest_state
+         ${deviceId != null ? 'WHERE device_id = ?' : ''}
+         ORDER BY device_id ASC, variable ASC`,
+        ...(deviceId != null ? [deviceId] : [])
       )
       .toArray();
     return rows.map((r) => ({
+      device_id: r.device_id,
       variable: r.variable,
       value: safeParse(r.value),
       received_at: r.received_at,
@@ -302,18 +336,21 @@ export class ProjectDO extends DurableObject<Env> {
   async getSeriesForVariables(
     variables: string[],
     sinceTs: number | null,
-    cap?: number
+    cap?: number,
+    deviceId?: string | null
   ): Promise<CompactSeries> {
     if (variables.length === 0) return {};
     const cutoff = sinceTs ?? 0;
     const placeholders = variables.map(() => '?').join(',');
+    const scoped = deviceId != null;
     const rows = this.sql
       .exec<{ ts: number; variable: string; value: string }>(
         `SELECT ts, variable, value FROM ring_buffer
-         WHERE variable IN (${placeholders}) AND ts >= ?
+         WHERE variable IN (${placeholders}) AND ts >= ?${scoped ? ' AND device_id = ?' : ''}
          ORDER BY ts ASC`,
         ...variables,
-        cutoff
+        cutoff,
+        ...(scoped ? [deviceId] : [])
       )
       .toArray();
     return toCompactSeries(
@@ -322,26 +359,24 @@ export class ProjectDO extends DurableObject<Env> {
     );
   }
 
-  async getSeries(variable: string | null, sinceTs: number | null): Promise<SeriesRow[]> {
+  async getSeries(
+    variable: string | null,
+    sinceTs: number | null,
+    deviceId?: string | null
+  ): Promise<SeriesRow[]> {
     const cutoff = sinceTs ?? 0;
-    const rows = variable
-      ? this.sql
-          .exec<{ ts: number; variable: string; value: string }>(
-            `SELECT ts, variable, value FROM ring_buffer
-             WHERE variable = ? AND ts >= ?
-             ORDER BY ts ASC`,
-            variable,
-            cutoff
-          )
-          .toArray()
-      : this.sql
-          .exec<{ ts: number; variable: string; value: string }>(
-            `SELECT ts, variable, value FROM ring_buffer
-             WHERE ts >= ?
-             ORDER BY ts ASC`,
-            cutoff
-          )
-          .toArray();
+    const where = ['ts >= ?'];
+    const binds: unknown[] = [cutoff];
+    if (variable) { where.push('variable = ?'); binds.push(variable); }
+    if (deviceId != null) { where.push('device_id = ?'); binds.push(deviceId); }
+    const rows = this.sql
+      .exec<{ ts: number; variable: string; value: string }>(
+        `SELECT ts, variable, value FROM ring_buffer
+         WHERE ${where.join(' AND ')}
+         ORDER BY ts ASC`,
+        ...binds
+      )
+      .toArray();
     return rows.map((r) => ({ ts: r.ts, variable: r.variable, value: safeParse(r.value) }));
   }
 
@@ -357,57 +392,181 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM subscriptions WHERE dashboard_id = ?`, dashboardId);
   }
 
-  async addControl(id: string, variable: string, value: unknown): Promise<void> {
+  async addControl(id: string, variable: string, value: unknown, deviceId: string | null = null): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
     this.sql.exec(
-      `INSERT INTO pending_control (id, variable, value, created_at, delivered_at)
-       VALUES (?, ?, ?, ?, NULL)`,
+      `INSERT INTO pending_control (id, variable, value, created_at, delivered_at, device_id)
+       VALUES (?, ?, ?, ?, NULL, ?)`,
       id,
       variable,
       JSON.stringify(value),
-      now
+      now,
+      deviceId
     );
 
-    // Push to any connected hardware WS clients. If offline, the write stays in
-    // pending_control and is flushed on next connect.
+    // Push to connected hardware. If offline, the write stays in pending_control
+    // and is flushed on next connect.
     const payload = JSON.stringify({ type: 'control', id, variable, value });
     for (const ws of this.ctx.getWebSockets()) {
+      if (deviceId !== null && this.deviceOf(ws) !== deviceId) continue;
       try { ws.send(payload); } catch { /* dead socket; ignore */ }
     }
 
     this.notifyDashboards([{ variable, value: value as IngestPoint['value'] }], now);
   }
 
-  async listPendingControl(): Promise<Array<{ id: string; variable: string; value: unknown }>> {
+  // A device sees broadcasts and its own writes, never another device's.
+  async listPendingControl(deviceId = ''): Promise<Array<{ id: string; variable: string; value: unknown }>> {
     const rows = this.sql
       .exec<{ id: string; variable: string; value: string }>(
         `SELECT id, variable, value FROM pending_control
-         WHERE delivered_at IS NULL
-         ORDER BY created_at ASC`
+         WHERE delivered_at IS NULL AND (device_id IS NULL OR device_id = ?)
+         ORDER BY created_at ASC`,
+        deviceId
       )
       .toArray();
     return rows.map((r) => ({ id: r.id, variable: r.variable, value: safeParse(r.value) }));
   }
 
-  async ackControl(ids: string[]): Promise<{ acked: number }> {
+  async ackControl(ids: string[], deviceId = ''): Promise<{ acked: number }> {
     if (ids.length === 0) return { acked: 0 };
     const now = Math.floor(Date.now() / 1000);
     const placeholders = ids.map(() => '?').join(',');
     const cursor = this.sql.exec(
       `UPDATE pending_control SET delivered_at = ?
-        WHERE id IN (${placeholders}) AND delivered_at IS NULL`,
+        WHERE id IN (${placeholders}) AND delivered_at IS NULL
+          AND (device_id IS NULL OR device_id = ?)`,
       now,
-      ...ids
+      ...ids,
+      deviceId
     );
     return { acked: cursor.rowsWritten };
   }
 
   // Drops hot state for a variable. Cold R2 history (partitioned by project+hour)
   // is left in place — orphaned but harmless.
-  async deleteVariable(variable: string): Promise<void> {
-    this.sql.exec(`DELETE FROM latest_state WHERE variable = ?`, variable);
-    this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ?`, variable);
-    this.sql.exec(`DELETE FROM pending_control WHERE variable = ?`, variable);
+  async deleteVariable(variable: string, deviceId?: string | null): Promise<void> {
+    if (deviceId == null) {
+      this.sql.exec(`DELETE FROM latest_state WHERE variable = ?`, variable);
+      this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ?`, variable);
+      this.sql.exec(`DELETE FROM pending_control WHERE variable = ?`, variable);
+      return;
+    }
+    this.sql.exec(`DELETE FROM latest_state WHERE variable = ? AND device_id = ?`, variable, deviceId);
+    this.sql.exec(`DELETE FROM ring_buffer WHERE variable = ? AND device_id = ?`, variable, deviceId);
+    this.sql.exec(`DELETE FROM pending_control WHERE variable = ? AND device_id IS ?`, variable, deviceId);
+  }
+
+  private isAgent(ws: WebSocket): boolean {
+    return (ws.deserializeAttachment() as { role?: string } | null)?.role === 'agent';
+  }
+
+  // Nothing is queued for an agent that isn't connected.
+  async requestBuild(fqbn: string, sketch: string): Promise<BuildOutcome> {
+    const agent = this.ctx.getWebSockets().find((ws) => this.isAgent(ws));
+    if (!agent) return { ok: false, error: 'no_agent', log: [] };
+
+    const id = newId('build');
+    const log: string[] = [];
+    return new Promise<BuildOutcome>((resolve) => {
+      this.pendingBuilds.set(id, { resolve, log });
+      setTimeout(() => {
+        const pending = this.pendingBuilds.get(id);
+        if (!pending) return;
+        this.pendingBuilds.delete(id);
+        pending.resolve({ ok: false, error: 'timed out', log: pending.log });
+      }, BUILD_TIMEOUT_MS);
+      try {
+        agent.send(JSON.stringify({ type: 'build', id, fqbn, sketch }));
+      } catch {
+        this.pendingBuilds.delete(id);
+        resolve({ ok: false, error: 'agent went away', log: [] });
+      }
+    });
+  }
+
+  private handleAgentFrame(raw: string): void {
+    let msg: Record<string, unknown>;
+    try {
+      msg = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    const build = typeof msg['build'] === 'string' ? msg['build'] : '';
+    const pending = this.pendingBuilds.get(build);
+    if (!pending) return;
+
+    if (msg['type'] === 'log' && typeof msg['line'] === 'string') {
+      if (pending.log.length < 500) pending.log.push(msg['line']);
+      return;
+    }
+    if (msg['type'] !== 'result') return;
+    this.pendingBuilds.delete(build);
+    // The agent uploads before it reports, so ok means the object is already there.
+    pending.resolve(
+      msg['ok'] === true
+        ? { ok: true, build, log: pending.log }
+        : { ok: false, error: String(msg['error'] ?? 'build failed'), log: pending.log }
+    );
+  }
+
+  // Survives hibernation, unlike anything held in memory.
+  private deviceOf(ws: WebSocket): string {
+    const att = ws.deserializeAttachment() as { device?: string } | null;
+    return typeof att?.device === 'string' ? att.device : '';
+  }
+
+  // The attachment holds a storage id; '' has to become a real D1 id.
+  private async d1DeviceId(ws: WebSocket, projectId: string): Promise<string | null> {
+    return this.deviceOf(ws) || (await defaultDeviceId(this.env, projectId));
+  }
+
+  private sendPending(ws: WebSocket, where: string, ...binds: unknown[]): void {
+    const rows = this.sql
+      .exec<{ id: string; variable: string; value: string }>(
+        `SELECT id, variable, value FROM pending_control
+          WHERE delivered_at IS NULL AND ${where}
+          ORDER BY created_at ASC`,
+        ...binds
+      )
+      .toArray();
+    for (const cmd of rows) {
+      try {
+        ws.send(JSON.stringify({ type: 'control', id: cmd.id, variable: cmd.variable, value: safeParse(cmd.value) }));
+      } catch { /* dead socket; ignore */ }
+    }
+  }
+
+  // In DO SQLite, not KV: an eventually consistent counter can be outrun.
+  async consumeOtaQuota(deviceId: string): Promise<boolean> {
+    const window = Math.floor(Date.now() / 1000 / 3600);
+    this.sql.exec(`DELETE FROM ota_quota WHERE window < ?`, window);
+    const row = this.sql
+      .exec<{ count: number }>(`SELECT count FROM ota_quota WHERE device_id = ? AND window = ?`, deviceId, window)
+      .toArray()[0];
+    if ((row?.count ?? 0) >= OTA_DOWNLOADS_PER_HOUR) return false;
+    this.sql.exec(
+      `INSERT INTO ota_quota (device_id, window, count) VALUES (?, ?, 1)
+       ON CONFLICT(device_id, window) DO UPDATE SET count = count + 1`,
+      deviceId,
+      window
+    );
+    return true;
+  }
+
+  // A nudge, not a push: the device still decides whether to pull.
+  async notifyOta(deviceId: string): Promise<void> {
+    const payload = JSON.stringify({ type: 'ota' });
+    for (const ws of this.ctx.getWebSockets()) {
+      if (this.deviceOf(ws) !== deviceId) continue;
+      try { ws.send(payload); } catch { /* dead socket; ignore */ }
+    }
+  }
+
+  async deleteDevice(deviceId: string): Promise<void> {
+    this.sql.exec(`DELETE FROM latest_state WHERE device_id = ?`, deviceId);
+    this.sql.exec(`DELETE FROM ring_buffer WHERE device_id = ?`, deviceId);
+    this.sql.exec(`DELETE FROM pending_control WHERE device_id = ?`, deviceId);
   }
 
   async flushNow(): Promise<FlushResult> {
@@ -427,26 +586,14 @@ export class ProjectDO extends DurableObject<Env> {
     const server = pair[1] as WebSocket;
     this.ctx.acceptWebSocket(server);
 
-    // Flush any pending (undelivered) control writes on connect so a device
-    // that missed messages while offline catches up immediately. The device
-    // acks them via `{type:'ack', ids:[...]}` once processed.
-    const pending = this.sql
-      .exec<{ id: string; variable: string; value: string }>(
-        `SELECT id, variable, value FROM pending_control
-          WHERE delivered_at IS NULL
-          ORDER BY created_at ASC`
-      )
-      .toArray();
-    for (const cmd of pending) {
-      try {
-        server.send(JSON.stringify({
-          type: 'control',
-          id: cmd.id,
-          variable: cmd.variable,
-          value: safeParse(cmd.value),
-        }));
-      } catch { /* ignore */ }
+    if (request.headers.get('x-nodrix-role') === 'agent') {
+      server.serializeAttachment({ role: 'agent' });
+      return new Response(null, { status: 101, webSocket: client });
     }
+
+    // Until a hello arrives the socket counts as the default device.
+    server.serializeAttachment({ device: '' });
+    this.sendPending(server, `(device_id IS NULL OR device_id = '')`);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -455,16 +602,39 @@ export class ProjectDO extends DurableObject<Env> {
   // parser. Invalid input → error frame; unknown/garbage → dropped.
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    if (this.isAgent(ws)) return this.handleAgentFrame(raw);
     const msg = parseDeviceMessage(raw);
     switch (msg.kind) {
+      case 'hello': {
+        const pid = this.projectId();
+        const key = normaliseDeviceKey(msg.device);
+        const device = key ? await resolveDevice(this.env, pid, key, Math.floor(Date.now() / 1000)) : null;
+        if (!device || !device.storageId) return;
+        ws.serializeAttachment({ device: device.storageId });
+        this.ctx.waitUntil(
+          recordDeviceSeen(this.env, device.id, msg.chip, msg.firmware)
+            .then(() => reconcile(this.env, device.id, msg.firmware ?? null))
+        );
+        this.sendPending(ws, `device_id = ?`, device.storageId);
+        return;
+      }
       case 'ack':
-        if (msg.ids.length > 0) await this.ackControl(msg.ids);
+        if (msg.ids.length > 0) await this.ackControl(msg.ids, this.deviceOf(ws));
         return;
       case 'telemetry': {
         const pid = this.projectId();
-        await this.ingest(pid, msg.points);
+        await this.ingest(pid, msg.points, this.deviceOf(ws));
         const now = Math.floor(Date.now() / 1000);
-        this.ctx.waitUntil(upsertVariables(this.env, pid, msg.points.map((p) => p.variable), now));
+        this.ctx.waitUntil(
+          this.d1DeviceId(ws, pid).then((id) =>
+            id
+              ? Promise.all([
+                  upsertVariables(this.env, pid, id, msg.points.map((p) => p.variable), now),
+                  touchDevice(this.env, id),
+                ])
+              : undefined
+          )
+        );
         return;
       }
       case 'event':
@@ -489,22 +659,21 @@ export class ProjectDO extends DurableObject<Env> {
     // Same as close: nothing to do.
   }
 
-  // Wipes all data owned by this project — DO SQLite + R2 telemetry history.
+  // Wipes all data owned by this project — DO SQLite + everything it owns in R2.
   async destroy(): Promise<void> {
     const projectId = this.projectId();
 
-    // Delete every R2 object under telemetry/{projectId}/ (paginated).
-    let cursor: string | undefined;
-    do {
-      const list = await this.env.R2.list({
-        prefix: `telemetry/${projectId}/`,
-        ...(cursor ? { cursor } : {}),
-      });
-      if (list.objects.length > 0) {
-        await this.env.R2.delete(list.objects.map((o) => o.key));
-      }
-      cursor = list.truncated ? list.cursor : undefined;
-    } while (cursor);
+    // A prefix added elsewhere and not listed here leaks objects nothing reaches.
+    for (const prefix of [`telemetry/${projectId}/`, `firmware/${projectId}/`, `builds/${projectId}/`]) {
+      let cursor: string | undefined;
+      do {
+        const list = await this.env.R2.list({ prefix, ...(cursor ? { cursor } : {}) });
+        if (list.objects.length > 0) {
+          await this.env.R2.delete(list.objects.map((o) => o.key));
+        }
+        cursor = list.truncated ? list.cursor : undefined;
+      } while (cursor);
+    }
 
     // Cancel any scheduled flush + wipe SQLite storage entirely.
     await this.ctx.storage.deleteAlarm();
@@ -558,8 +727,8 @@ export class ProjectDO extends DurableObject<Env> {
   private async runFlush(): Promise<FlushResult> {
     const cursor = this.getFlushCursor();
     const rows = this.sql
-      .exec<{ rowid: number; ts: number; variable: string; value: string }>(
-        `SELECT rowid, ts, variable, value FROM ring_buffer WHERE rowid > ? ORDER BY rowid ASC`,
+      .exec<{ rowid: number; ts: number; device_id: string; variable: string; value: string }>(
+        `SELECT rowid, ts, device_id, variable, value FROM ring_buffer WHERE rowid > ? ORDER BY rowid ASC`,
         cursor
       )
       .toArray();
@@ -583,7 +752,7 @@ export class ProjectDO extends DurableObject<Env> {
       const key = `telemetry/${projectId}/${bucket}/r-${lastRowid.toString().padStart(12, '0')}.ndjson`;
       const body = bucketRows
         .map((r) =>
-          JSON.stringify({ ts: r.ts, variable: r.variable, value: safeParse(r.value) })
+          JSON.stringify({ ts: r.ts, device: r.device_id || null, variable: r.variable, value: safeParse(r.value) })
         )
         .join('\n') + '\n';
 
@@ -601,56 +770,6 @@ export class ProjectDO extends DurableObject<Env> {
     return { flushed: rows.length, keys, newCursor };
   }
 
-  private initSchema(): void {
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS latest_state (
-        variable    TEXT PRIMARY KEY,
-        value       TEXT NOT NULL,
-        received_at INTEGER NOT NULL
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS ring_buffer (
-        rowid    INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts       INTEGER NOT NULL,
-        variable TEXT NOT NULL,
-        value    TEXT NOT NULL
-      );
-    `);
-    this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_ring_buffer_ts ON ring_buffer(ts);`);
-    // Serves the per-variable series reads (chart snapshots + delta polls); the
-    // ts-only index above stays for age-based eviction.
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_ring_buffer_var_ts ON ring_buffer(variable, ts);`
-    );
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS pending_control (
-        id           TEXT PRIMARY KEY,
-        variable     TEXT NOT NULL,
-        value        TEXT NOT NULL,
-        created_at   INTEGER NOT NULL,
-        delivered_at INTEGER
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS flush_meta (
-        k TEXT PRIMARY KEY,
-        v TEXT
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS subscriptions (
-        dashboard_id TEXT PRIMARY KEY
-      );
-    `);
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS auto_cache (
-        k TEXT PRIMARY KEY,
-        v TEXT
-      );
-    `);
-  }
-
   private evictRingBuffer(now: number): void {
     // Gate the actual eviction on a cheap last_evict_at lookup so the age DELETE,
     // COUNT, and overflow DELETE don't run on every single ingest.
@@ -663,16 +782,20 @@ export class ProjectDO extends DurableObject<Env> {
     const ageCutoff = now - RING_BUFFER_MAX_AGE_SECONDS;
     this.sql.exec(`DELETE FROM ring_buffer WHERE ts < ?`, ageCutoff);
 
-    const row = this.sql
-      .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM ring_buffer`)
-      .one();
-    if (row.count > RING_BUFFER_MAX_ROWS) {
-      const overflow = row.count - RING_BUFFER_MAX_ROWS;
+    const over = this.sql
+      .exec<{ device_id: string; count: number }>(
+        `SELECT device_id, COUNT(*) AS count FROM ring_buffer
+          GROUP BY device_id HAVING count > ?`,
+        RING_BUFFER_MAX_ROWS_PER_DEVICE
+      )
+      .toArray();
+    for (const d of over) {
       this.sql.exec(
         `DELETE FROM ring_buffer WHERE rowid IN (
-           SELECT rowid FROM ring_buffer ORDER BY rowid ASC LIMIT ?
+           SELECT rowid FROM ring_buffer WHERE device_id = ? ORDER BY rowid ASC LIMIT ?
          )`,
-        overflow
+        d.device_id,
+        d.count - RING_BUFFER_MAX_ROWS_PER_DEVICE
       );
     }
 

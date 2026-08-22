@@ -71,7 +71,24 @@ test('event with no name is an error frame', () => {
 });
 
 test('unknown type is ignored', () => {
+  expect(parseDeviceMessage(JSON.stringify({ type: 'wat' }))).toEqual({ kind: 'ignore' });
+});
+
+test('hello carries the device and its optional metadata', () => {
+  expect(parseDeviceMessage(JSON.stringify({ type: 'hello', device: 'a4:cf:12:00' })))
+    .toEqual({ kind: 'hello', device: 'a4:cf:12:00' });
+  expect(parseDeviceMessage(JSON.stringify({ type: 'hello', device: 'b1', chip: 'esp32s3', firmware: '1.4.0' })))
+    .toEqual({ kind: 'hello', device: 'b1', chip: 'esp32s3', firmware: '1.4.0' });
+});
+
+test('hello without a device is ignored', () => {
   expect(parseDeviceMessage(JSON.stringify({ type: 'hello' }))).toEqual({ kind: 'ignore' });
+  expect(parseDeviceMessage(JSON.stringify({ type: 'hello', device: '  ' }))).toEqual({ kind: 'ignore' });
+});
+
+test('hello metadata is length-capped', () => {
+  const m = parseDeviceMessage(JSON.stringify({ type: 'hello', device: 'b1', chip: 'x'.repeat(80) }));
+  expect(m.kind === 'hello' && m.chip?.length).toBe(32);
 });
 
 test('non-JSON is ignored', () => {

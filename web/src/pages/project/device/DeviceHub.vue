@@ -1,0 +1,51 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { RouterLink, RouterView, useRoute } from 'vue-router';
+import { useProjectStore } from '../../../stores/project';
+
+const project = useProjectStore();
+const route = useRoute();
+
+const proj = computed(() => project.currentProjectId ?? '');
+
+const tabs = computed(() => [
+  { name: 'devices', label: 'Devices', to: `/p/${proj.value}/device`, count: project.devices.length },
+  { name: 'device-code', label: 'Code', to: `/p/${proj.value}/device/code` },
+  { name: 'device-flash', label: 'Flash', to: `/p/${proj.value}/device/flash` },
+  { name: 'device-firmware', label: 'Firmware', to: `/p/${proj.value}/device/firmware` },
+  { name: 'serial-console', label: 'Console', to: `/p/${proj.value}/device/console` },
+]);
+</script>
+
+<template>
+  <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+    <header class="mb-5">
+      <h1 class="text-xl font-semibold tracking-tight">Device</h1>
+      <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+        Talk to a board over USB — watch what it prints, and see why it isn't connecting.
+      </p>
+    </header>
+
+    <div class="mb-6 border-b border-neutral-200 dark:border-neutral-800">
+      <nav class="-mb-px flex gap-6 text-sm">
+        <RouterLink
+          v-for="t in tabs"
+          :key="t.name"
+          :to="t.to"
+          class="border-b-2 px-1 pb-2.5 font-medium transition"
+          :class="route.name === t.name
+            ? 'border-accent-600 text-accent-700 dark:text-accent-400'
+            : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'"
+        >
+          {{ t.label }}
+          <span
+            v-if="t.count !== undefined"
+            class="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          >{{ t.count }}</span>
+        </RouterLink>
+      </nav>
+    </div>
+
+    <RouterView />
+  </div>
+</template>
