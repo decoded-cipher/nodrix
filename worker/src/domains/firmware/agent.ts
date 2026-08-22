@@ -98,7 +98,8 @@ build.post('/', async (c) => {
   return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson' } });
 });
 
-// One-shot: the browser flashes from memory and a rebuild is cheap.
+// Left in place after reading: one build can be flashed over USB and kept for
+// OTA. pruneArtifacts sweeps whatever nobody promoted.
 build.get('/:id/artifact', async (c) => {
   const user = c.get('user');
   if (user.role !== 'owner' && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
@@ -110,7 +111,6 @@ build.get('/:id/artifact', async (c) => {
   const object = await c.env.R2.get(key);
   if (!object) return c.json({ error: 'not_found' }, 404);
 
-  c.executionCtx.waitUntil(c.env.R2.delete(key));
   return new Response(object.body, {
     headers: {
       'Content-Type': 'application/octet-stream',

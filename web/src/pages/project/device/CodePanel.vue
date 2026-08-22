@@ -39,7 +39,7 @@ const FQBNS = [
 ];
 
 const { flash } = useEspFlasher();
-const { port, request } = useSerialPort();
+const { supported, port, request } = useSerialPort();
 const fqbn = ref(FQBNS[0]!.value);
 const building = ref(false);
 const buildLog = ref<string[]>([]);
@@ -59,7 +59,6 @@ async function compileAndFlash() {
       return;
     }
     if (!port.value && !(await request())) return;
-    // The image is served once and deleted, so ask for it only after a port is open.
     const bytes = new Uint8Array(await api.bytes(`/v1/admin/projects/${pid}/build/${res.build}/artifact`));
     const ok = await flash([{ data: bytes, address: 0x10000 }]);
     if (ok) toast.success('Flashed — the board is restarting');
@@ -167,11 +166,14 @@ function reset() {
         </select>
         <button
           type="button"
-          :disabled="building"
+          :disabled="building || !supported"
           class="rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
           @click="compileAndFlash"
         >{{ building ? 'Building…' : 'Compile and flash' }}</button>
-        <p class="text-xs text-neutral-500">
+        <p v-if="!supported" class="text-xs text-neutral-500">
+          Flashing needs Web Serial — Chrome, Edge or Opera on desktop, or Chrome on Android.
+        </p>
+        <p v-else class="text-xs text-neutral-500">
           Builds on your machine via the nodrix agent. A first build installs the toolchain and takes minutes.
         </p>
       </div>
