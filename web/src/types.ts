@@ -92,8 +92,6 @@ export type Firmware = {
   created_at: number;
 };
 
-export type FirmwareEntry = { example: string; target: string; file: string; size: number };
-export type FirmwareCatalog = { tag: string | null; entries: FirmwareEntry[] };
 
 export type ProjectToken = {
   id: string;
