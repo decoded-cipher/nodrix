@@ -11,6 +11,7 @@ import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
 import { defaultDeviceId, normaliseDeviceKey, resolveDevice, recordDeviceSeen } from '../../domains/devices/service';
+import { reconcile } from '../../domains/firmware/ota';
 import { migrateSchema, type SchemaStep } from './schema';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
@@ -536,6 +537,15 @@ export class ProjectDO extends DurableObject<Env> {
     }
   }
 
+  // A nudge, not a push: the device still decides whether to pull.
+  async notifyOta(deviceId: string): Promise<void> {
+    const payload = JSON.stringify({ type: 'ota' });
+    for (const ws of this.ctx.getWebSockets()) {
+      if (this.deviceOf(ws) !== deviceId) continue;
+      try { ws.send(payload); } catch { /* dead socket; ignore */ }
+    }
+  }
+
   async deleteDevice(deviceId: string): Promise<void> {
     this.sql.exec(`DELETE FROM latest_state WHERE device_id = ?`, deviceId);
     this.sql.exec(`DELETE FROM ring_buffer WHERE device_id = ?`, deviceId);
@@ -578,7 +588,10 @@ export class ProjectDO extends DurableObject<Env> {
         const device = key ? await resolveDevice(this.env, pid, key, Math.floor(Date.now() / 1000)) : null;
         if (!device || !device.storageId) return;
         ws.serializeAttachment({ device: device.storageId });
-        this.ctx.waitUntil(recordDeviceSeen(this.env, device.id, msg.chip, msg.firmware));
+        this.ctx.waitUntil(
+          recordDeviceSeen(this.env, device.id, msg.chip, msg.firmware)
+            .then(() => reconcile(this.env, device.id, msg.firmware ?? null))
+        );
         this.sendPending(ws, `device_id = ?`, device.storageId);
         return;
       }

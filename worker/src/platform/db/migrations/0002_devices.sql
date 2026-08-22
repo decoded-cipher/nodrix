@@ -52,3 +52,26 @@ ALTER TABLE project_variables_new RENAME TO project_variables;
 
 CREATE UNIQUE INDEX idx_project_variables_key
   ON project_variables(project_id, device_id, key);
+
+-- Firmware uploaded to this instance. The image itself lives in R2; this is the
+-- metadata the dashboard and the update check read.
+CREATE TABLE IF NOT EXISTS firmware (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  version     TEXT NOT NULL,
+  target      TEXT,
+  size        INTEGER NOT NULL,
+  sha256      TEXT NOT NULL,
+  r2_key      TEXT NOT NULL,
+  notes       TEXT,
+  created_by  TEXT REFERENCES users(id),
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_firmware_project ON firmware(project_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_firmware_version ON firmware(project_id, version);
+
+-- Desired state. A device compares its own version against this and pulls when
+-- they differ; nothing pushes an image at a device.
+ALTER TABLE devices ADD COLUMN desired_firmware_id TEXT REFERENCES firmware(id) ON DELETE SET NULL;
+ALTER TABLE devices ADD COLUMN ota_status TEXT;
+ALTER TABLE devices ADD COLUMN ota_updated_at INTEGER;

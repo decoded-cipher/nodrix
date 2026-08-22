@@ -113,6 +113,16 @@ export async function resolveDevice(
   return { id: settled.id, storageId: settled.id };
 }
 
+// DO storage calls the default device '', so a D1 id passed straight through
+// silently matches nothing. Everything crossing that boundary goes through here.
+export async function storageIdOf(env: Env, projectId: string, deviceId: string): Promise<string> {
+  const row = await env.DB
+    .prepare(`SELECT is_default FROM devices WHERE id = ? AND project_id = ?`)
+    .bind(deviceId, projectId)
+    .first<{ is_default: number }>();
+  return row?.is_default ? '' : deviceId;
+}
+
 export async function listDevices(env: Env, projectId: string): Promise<DeviceSummary[]> {
   const rows = await env.DB
     .prepare(

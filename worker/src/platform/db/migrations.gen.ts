@@ -60,7 +60,13 @@ export const MIGRATIONS: Migration[] = [
       "INSERT INTO project_variables_new (id, project_id, device_id, key, unit, created_at, updated_at, last_seen)\nSELECT v.id, v.project_id, d.id, v.key, v.unit, v.created_at, v.updated_at, v.last_seen\nFROM project_variables v\nJOIN devices d ON d.project_id = v.project_id AND d.is_default = 1",
       "DROP TABLE project_variables",
       "ALTER TABLE project_variables_new RENAME TO project_variables",
-      "CREATE UNIQUE INDEX idx_project_variables_key\n  ON project_variables(project_id, device_id, key)"
+      "CREATE UNIQUE INDEX idx_project_variables_key\n  ON project_variables(project_id, device_id, key)",
+      "CREATE TABLE IF NOT EXISTS firmware (\n  id          TEXT PRIMARY KEY,\n  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  version     TEXT NOT NULL,\n  target      TEXT,\n  size        INTEGER NOT NULL,\n  sha256      TEXT NOT NULL,\n  r2_key      TEXT NOT NULL,\n  notes       TEXT,\n  created_by  TEXT REFERENCES users(id),\n  created_at  INTEGER NOT NULL\n)",
+      "CREATE INDEX IF NOT EXISTS idx_firmware_project ON firmware(project_id, created_at DESC)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_firmware_version ON firmware(project_id, version)",
+      "ALTER TABLE devices ADD COLUMN desired_firmware_id TEXT REFERENCES firmware(id) ON DELETE SET NULL",
+      "ALTER TABLE devices ADD COLUMN ota_status TEXT",
+      "ALTER TABLE devices ADD COLUMN ota_updated_at INTEGER"
     ]
   }
 ];

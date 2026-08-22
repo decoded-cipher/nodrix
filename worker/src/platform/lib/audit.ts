@@ -22,6 +22,7 @@ export type AuditTargetType =
   | 'project'
   | 'variable'
   | 'device'
+  | 'firmware'
   | 'project_token'
   | 'dashboard'
   | 'token'

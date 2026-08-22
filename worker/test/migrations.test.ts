@@ -117,6 +117,36 @@ test('the same key is now allowed once per device', () => {
   ).toThrow();
 });
 
+test('a device points at desired firmware and survives its deletion', () => {
+  const db = new Database(':memory:');
+  db.run('PRAGMA foreign_keys = ON');
+  apply(db, 1);
+  seed(db);
+  apply(db, MIGRATIONS.length);
+
+  db.run(`INSERT INTO firmware (id, project_id, version, size, sha256, r2_key, created_at)
+          VALUES ('fw_1', 'prj_alpha', '1.4.0', 100, 'abc', 'k', 1)`);
+  db.run(`UPDATE devices SET desired_firmware_id = 'fw_1' WHERE id = 'dev_alpha'`);
+  db.run(`DELETE FROM firmware WHERE id = 'fw_1'`);
+
+  // ON DELETE SET NULL, so the device stays; it just has nothing pending.
+  const row = db.query(`SELECT desired_firmware_id FROM devices WHERE id = 'dev_alpha'`).get();
+  expect(row).toEqual({ desired_firmware_id: null });
+});
+
+test('one firmware version per project', () => {
+  const db = new Database(':memory:');
+  apply(db, 1);
+  seed(db);
+  apply(db, MIGRATIONS.length);
+  const insert = (id: string, project: string) =>
+    db.run(`INSERT INTO firmware (id, project_id, version, size, sha256, r2_key, created_at)
+            VALUES ('${id}', '${project}', '1.0.0', 1, 'a', 'k', 1)`);
+  insert('fw_a', 'prj_alpha');
+  expect(() => insert('fw_b', 'prj_beta')).not.toThrow();
+  expect(() => insert('fw_c', 'prj_alpha')).toThrow();
+});
+
 // The baseline is all CREATE ... IF NOT EXISTS, including the index whose columns
 // 0002 changes. Replaying it must not put the old shape back.
 test('replaying the baseline over a migrated database changes nothing', () => {

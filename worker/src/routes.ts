@@ -20,6 +20,8 @@ import projects from './domains/projects/routes';
 import variables from './domains/variables/routes';
 import devicesRouter from './domains/devices/routes';
 import firmware from './domains/firmware/routes';
+import firmwareAdmin from './domains/firmware/admin';
+import otaDevice from './domains/firmware/device';
 import { readList, readState, readSeries } from './domains/variables/read';
 import dashboards from './domains/dashboards/routes';
 import publicDashboards from './domains/dashboards/public';
@@ -71,6 +73,8 @@ export function registerRoutes(app: App): void {
   app.route('/v1/admin/projects/:proj/variables', variables);
   app.route('/v1/admin/projects/:proj/devices', devicesRouter);
   app.route('/v1/admin/firmware', firmware);
+  app.route('/v1/admin/projects/:proj/firmware', firmwareAdmin);
+  app.route('/v1/ota', otaDevice);
   app.route('/v1/admin/projects/:proj/dashboards', dashboards);
   app.route('/v1/admin/projects/:proj/automations', automations);
   app.route('/v1/admin/projects/:proj/integrations', integrations);
