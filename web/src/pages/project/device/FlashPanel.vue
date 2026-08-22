@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { api } from '../../../api';
 import { useSerialPort } from '../../../composables/useSerialPort';
 import { useEspFlasher, type FlashPart } from '../../../composables/useEspFlasher';
 import { toast } from '../../../lib/toast';
+import type { FirmwareCatalog } from '../../../types';
 
 const { supported, port, request } = useSerialPort();
 const { flash, phase, progress, chip, error } = useEspFlasher();
@@ -10,8 +12,31 @@ const { flash, phase, progress, chip, error } = useEspFlasher();
 // A sketch built by Arduino starts here; a full factory image starts at 0.
 const DEFAULT_OFFSET = 0x10000;
 
+const source = ref<'example' | 'file'>('example');
+const catalog = ref<FirmwareCatalog>({ tag: null, entries: [] });
+const selected = ref('');
 const file = ref<File | null>(null);
 const offset = ref(DEFAULT_OFFSET);
+
+onMounted(async () => {
+  try {
+    catalog.value = await api.get<FirmwareCatalog>('/v1/admin/firmware/catalog');
+    selected.value = catalog.value.entries[0]?.file ?? '';
+  } catch { /* no published examples is a normal state */ }
+  if (!catalog.value.entries.length) source.value = 'file';
+});
+
+const ready = computed(() => (source.value === 'example' ? !!selected.value : !!file.value));
+
+async function loadBytes(): Promise<Uint8Array> {
+  if (source.value === 'file') return new Uint8Array(await file.value!.arrayBuffer());
+  const res = await fetch(
+    `/v1/admin/firmware/binary/${encodeURIComponent(catalog.value.tag ?? '')}/${encodeURIComponent(selected.value)}`,
+    { credentials: 'include' }
+  );
+  if (!res.ok) throw new Error('Could not download that firmware');
+  return new Uint8Array(await res.arrayBuffer());
+}
 
 const busy = computed(() => phase.value === 'connecting' || phase.value === 'writing');
 const offsetHex = computed({
@@ -28,11 +53,15 @@ function pick(e: Event) {
 }
 
 async function start() {
-  if (!file.value) return;
+  if (!ready.value) return;
   if (!port.value && !(await request())) return;
-  const parts: FlashPart[] = [
-    { data: new Uint8Array(await file.value.arrayBuffer()), address: offset.value },
-  ];
+  let parts: FlashPart[];
+  try {
+    parts = [{ data: await loadBytes(), address: offset.value }];
+  } catch (e) {
+    toast.error((e as Error).message);
+    return;
+  }
   const ok = await flash(parts);
   if (ok) toast.success('Flashed — the board is restarting');
   else toast.error(error.value ?? 'Flashing failed');
@@ -52,7 +81,33 @@ async function start() {
 
   <div v-else class="space-y-4">
     <div class="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-      <label class="block">
+      <div class="mb-3 flex gap-4 text-xs">
+        <label class="flex items-center gap-1.5">
+          <input v-model="source" type="radio" value="example" :disabled="!catalog.entries.length" />
+          Published example
+        </label>
+        <label class="flex items-center gap-1.5">
+          <input v-model="source" type="radio" value="file" />
+          My own .bin
+        </label>
+      </div>
+
+      <label v-if="source === 'example'" class="block">
+        <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Example</span>
+        <select
+          v-model="selected"
+          class="mt-1 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+        >
+          <option v-for="e in catalog.entries" :key="e.file" :value="e.file">
+            {{ e.example }} — {{ e.target }}
+          </option>
+        </select>
+        <span class="mt-1 block text-[11px] text-neutral-500">
+          Built from the SDK examples at {{ catalog.tag }}.
+        </span>
+      </label>
+
+      <label v-else class="block">
         <span class="block text-xs font-medium text-neutral-600 dark:text-neutral-300">Firmware</span>
         <input
           type="file"
@@ -75,7 +130,7 @@ async function start() {
 
       <button
         type="button"
-        :disabled="!file || busy"
+        :disabled="!ready || busy"
         class="mt-4 rounded-md bg-accent-600 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
         @click="start"
       >{{ busy ? 'Flashing…' : 'Flash' }}</button>

@@ -80,6 +80,9 @@ export type Device = {
   last_seen: number | null;
 };
 
+export type FirmwareEntry = { example: string; target: string; file: string; size: number };
+export type FirmwareCatalog = { tag: string | null; entries: FirmwareEntry[] };
+
 export type ProjectToken = {
   id: string;
   name?: string | null;
