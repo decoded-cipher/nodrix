@@ -47,5 +47,19 @@ export const MIGRATIONS: Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_invites_email ON invites(email) WHERE email IS NOT NULL",
       "CREATE TABLE IF NOT EXISTS invite_projects (\n  invite_id  TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,\n  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  PRIMARY KEY (invite_id, project_id)\n)"
     ]
+  },
+  {
+    "name": "0002_devices",
+    "statements": [
+      "CREATE TABLE IF NOT EXISTS devices (\n  id               TEXT PRIMARY KEY,\n  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  name             TEXT NOT NULL,\n  chip             TEXT,\n  firmware_version TEXT,\n  is_default       INTEGER NOT NULL DEFAULT 0,\n  first_seen       INTEGER,\n  last_seen        INTEGER,\n  created_at       INTEGER NOT NULL\n)",
+      "CREATE INDEX IF NOT EXISTS idx_devices_project ON devices(project_id)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_default\n  ON devices(project_id) WHERE is_default = 1",
+      "INSERT INTO devices (id, project_id, name, is_default, created_at)\nSELECT 'dev_' || substr(p.id, 5), p.id, 'Default', 1, p.created_at\nFROM projects p\nWHERE NOT EXISTS (SELECT 1 FROM devices d WHERE d.project_id = p.id AND d.is_default = 1)",
+      "CREATE TABLE project_variables_new (\n  id          TEXT PRIMARY KEY,\n  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n  device_id   TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,\n  key         TEXT NOT NULL,\n  unit        TEXT,\n  created_at  INTEGER NOT NULL,\n  updated_at  INTEGER NOT NULL,\n  last_seen   INTEGER\n)",
+      "INSERT INTO project_variables_new (id, project_id, device_id, key, unit, created_at, updated_at, last_seen)\nSELECT v.id, v.project_id, d.id, v.key, v.unit, v.created_at, v.updated_at, v.last_seen\nFROM project_variables v\nJOIN devices d ON d.project_id = v.project_id AND d.is_default = 1",
+      "DROP TABLE project_variables",
+      "ALTER TABLE project_variables_new RENAME TO project_variables",
+      "CREATE UNIQUE INDEX idx_project_variables_key\n  ON project_variables(project_id, device_id, key)"
+    ]
   }
 ];
