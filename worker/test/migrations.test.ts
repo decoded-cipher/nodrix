@@ -147,6 +147,39 @@ test('one firmware version per project', () => {
   expect(() => insert('fw_c', 'prj_alpha')).toThrow();
 });
 
+// Mirrors the retention query in firmware/ota.ts — what it spares is the point.
+test('retention spares recent images and anything a device needs', () => {
+  const db = new Database(':memory:');
+  apply(db, 1);
+  seed(db);
+  apply(db, MIGRATIONS.length);
+
+  const add = (id: string, version: string, at: number) =>
+    db.run(`INSERT INTO firmware (id, project_id, version, size, sha256, r2_key, created_at)
+            VALUES ('${id}', 'prj_alpha', '${version}', 1, 'a', 'k', ${at})`);
+  add('fw_old', '0.1.0', 1);
+  add('fw_running', '0.2.0', 2);
+  add('fw_desired', '0.3.0', 3);
+  add('fw_recent', '0.4.0', 4);
+
+  db.run(`UPDATE devices SET firmware_version = '0.2.0' WHERE id = 'dev_alpha'`);
+  db.run(`INSERT INTO devices (id, project_id, name, desired_firmware_id, created_at)
+          VALUES ('dev_two', 'prj_alpha', 'Shed', 'fw_desired', 1)`);
+
+  const stale = db
+    .query<{ id: string }, []>(
+      `SELECT id FROM firmware
+        WHERE project_id = 'prj_alpha'
+          AND id NOT IN (SELECT id FROM firmware WHERE project_id = 'prj_alpha' ORDER BY created_at DESC LIMIT 1)
+          AND id NOT IN (SELECT desired_firmware_id FROM devices
+                          WHERE project_id = 'prj_alpha' AND desired_firmware_id IS NOT NULL)
+          AND version NOT IN (SELECT firmware_version FROM devices
+                               WHERE project_id = 'prj_alpha' AND firmware_version IS NOT NULL)`
+    )
+    .all();
+  expect(stale).toEqual([{ id: 'fw_old' }]);
+});
+
 // The baseline is all CREATE ... IF NOT EXISTS, including the index whose columns
 // 0002 changes. Replaying it must not put the old shape back.
 test('replaying the baseline over a migrated database changes nothing', () => {

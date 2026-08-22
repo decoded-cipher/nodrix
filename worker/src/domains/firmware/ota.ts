@@ -5,6 +5,7 @@ import { projectStub } from '../../platform/durable-objects/stubs';
 import { storageIdOf } from '../devices/service';
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const KEEP_VERSIONS = 10;
 const SAFE_VERSION = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 
 export type FirmwareRow = {
@@ -60,7 +61,31 @@ export async function uploadFirmware(
     throw new ServiceError('conflict', 'that version already exists', 'duplicate_version');
   }
 
+  await prune(env, projectId).catch(() => {});
   return { id, version, target: input.target ?? null, size: input.body.byteLength, sha256, notes: input.notes ?? null, created_at: now };
+}
+
+// Spares anything a device runs or is waiting to run; deleting those strands a
+// pending update or loses the image a board is on.
+async function prune(env: Env, projectId: string): Promise<void> {
+  const stale = await env.DB
+    .prepare(
+      `SELECT id, r2_key FROM firmware
+        WHERE project_id = ?
+          AND id NOT IN (SELECT id FROM firmware WHERE project_id = ? ORDER BY created_at DESC LIMIT ?)
+          AND id NOT IN (SELECT desired_firmware_id FROM devices
+                          WHERE project_id = ? AND desired_firmware_id IS NOT NULL)
+          AND version NOT IN (SELECT firmware_version FROM devices
+                               WHERE project_id = ? AND firmware_version IS NOT NULL)`
+    )
+    .bind(projectId, projectId, KEEP_VERSIONS, projectId, projectId)
+    .all<{ id: string; r2_key: string }>();
+  if (stale.results.length === 0) return;
+
+  await env.DB.batch(
+    stale.results.map((r) => env.DB.prepare(`DELETE FROM firmware WHERE id = ?`).bind(r.id))
+  );
+  await env.R2.delete(stale.results.map((r) => r.r2_key)).catch(() => {});
 }
 
 export async function listFirmware(env: Env, projectId: string): Promise<FirmwareRow[]> {
