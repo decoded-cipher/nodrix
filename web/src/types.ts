@@ -70,6 +70,16 @@ export type Variable = {
   last_seen: number | null;
 };
 
+export type Device = {
+  id: string;
+  name: string;
+  chip: string | null;
+  firmware_version: string | null;
+  is_default: number;
+  first_seen: number | null;
+  last_seen: number | null;
+};
+
 export type ProjectToken = {
   id: string;
   name?: string | null;

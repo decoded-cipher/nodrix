@@ -9,7 +9,8 @@ const route = useRoute();
 const proj = computed(() => project.currentProjectId ?? '');
 
 const tabs = computed(() => [
-  { name: 'serial-console', label: 'Console', to: `/p/${proj.value}/device` },
+  { name: 'devices', label: 'Devices', to: `/p/${proj.value}/device`, count: project.devices.length },
+  { name: 'serial-console', label: 'Console', to: `/p/${proj.value}/device/console` },
 ]);
 </script>
 
@@ -32,7 +33,13 @@ const tabs = computed(() => [
           :class="route.name === t.name
             ? 'border-accent-600 text-accent-700 dark:text-accent-400'
             : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'"
-        >{{ t.label }}</RouterLink>
+        >
+          {{ t.label }}
+          <span
+            v-if="t.count !== undefined"
+            class="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          >{{ t.count }}</span>
+        </RouterLink>
       </nav>
     </div>
 

@@ -8,6 +8,7 @@ import type {
   AutomationGraph,
   Dashboard,
   DashboardMeta,
+  Device,
   Variable,
   ProjectToken,
   ProjectTokenWithSecret,
@@ -23,6 +24,7 @@ export const useProjectStore = defineStore('project', () => {
   const currentProjectId = ref<string | null>(null);
   const variables = ref<Variable[]>([]);
   const projectTokens = ref<ProjectToken[]>([]);
+  const devices = ref<Device[]>([]);
   const dashboards = ref<DashboardMeta[]>([]);
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
@@ -42,6 +44,7 @@ export const useProjectStore = defineStore('project', () => {
       automations.value = [];
       integrations.value = [];
       projectTokens.value = [];
+      devices.value = [];
     }
     currentProjectId.value = projectId;
     await Promise.all([loadVariables(), loadDashboards()]);
@@ -62,6 +65,31 @@ export const useProjectStore = defineStore('project', () => {
       `/v1/admin/projects/${currentProjectId.value}/variables`
     );
     variables.value = data.variables;
+  }
+
+  async function loadDevices(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ devices: Device[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/devices`
+    );
+    devices.value = data.devices;
+  }
+
+  async function renameDevice(id: string, name: string): Promise<void> {
+    const pid = requireProjectId();
+    const { device } = await api.patch<{ device: Device }>(
+      `/v1/admin/projects/${pid}/devices/${id}`,
+      { name }
+    );
+    devices.value = devices.value.map((d) => (d.id === id ? device : d));
+  }
+
+  async function forgetDevice(id: string): Promise<void> {
+    const pid = requireProjectId();
+    await api.del(`/v1/admin/projects/${pid}/devices/${id}`);
+    devices.value = devices.value.filter((d) => d.id !== id);
+    // Its variables went with it.
+    await loadVariables();
   }
 
   async function createVariable(input: { key: string; unit?: string | null }): Promise<Variable> {
@@ -370,6 +398,7 @@ export const useProjectStore = defineStore('project', () => {
   return {
     currentProjectId,
     variables,
+    devices,
     projectTokens,
     dashboards,
     tokens,
@@ -377,6 +406,9 @@ export const useProjectStore = defineStore('project', () => {
     integrations,
     pendingAutomation,
     switchTo,
+    loadDevices,
+    renameDevice,
+    forgetDevice,
     loadVariables,
     createVariable,
     updateVariable,

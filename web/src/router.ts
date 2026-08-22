@@ -47,7 +47,8 @@ const routes: RouteRecordRaw[] = [
             path: 'device',
             component: () => import('./pages/project/device/DeviceHub.vue'),
             children: [
-              { path: '', name: 'serial-console', component: () => import('./pages/project/device/SerialConsole.vue'), meta: { title: 'Console' } },
+              { path: '', name: 'devices', component: () => import('./pages/project/device/DevicesList.vue'), meta: { title: 'Devices' } },
+              { path: 'console', name: 'serial-console', component: () => import('./pages/project/device/SerialConsole.vue'), meta: { title: 'Console' } },
             ],
           },
           // Automations + Integrations live under one hub with two tabs.
