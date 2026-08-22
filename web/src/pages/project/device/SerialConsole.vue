@@ -2,10 +2,12 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useSerialPort, BAUD_RATES } from '../../../composables/useSerialPort';
 import { useSerialLog, type LogEntry } from '../../../composables/useSerialLog';
+import { useSerialDiagnosis } from '../../../composables/useSerialDiagnosis';
 import { toast } from '../../../lib/toast';
 
 const { supported, port, state, lastError, request, startMonitor, stopMonitor, setBaud } = useSerialPort();
 const { entries, paused, garbled, setPaused, clear, toText } = useSerialLog();
+const diagnosis = useSerialDiagnosis();
 
 const viewport = ref<HTMLElement | null>(null);
 const stuckToBottom = ref(true);
@@ -54,6 +56,12 @@ async function copyAll() {
 }
 
 // The viewport is dark in both themes, so these take no light variant.
+const DIAGNOSIS_TONE = {
+  ok: 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200',
+  warn: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200',
+  error: 'border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200',
+};
+
 const TONE: Record<LogEntry['level'], string> = {
   ok: 'text-emerald-400',
   warn: 'text-amber-400',
@@ -117,6 +125,11 @@ function stamp(at: number) {
           @click="clear()"
         >Clear</button>
       </div>
+    </div>
+
+    <div v-if="diagnosis" class="rounded-lg border px-3 py-2" :class="DIAGNOSIS_TONE[diagnosis.tone]">
+      <p class="text-sm font-semibold">{{ diagnosis.headline }}</p>
+      <p v-if="diagnosis.detail" class="mt-0.5 text-xs opacity-90">{{ diagnosis.detail }}</p>
     </div>
 
     <p v-if="garbled" class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
