@@ -3,7 +3,7 @@
   "compilerOptions": {
     "jsx": "preserve",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "w3c-web-serial"],
     "noEmit": true,
     "allowImportingTsExtensions": false,
     "useDefineForClassFields": true
