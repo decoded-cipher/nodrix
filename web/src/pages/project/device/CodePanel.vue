@@ -31,16 +31,19 @@ const example = ref('');
 const code = ref('');
 const loading = ref(false);
 
+// ESP32 keeps a bootloader and partition table below the app; an ESP8266 sketch
+// is the whole image and starts at zero.
 const FQBNS = [
-  { value: 'esp32:esp32:esp32', label: 'ESP32' },
-  { value: 'esp32:esp32:esp32s3', label: 'ESP32-S3' },
-  { value: 'esp32:esp32:esp32c3', label: 'ESP32-C3' },
-  { value: 'esp8266:esp8266:nodemcuv2', label: 'ESP8266 (NodeMCU)' },
+  { value: 'esp32:esp32:esp32', label: 'ESP32', offset: 0x10000 },
+  { value: 'esp32:esp32:esp32s3', label: 'ESP32-S3', offset: 0x10000 },
+  { value: 'esp32:esp32:esp32c3', label: 'ESP32-C3', offset: 0x10000 },
+  { value: 'esp8266:esp8266:nodemcuv2', label: 'ESP8266 (NodeMCU)', offset: 0x0 },
 ];
 
 const { flash } = useEspFlasher();
 const { supported, port, request } = useSerialPort();
 const fqbn = ref(FQBNS[0]!.value);
+const flashOffset = computed(() => FQBNS.find((b) => b.value === fqbn.value)?.offset ?? 0x10000);
 const building = ref(false);
 const buildLog = ref<string[]>([]);
 const buildError = ref('');
@@ -79,7 +82,9 @@ async function compileAndFlash() {
     if (!port.value && !(await request())) return;
     const pid = project.currentProjectId ?? '';
     const bytes = new Uint8Array(await api.bytes(`/v1/admin/projects/${pid}/build/${id}/artifact`));
-    if (await flash([{ data: bytes, address: 0x10000 }])) toast.success('Flashed — the board is restarting');
+    if (await flash([{ data: bytes, address: flashOffset.value }])) {
+      toast.success('Flashed — the board is restarting');
+    }
   } catch (e) {
     buildError.value = (e as Error).message;
   }
