@@ -14,7 +14,7 @@
 - 🧠 **Native MCP server** — an owner-gated Model Context Protocol endpoint with a Claude connector for AI clients (off by default).
 - 👥 **Multi-user** — owner / admin / member roles, email invites, and social sign-in (Google, GitHub).
 - 📝 **Audit log** — every privileged action recorded and paginated in the UI.
-- 🔧 **Write, build and flash from the browser** — a code editor, serial monitor and Web Serial flasher in one page; the [nodrix agent](https://github.com/decoded-cipher/nodrix-agent) compiles on your machine, and the same build ships over the air.
+- 🔧 **Over-the-air updates** — compile with your own toolchain, upload the image, assign it to a board; it pulls the update on its next check.
 
 ## Quick start
 
@@ -37,22 +37,17 @@
      -H "Authorization: Bearer $NODRIX_TOKEN"
    ```
 
-## Flashing hardware from the browser
+## Updating hardware over the air
 
-The Code page pairs an editor with a serial monitor and flashes over Web Serial, so a board goes from sketch to running without leaving the browser. Compiling is the one part a browser cannot do — the ESP32 sysroot alone is over 150 MB — so it runs on your own machine via the agent.
+Compile with the toolchain you already use, upload the image, and any board in the project can take it on its next check — no USB, no cable, no physical access.
 
-```bash
-curl -fsSL -o nodrix-agent \
-  https://github.com/decoded-cipher/nodrix-agent/releases/latest/download/nodrix-agent-macos-arm64
-chmod +x nodrix-agent
-arduino-cli core install esp32:esp32
+1. **Version the sketch.** `Nodrix.setFirmwareVersion("1.2.0")` — the board reports this back, and it is how nodrix knows the update landed.
+2. **Compile.** Arduino IDE: **Sketch → Export Compiled Binary**, then take `<sketch>.ino.bin` from `build/<board>/`. `arduino-cli compile --output-dir build` and PlatformIO's `.pio/build/<env>/firmware.bin` work the same way. Upload the app image, not `.ino.merged.bin` or `.ino.bootloader.bin` — nodrix rejects those, since a board flashed with one over the air would not boot.
+3. **Upload** it on **Devices → Upload firmware** with the same version string, and **assign** it to a device.
 
-NODRIX_INSTANCE=https://<your-worker> NODRIX_TOKEN=<admin token> ./nodrix-agent
-```
+A board on the control socket is told immediately; one on HTTP finds it at its next check or on reboot. The board reports the new version when it comes back up, which is what marks the update done. If it keeps pulling the image without ever reporting the new version — nearly always the version in the sketch not matching the one on the upload — nodrix stops offering it after a few attempts and says so, instead of leaving the board reinstalling forever. Assigning the firmware again clears that and retries.
 
-Other platforms are on the [agent releases](https://github.com/decoded-cipher/nodrix-agent/releases/latest). The agent dials out to your instance, so there is no port to open and no certificate to install; it never touches the serial port, which the browser owns. Flashing needs Chrome, Edge or Opera on desktop, or Chrome on Android — Safari and Firefox have no Web Serial.
-
-Keep a build and it becomes a firmware version you can send to any device over the air.
+The first flash of a board is still over USB, with the Arduino IDE or `esptool`, and it needs a partition scheme with OTA slots (the ESP32 default has them). Every image you ship over the air has to include the nodrix SDK, or the board will have no way to receive the next one.
 
 ## Architecture
 
@@ -60,7 +55,6 @@ Keep a build and it becomes a firmware version you can send to any device over t
 - **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder, built and served as Worker static assets.
 - **Shared** ([shared/](shared/)) — framework-agnostic Web Component widgets, the integration catalog, and automation blocks, consumed by both web and worker so there is a single source of truth.
 - **Deploy** ([deploy/](deploy/)) — the small config carrier behind the one-click Deploy to Cloudflare.
-- **Agent** ([nodrix-agent](https://github.com/decoded-cipher/nodrix-agent)) — an optional CLI on your own machine that runs `arduino-cli` for browser builds. Separate repo, separate release.
 
 ```
 worker/   Cloudflare Worker — API, Durable Objects, Workflow
