@@ -22,9 +22,8 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        // og.png is for social scrapers; the Code chunk is ~630 kB of CodeMirror
-        // and esptool-js that needs hardware anyway.
-        globIgnores: ['**/og.png', '**/CodePanel-*.js'],
+        // og.png is for social scrapers, not for the app shell.
+        globIgnores: ['**/og.png'],
         navigateFallback: '/index.html',
         // Never hijack worker-rendered routes with the SPA fallback.
         navigateFallbackDenylist: [/^\/v1/, /^\/ws/, /^\/authorize/, /^\/\.well-known\//],

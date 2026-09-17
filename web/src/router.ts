@@ -45,11 +45,9 @@ const routes: RouteRecordRaw[] = [
           },
           {
             path: 'device',
-            component: () => import('./pages/project/device/DeviceHub.vue'),
-            children: [
-              { path: '', name: 'devices', component: () => import('./pages/project/device/DevicesList.vue'), meta: { title: 'Devices' } },
-              { path: 'code', name: 'device-code', component: () => import('./pages/project/device/CodePanel.vue'), meta: { title: 'Code' } },
-            ],
+            name: 'devices',
+            component: () => import('./pages/project/device/DevicesList.vue'),
+            meta: { title: 'Devices' },
           },
           // Automations + Integrations live under one hub with two tabs.
           {

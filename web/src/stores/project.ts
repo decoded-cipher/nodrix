@@ -86,12 +86,6 @@ export const useProjectStore = defineStore('project', () => {
     firmware.value = data.firmware;
   }
 
-  async function publishBuild(buildId: string): Promise<void> {
-    const pid = requireProjectId();
-    await api.post(`/v1/admin/projects/${pid}/build/${buildId}/firmware`);
-    await loadFirmware();
-  }
-
   async function deleteFirmware(id: string): Promise<void> {
     const pid = requireProjectId();
     await api.del(`/v1/admin/projects/${pid}/firmware/${id}`);
@@ -439,7 +433,6 @@ export const useProjectStore = defineStore('project', () => {
     switchTo,
     loadDevices,
     loadFirmware,
-    publishBuild,
     deleteFirmware,
     assignFirmware,
     renameDevice,

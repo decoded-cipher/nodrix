@@ -59,7 +59,7 @@ const projectScoped = computed<NavItem[]>(() => {
         path === `/p/${id}/dashboards` || path.startsWith(`/p/${id}/d/`),
     },
     {
-      label: 'Device',
+      label: 'Devices',
       to: `/p/${id}/device`,
       icon: 'device',
       disabled: !hasProject.value,
