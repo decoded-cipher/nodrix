@@ -75,3 +75,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_firmware_version ON firmware(project_id, v
 ALTER TABLE devices ADD COLUMN desired_firmware_id TEXT REFERENCES firmware(id) ON DELETE SET NULL;
 ALTER TABLE devices ADD COLUMN ota_status TEXT;
 ALTER TABLE devices ADD COLUMN ota_updated_at INTEGER;
+-- Pulls since the current firmware was assigned. A board that keeps pulling and
+-- never reports the new version is looping, not updating.
+ALTER TABLE devices ADD COLUMN ota_attempts INTEGER NOT NULL DEFAULT 0;

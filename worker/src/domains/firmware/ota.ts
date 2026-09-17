@@ -139,9 +139,10 @@ export async function assignFirmware(
       .first<{ ok: number }>();
     if (!fw) throw new ServiceError('not_found', 'no such firmware', 'unknown_firmware');
   }
+  // Assigning is also the retry: a device parked at 'failed' starts over.
   const res = await env.DB
     .prepare(
-      `UPDATE devices SET desired_firmware_id = ?, ota_status = ?, ota_updated_at = ?
+      `UPDATE devices SET desired_firmware_id = ?, ota_status = ?, ota_updated_at = ?, ota_attempts = 0
         WHERE id = ? AND project_id = ?`
     )
     .bind(firmwareId, firmwareId ? 'pending' : null, Math.floor(Date.now() / 1000), deviceId, projectId)
@@ -157,6 +158,8 @@ export async function assignFirmware(
 
 export type UpdateOffer = { version: string; size: number; sha256: string; url: string } | null;
 
+export const MAX_OTA_ATTEMPTS = 3;
+
 // Reported vs desired is the whole reconciliation; there is no job to track.
 // A version the board claims in this request beats the stored one, which may not
 // have caught up with the update it just applied.
@@ -168,14 +171,23 @@ export async function offerFor(
 ): Promise<UpdateOffer> {
   const row = await env.DB
     .prepare(
-      `SELECT f.version AS version, f.size AS size, f.sha256 AS sha256, d.firmware_version AS current
+      `SELECT f.version AS version, f.size AS size, f.sha256 AS sha256,
+              d.firmware_version AS current, d.ota_status AS status
          FROM devices d JOIN firmware f ON f.id = d.desired_firmware_id
         WHERE d.id = ? AND d.project_id = ?`
     )
     .bind(deviceId, projectId)
-    .first<{ version: string; size: number; sha256: string; current: string | null }>();
+    .first<{ version: string; size: number; sha256: string; current: string | null; status: string | null }>();
   if (!row || (reported ?? row.current) === row.version) return null;
+  if (row.status === 'failed') return null;
   return { version: row.version, size: row.size, sha256: row.sha256, url: '/v1/ota/image' };
+}
+
+export async function recordOtaAttempt(env: Env, deviceId: string): Promise<void> {
+  await env.DB
+    .prepare(`UPDATE devices SET ota_attempts = ota_attempts + 1 WHERE id = ?`)
+    .bind(deviceId)
+    .run();
 }
 
 export async function openImage(env: Env, projectId: string, deviceId: string): Promise<R2ObjectBody | null> {
@@ -191,6 +203,8 @@ export async function openImage(env: Env, projectId: string, deviceId: string): 
 }
 
 // Only the board knows it booted, so reporting the version is the success signal.
+// Reporting something else after MAX_OTA_ATTEMPTS pulls means the update isn't
+// landing — usually the sketch's version doesn't match the one on the upload.
 export async function reconcile(env: Env, deviceId: string, reported: string | null): Promise<void> {
   if (!reported) return;
   await env.DB
@@ -199,10 +213,14 @@ export async function reconcile(env: Env, deviceId: string, reported: string | n
           SET ota_status = CASE
                 WHEN desired_firmware_id IS NULL THEN NULL
                 WHEN ? = (SELECT version FROM firmware WHERE id = desired_firmware_id) THEN 'ok'
+                WHEN ota_attempts >= ? THEN 'failed'
                 ELSE ota_status END,
+              ota_attempts = CASE
+                WHEN ? = (SELECT version FROM firmware WHERE id = desired_firmware_id) THEN 0
+                ELSE ota_attempts END,
               ota_updated_at = ?
         WHERE id = ?`
     )
-    .bind(reported, Math.floor(Date.now() / 1000), deviceId)
+    .bind(reported, MAX_OTA_ATTEMPTS, reported, Math.floor(Date.now() / 1000), deviceId)
     .run();
 }

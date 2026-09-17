@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { normaliseDeviceKey, recordDeviceSeen, resolveDevice, touchDevice } from '../devices/service';
-import { offerFor, openImage, reconcile } from './ota';
+import { offerFor, openImage, reconcile, recordOtaAttempt } from './ota';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { storageIdOf } from '../devices/service';
 
@@ -52,6 +52,7 @@ ota.get('/image', async (c) => {
 
   const object = await openImage(c.env, project_id, deviceId);
   if (!object) return c.json({ error: 'not_found' }, 404);
+  c.executionCtx.waitUntil(recordOtaAttempt(c.env, deviceId));
   return new Response(object.body, {
     headers: {
       'Content-Type': 'application/octet-stream',

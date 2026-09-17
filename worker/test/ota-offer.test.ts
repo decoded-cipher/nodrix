@@ -13,7 +13,7 @@ function envWith(row: Record<string, unknown> | null) {
   } as unknown as Env;
 }
 
-const desired = { version: '1.2.0', size: 100, sha256: 'abc', current: null };
+const desired = { version: '1.2.0', size: 100, sha256: 'abc', current: null, status: 'pending' };
 
 test('offers when the board runs something else', async () => {
   const offer = await offerFor(envWith({ ...desired, current: '1.1.0' }), 'prj_a', 'dev_a');
@@ -37,4 +37,11 @@ test('a stale stored version does not suppress a real update', async () => {
 
 test('offers nothing with no desired firmware', async () => {
   expect(await offerFor(envWith(null), 'prj_a', 'dev_a')).toBeNull();
+});
+
+// A board that pulled the image and still reports the old version isn't retrying
+// its way out of it; offering again is the reflash loop.
+test('offers nothing once the update is marked failed', async () => {
+  const env = envWith({ ...desired, current: '1.1.0', status: 'failed' });
+  expect(await offerFor(env, 'prj_a', 'dev_a', '1.1.0')).toBeNull();
 });

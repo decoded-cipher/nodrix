@@ -66,7 +66,8 @@ export const MIGRATIONS: Migration[] = [
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_firmware_version ON firmware(project_id, version)",
       "ALTER TABLE devices ADD COLUMN desired_firmware_id TEXT REFERENCES firmware(id) ON DELETE SET NULL",
       "ALTER TABLE devices ADD COLUMN ota_status TEXT",
-      "ALTER TABLE devices ADD COLUMN ota_updated_at INTEGER"
+      "ALTER TABLE devices ADD COLUMN ota_updated_at INTEGER",
+      "ALTER TABLE devices ADD COLUMN ota_attempts INTEGER NOT NULL DEFAULT 0"
     ]
   }
 ];
