@@ -30,9 +30,6 @@ const FLUSH_INTERVAL_MS = 60_000;
 const HIGH_WATER_MARK_ROWS = 500;
 // Roughly a megabyte a call, and a boot-looping board would pull it forever.
 const OTA_DOWNLOADS_PER_HOUR = 6;
-// A cold toolchain install can take minutes; a warm build is seconds.
-const BUILD_TIMEOUT_MS = 5 * 60_000;
-const MAX_BUILD_LOG_LINES = 500;
 // Variable-trigger automations are cached in DO SQLite so high-rate telemetry
 // doesn't read D1 per point. Refreshed when stale or on invalidateAutomations().
 const AUTO_CACHE_TTL_MS = 30_000;
@@ -60,13 +57,6 @@ export type SeriesRow = {
   value: unknown;
 };
 
-// The artifact goes to R2 on its own route; only its id crosses the DO.
-export type BuildOutcome =
-  | { ok: true; build: string }
-  | { ok: false; error: string; code?: string };
-
-type PendingBuild = { controller: ReadableByteStreamController; lines: number; done: boolean };
-
 export type FlushResult = {
   flushed: number;
   keys: string[];
@@ -76,8 +66,6 @@ export type FlushResult = {
 
 export class ProjectDO extends DurableObject<Env> {
   private sql: SqlStorage;
-  // Held only while a browser waits on the response, so hibernation can't strand one.
-  private pendingBuilds = new Map<string, PendingBuild>();
 
   private projectId(): string {
     // Stored on first ingest; used as the R2 key prefix.
@@ -460,81 +448,6 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM pending_control WHERE variable = ? AND device_id IS ?`, variable, deviceId);
   }
 
-  private isAgent(ws: WebSocket): boolean {
-    return (ws.deserializeAttachment() as { role?: string } | null)?.role === 'agent';
-  }
-
-  // NDJSON as the build happens: a cold toolchain install is minutes long, and a
-  // console that prints nothing until the end reads as a hang. RPC carries byte
-  // streams only, hence type: 'bytes'.
-  requestBuild(fqbn: string, sketch: string): ReadableStream<Uint8Array> {
-    const id = newId('build');
-    const agent = this.ctx.getWebSockets().find((ws) => this.isAgent(ws));
-
-    return new ReadableStream({
-      type: 'bytes',
-      start: (controller) => {
-        const pending: PendingBuild = { controller, lines: 0, done: false };
-        if (!agent) {
-          return this.finishBuild(pending, { ok: false, code: 'no_agent', error: 'no agent is connected' });
-        }
-
-        this.pendingBuilds.set(id, pending);
-        setTimeout(() => {
-          if (this.pendingBuilds.delete(id)) this.finishBuild(pending, { ok: false, error: 'timed out' });
-        }, BUILD_TIMEOUT_MS);
-        try {
-          agent.send(JSON.stringify({ type: 'build', id, fqbn, sketch }));
-        } catch {
-          this.pendingBuilds.delete(id);
-          this.finishBuild(pending, { ok: false, error: 'the agent went away' });
-        }
-      },
-    });
-  }
-
-  private writeBuildFrame(p: PendingBuild, frame: unknown): void {
-    if (p.done) return;
-    try {
-      p.controller.enqueue(new TextEncoder().encode(`${JSON.stringify(frame)}\n`));
-    } catch {
-      p.done = true;
-    }
-  }
-
-  private finishBuild(p: PendingBuild, result: BuildOutcome): void {
-    if (p.done) return;
-    this.writeBuildFrame(p, { type: 'result', ...result });
-    p.done = true;
-    try {
-      p.controller.close();
-    } catch { /* the reader went away */ }
-  }
-
-  private handleAgentFrame(raw: string): void {
-    let msg: Record<string, unknown>;
-    try {
-      msg = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      return;
-    }
-    const build = typeof msg['build'] === 'string' ? msg['build'] : '';
-    const pending = this.pendingBuilds.get(build);
-    if (!pending) return;
-
-    if (msg['type'] === 'log' && typeof msg['line'] === 'string') {
-      if (pending.lines++ < MAX_BUILD_LOG_LINES) this.writeBuildFrame(pending, { type: 'log', line: msg['line'] });
-      return;
-    }
-    if (msg['type'] !== 'result') return;
-    this.pendingBuilds.delete(build);
-    // The agent uploads before it reports, so ok means the object is already there.
-    this.finishBuild(
-      pending,
-      msg['ok'] === true ? { ok: true, build } : { ok: false, error: String(msg['error'] ?? 'build failed') }
-    );
-  }
-
   // Survives hibernation, unlike anything held in memory.
   private deviceOf(ws: WebSocket): string {
     const att = ws.deserializeAttachment() as { device?: string } | null;
@@ -611,11 +524,6 @@ export class ProjectDO extends DurableObject<Env> {
     const server = pair[1] as WebSocket;
     this.ctx.acceptWebSocket(server);
 
-    if (request.headers.get('x-nodrix-role') === 'agent') {
-      server.serializeAttachment({ role: 'agent' });
-      return new Response(null, { status: 101, webSocket: client });
-    }
-
     // Until a hello arrives the socket counts as the default device.
     server.serializeAttachment({ device: '' });
     this.sendPending(server, `(device_id IS NULL OR device_id = '')`);
@@ -627,7 +535,6 @@ export class ProjectDO extends DurableObject<Env> {
   // parser. Invalid input → error frame; unknown/garbage → dropped.
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
-    if (this.isAgent(ws)) return this.handleAgentFrame(raw);
     const msg = parseDeviceMessage(raw);
     switch (msg.kind) {
       case 'hello': {
@@ -689,6 +596,7 @@ export class ProjectDO extends DurableObject<Env> {
     const projectId = this.projectId();
 
     // A prefix added elsewhere and not listed here leaks objects nothing reaches.
+    // builds/ is no longer written; kept so agent-era artifacts still get swept.
     for (const prefix of [`telemetry/${projectId}/`, `firmware/${projectId}/`, `builds/${projectId}/`]) {
       let cursor: string | undefined;
       do {
