@@ -3,8 +3,9 @@ import { newId } from '../../platform/lib/ids';
 import { ServiceError } from '../../platform/lib/service';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { storageIdOf } from '../devices/service';
+import { inspectImage } from './image';
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const KEEP_VERSIONS = 10;
 const SAFE_VERSION = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 
@@ -22,47 +23,62 @@ function r2Key(projectId: string, firmwareId: string): string {
   return `firmware/${projectId}/${firmwareId}.bin`;
 }
 
-// The image is already in R2 under builds/; this gives it a row and retention.
-export async function publishBuild(
+// The version is the only handle the board reports back, so it has to match what
+// the sketch passes to setFirmwareVersion() — see reconcile().
+export async function uploadFirmware(
   env: Env,
   projectId: string,
   userId: string,
-  buildId: string,
-  notes: string | null
+  input: { version: string; notes: string | null; body: ArrayBuffer }
 ): Promise<FirmwareRow> {
-  const source = await env.R2.get(`builds/${projectId}/${buildId}.bin`);
-  if (!source) throw new ServiceError('not_found', 'that build has expired', 'unknown_build');
+  const version = input.version.trim();
+  if (!version) throw new ServiceError('bad_request', 'a version is required', 'missing_version');
+  if (!SAFE_VERSION.test(version)) {
+    throw new ServiceError(
+      'bad_request',
+      'a version is letters, digits, dot, underscore, plus or dash, up to 64 characters',
+      'invalid_version'
+    );
+  }
+  if (input.body.byteLength === 0) throw new ServiceError('bad_request', 'the image is empty', 'empty_image');
+  if (input.body.byteLength > MAX_IMAGE_BYTES) {
+    throw new ServiceError('bad_request', 'the image is too large', 'image_too_large');
+  }
 
-  const body = await source.arrayBuffer();
-  if (body.byteLength === 0) throw new ServiceError('bad_request', 'the build is empty', 'empty_image');
-  if (body.byteLength > MAX_IMAGE_BYTES) throw new ServiceError('bad_request', 'the build is too large', 'image_too_large');
-  // The board reports the build id it was compiled with, so this always matches.
-  if (!SAFE_VERSION.test(buildId)) throw new ServiceError('bad_request', 'bad build id', 'invalid_version');
+  const check = inspectImage(input.body);
+  if (!check.ok) throw new ServiceError('bad_request', check.reason, check.code);
 
-  const digest = await crypto.subtle.digest('SHA-256', body);
+  const digest = await crypto.subtle.digest('SHA-256', input.body);
   const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
   const id = newId('firmware');
   const key = r2Key(projectId, id);
   const now = Math.floor(Date.now() / 1000);
 
-  await env.R2.put(key, body, { httpMetadata: { contentType: 'application/octet-stream' } });
+  await env.R2.put(key, input.body, { httpMetadata: { contentType: 'application/octet-stream' } });
   try {
     await env.DB
       .prepare(
         `INSERT INTO firmware (id, project_id, version, target, size, sha256, r2_key, notes, created_by, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, projectId, buildId, null, body.byteLength, sha256, key, notes, userId, now)
+      .bind(id, projectId, version, check.chip, input.body.byteLength, sha256, key, input.notes, userId, now)
       .run();
   } catch {
-    // Don't leave an image in R2 that no row points at.
     await env.R2.delete(key).catch(() => {});
-    throw new ServiceError('conflict', 'that build is already saved', 'duplicate_version');
+    throw new ServiceError('conflict', `version ${version} already exists`, 'duplicate_version');
   }
 
   await prune(env, projectId).catch(() => {});
-  return { id, version: buildId, target: null, size: body.byteLength, sha256, notes, created_at: now };
+  return {
+    id,
+    version,
+    target: check.chip,
+    size: input.body.byteLength,
+    sha256,
+    notes: input.notes,
+    created_at: now,
+  };
 }
 
 // Spares anything a device runs or is waiting to run; deleting those strands a
