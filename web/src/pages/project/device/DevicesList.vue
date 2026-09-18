@@ -129,7 +129,7 @@ async function forget(id: string, name: string) {
               v-if="editingId === d.id"
               :ref="(el) => focusName(el as Element | null)"
               v-model="draftName"
-              class="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+              class="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
               @keyup.enter="saveName(d.id)"
               @keyup.esc="editingId = null"
               @blur="saveName(d.id)"
