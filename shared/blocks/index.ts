@@ -26,6 +26,7 @@ export type BlockFieldType =
   | 'number'
   | 'boolean'
   | 'variable'
+  | 'device'
   | 'integration'
   | 'time'
   | 'weekdays';

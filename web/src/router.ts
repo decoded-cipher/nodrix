@@ -43,6 +43,14 @@ const routes: RouteRecordRaw[] = [
               { path: 'tokens', name: 'variable-tokens', component: () => import('./pages/project/variables/ConnectionTokens.vue'), meta: { title: 'Connection tokens' } },
             ],
           },
+          {
+            path: 'device',
+            component: () => import('./pages/project/device/DevicesHub.vue'),
+            children: [
+              { path: '', name: 'devices', component: () => import('./pages/project/device/DevicesList.vue'), meta: { title: 'Devices' } },
+              { path: 'firmware', name: 'device-firmware', component: () => import('./pages/project/device/FirmwareList.vue'), meta: { title: 'Firmware' } },
+            ],
+          },
           // Automations + Integrations live under one hub with two tabs.
           {
             path: 'automations',

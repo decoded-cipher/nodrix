@@ -9,9 +9,9 @@ compatibility_flags = ["nodejs_compat"]
 # bindings change; they can't be symlinked (the subdir must be self-contained).
 #
 # Build pipeline. scripts/build-from-upstream.sh, when running under Workers
-# Builds (detected via WORKERS_CI_COMMIT_SHA), replaces the clone's working
-# tree with upstream source before invoking the build chain. The user's
-# wrangler.toml (resource IDs from the Deploy button) is preserved across it.
+# Builds (detected via WORKERS_CI_COMMIT_SHA), replaces the clone's working tree
+# with upstream source, then rebuilds its wrangler.toml from deploy/wrangler.toml
+# — bindings from upstream, resource IDs and Worker name from the deployment.
 #
 # Locally the same script falls through to the standard build chain, so
 # `bun run build` / `wrangler deploy --dry-run` still work for development.

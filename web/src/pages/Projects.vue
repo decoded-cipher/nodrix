@@ -105,6 +105,13 @@ async function removeProject(p: Project) {
   if (editing.value?.id === p.id) editing.value = null;
 }
 
+// Navigation, not fetch — a Blob would defeat the streaming.
+function exportProject(p: Project, event: Event) {
+  event.stopPropagation();
+  openMenuFor.value = null;
+  window.location.href = `/v1/admin/projects/${p.id}/export`;
+}
+
 function deleteFromMenu(p: Project, event: Event) {
   event.stopPropagation();
   openMenuFor.value = null;
@@ -228,6 +235,11 @@ watch(
               class="block w-full px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
               @click="startEdit(p, $event)"
             >Edit project</button>
+            <button
+              type="button"
+              class="block w-full px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              @click="exportProject(p, $event)"
+            >Export data</button>
             <button
               type="button"
               class="block w-full px-3 py-1.5 text-left text-xs text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"

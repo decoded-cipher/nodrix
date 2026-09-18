@@ -93,6 +93,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
       inputSchema: {
         project: project.optional(),
         variable: z.string().describe('Variable key.'),
+        device: z.string().optional().describe('Device id. Omit to read across every device.'),
         window: z
           .string()
           .regex(/^\d+[smh]$/)
@@ -104,7 +105,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     (args) =>
       run(async () => {
         const pid = await resolveProjectId(env, props, args.project);
-        const { window, points } = await getSeries(env, pid, args.variable, args.window ?? '1h');
+        const { window, points } = await getSeries(env, pid, args.variable, args.window ?? '1h', args.device);
         return { project: pid, variable: args.variable, window, points };
       })
   );

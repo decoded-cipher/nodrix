@@ -1,6 +1,7 @@
 import type { Env } from '../../env';
 import { type Actor, isInstanceAdmin, ServiceError } from '../../platform/lib/service';
 import { newId } from '../../platform/lib/ids';
+import { createDefaultDevice } from '../devices/service';
 import { recordAudit } from '../../platform/lib/audit';
 import { buildUpdate, chunk, inClause, MAX_BOUND_PARAMS } from '../../platform/lib/sql';
 
@@ -103,12 +104,13 @@ export async function createProject(
 
   const id = newId('project');
   const now = Math.floor(Date.now() / 1000);
-  await env.DB
-    .prepare(
-      `INSERT INTO projects (id, name, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(id, name, actor.userId, now, now)
-    .run();
+  // One batch so a project can never exist without its default device.
+  await env.DB.batch([
+    env.DB
+      .prepare(`INSERT INTO projects (id, name, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
+      .bind(id, name, actor.userId, now, now),
+    createDefaultDevice(env, id, now),
+  ]);
 
   await recordAudit(env, {
     projectId: id,

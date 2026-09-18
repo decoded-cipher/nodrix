@@ -3,6 +3,7 @@ import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { lookupProjectToken, touchTokenLastUsed } from '../../platform/lib/tokens';
 import { projectStub } from '../../platform/durable-objects/stubs';
+import { normaliseDeviceKey, resolveDevice, touchDevice } from '../devices/service';
 
 const control = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
@@ -12,8 +13,15 @@ control.use('*', requireProjectToken);
 // Pending cloud->hardware variable writes for the authenticated project.
 control.get('/', async (c) => {
   const { project_id } = c.get('projectToken');
+  const device = await resolveDevice(
+    c.env,
+    project_id,
+    normaliseDeviceKey(c.req.header('x-nodrix-device')),
+    Math.floor(Date.now() / 1000)
+  );
+  if (device) c.executionCtx.waitUntil(touchDevice(c.env, device.id));
   const stub = projectStub(c.env, project_id);
-  const pending = await stub.listPendingControl();
+  const pending = await stub.listPendingControl(device?.storageId ?? '');
   return c.json({ control: pending });
 });
 
@@ -24,8 +32,14 @@ control.post('/ack', async (c) => {
   if (ids.length === 0) return c.json({ acked: 0 });
 
   const { project_id } = c.get('projectToken');
+  const device = await resolveDevice(
+    c.env,
+    project_id,
+    normaliseDeviceKey(c.req.header('x-nodrix-device')),
+    Math.floor(Date.now() / 1000)
+  );
   const stub = projectStub(c.env, project_id);
-  const result = await stub.ackControl(ids);
+  const result = await stub.ackControl(ids, device?.storageId ?? '');
   return c.json(result);
 });
 

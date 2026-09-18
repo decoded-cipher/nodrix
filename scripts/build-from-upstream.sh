@@ -9,9 +9,11 @@
 # source of truth — meaning code changes in upstream never reach them. With
 # this script, every deploy:
 #
-#   1. Preserves the user's wrangler.toml (which has their resource IDs,
-#      filled by the Deploy button on day 1 and never changed since).
-#   2. Replaces every other file with the upstream source's contents.
+#   1. Replaces every file with the upstream source's contents.
+#   2. Rebuilds wrangler.toml from upstream's carrier template, keeping only the
+#      deployment's identity (Worker name, account, routes, resource IDs, vars).
+#      Keeping the whole file instead froze the topology at day 1, so a binding
+#      or flag added upstream never reached anyone who had already deployed.
 #   3. Runs upstream's build pipeline.
 #
 # Result: the user's clone is functionally a config carrier. Code = upstream.
@@ -31,6 +33,7 @@ UPSTREAM_REPO="${NODRIX_UPSTREAM_REPO:-decoded-cipher/nodrix}"
 DEPLOY_CHANNEL="${NODRIX_DEPLOY_CHANNEL:-release}"
 UPSTREAM_DIR="/tmp/nodrix-upstream"
 WRANGLER_BACKUP="/tmp/nodrix-wrangler.toml"
+WRANGLER_MERGED="/tmp/nodrix-wrangler.merged.toml"
 
 if [ -z "${WORKERS_CI_COMMIT_SHA:-}" ]; then
   echo "[build-from-upstream] not in Workers Builds CI — running local build chain"
@@ -43,7 +46,7 @@ fi
 
 echo "[build-from-upstream] CI build — pulling upstream ${UPSTREAM_REPO} (${DEPLOY_CHANNEL} channel)"
 
-# 1. Preserve user's wrangler.toml.
+# 1. Save the deployment's wrangler.toml; step 4 merges it back.
 if [ ! -f wrangler.toml ]; then
   echo "[build-from-upstream] no wrangler.toml in cwd — refusing to proceed" >&2
   exit 1
@@ -114,8 +117,17 @@ for dir in web worker scripts; do
     done
 done
 
-# 4. Restore user's wrangler.toml in case upstream had its own (which it does).
-cp "${WRANGLER_BACKUP}" wrangler.toml
+# 4. Rebuild wrangler.toml. This script comes from master but the clone is the
+#    release tag, so a release predating the merge script falls back instead of
+#    failing.
+if [ -f scripts/merge-wrangler.ts ] && [ -f ./deploy/wrangler.toml ]; then
+  echo "[build-from-upstream] merging deployment identity into upstream wrangler.toml"
+  bun scripts/merge-wrangler.ts "${WRANGLER_BACKUP}" ./deploy/wrangler.toml > "${WRANGLER_MERGED}"
+  mv "${WRANGLER_MERGED}" wrangler.toml
+else
+  echo "[build-from-upstream] upstream has no merge script — keeping wrangler.toml as-is"
+  cp "${WRANGLER_BACKUP}" wrangler.toml
+fi
 
 # 4b. Drop the nested deploy/ that the overlay just brought in. The clone root
 #     IS the deploy carrier; upstream's own deploy/ dir is dead weight here and

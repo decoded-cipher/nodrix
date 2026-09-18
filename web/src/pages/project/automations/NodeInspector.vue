@@ -17,6 +17,10 @@ const WEEKDAYS = [
 ];
 
 const variableOptions = computed(() => project.variables.map((v) => ({ value: v.key, label: v.key })));
+const deviceOptions = computed(() => [
+  { value: '', label: 'Any device' },
+  ...project.devices.map((d) => ({ value: d.id, label: d.name })),
+]);
 const integrationOptions = computed(() =>
   project.integrations.map((i) => ({ value: i.id, label: i.name, hint: connSpec(i.kind).label }))
 );
@@ -94,6 +98,14 @@ watch(() => cfg.value['operation'], () => { if (isCallIntegration.value) seedDef
         v-model="cfg[f.key]"
         :options="variableOptions"
         placeholder="Variable"
+        size="sm"
+        class="mt-1 w-full"
+      />
+      <Dropdown
+        v-else-if="f.type === 'device'"
+        v-model="cfg[f.key]"
+        :options="deviceOptions"
+        placeholder="Any device"
         size="sm"
         class="mt-1 w-full"
       />

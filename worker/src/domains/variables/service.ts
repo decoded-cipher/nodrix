@@ -4,6 +4,7 @@ import { recordAudit } from '../../platform/lib/audit';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { type Actor, ServiceError } from '../../platform/lib/service';
 import { assertProjectAccess } from '../projects/service';
+import { defaultDeviceId, listDevices, storageIdOf } from '../devices/service';
 
 export type VariableSummary = {
   id: string;
@@ -27,13 +28,27 @@ export async function listVariables(env: Env, projectId: string): Promise<Variab
 }
 
 export type StateEntry = { value: unknown; received_at: number };
+export type DeviceState = { id: string; name: string; variables: Record<string, StateEntry> };
 
-// Latest value of every variable. Mirrors GET /v1/projects/:proj/state.
-export async function getState(env: Env, projectId: string): Promise<Record<string, StateEntry>> {
-  const latest = await projectStub(env, projectId).getLatestState();
-  const out: Record<string, StateEntry> = {};
-  for (const r of latest) out[r.variable] = { value: r.value, received_at: r.received_at };
-  return out;
+// Mirrors GET /v1/projects/:proj/state. Grouped by device because two of them
+// may report the same key, and a flat map would drop one.
+export async function getState(env: Env, projectId: string): Promise<DeviceState[]> {
+  const [latest, devices] = await Promise.all([
+    projectStub(env, projectId).getLatestState(),
+    listDevices(env, projectId),
+  ]);
+  const fallback = devices.find((d) => d.is_default)?.id;
+  const byDevice = new Map<string, DeviceState>();
+  for (const d of devices) byDevice.set(d.id, { id: d.id, name: d.name, variables: {} });
+
+  for (const r of latest) {
+    // The DO marks the default device '' so it never had to backfill.
+    const id = r.device_id || fallback;
+    if (!id) continue;
+    const bucket = byDevice.get(id);
+    if (bucket) bucket.variables[r.variable] = { value: r.value, received_at: r.received_at };
+  }
+  return [...byDevice.values()];
 }
 
 // Recent points from the Project DO ring buffer (never R2). Mirrors
@@ -41,7 +56,8 @@ export async function getSeries(
   env: Env,
   projectId: string,
   variable: string,
-  windowStr: string
+  windowStr: string,
+  deviceId?: string | null
 ): Promise<{ window: string; points: unknown[] }> {
   const now = Math.floor(Date.now() / 1000);
   const m = /^(\d+)([smh])$/.exec(windowStr);
@@ -50,7 +66,9 @@ export async function getSeries(
     const n = Number(m[1]);
     seconds = m[2] === 'h' ? n * 3600 : m[2] === 'm' ? n * 60 : n;
   }
-  const points = await projectStub(env, projectId).getSeries(variable, now - seconds);
+  // No device reads the whole project — what a single-device instance always did.
+  const storageId = deviceId ? await storageIdOf(env, projectId, deviceId) : null;
+  const points = await projectStub(env, projectId).getSeries(variable, now - seconds, storageId);
   return { window: m ? windowStr : '1h', points };
 }
 
@@ -68,13 +86,16 @@ export async function createVariable(
 
   const id = newId('variable');
   const now = Math.floor(Date.now() / 1000);
+  // Hand-declared variables belong to the default device.
+  const deviceId = await defaultDeviceId(env, projectId);
+  if (!deviceId) throw new ServiceError('not_found', 'project has no default device', 'no_default_device');
   try {
     await env.DB
       .prepare(
-        `INSERT INTO project_variables (id, project_id, key, unit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO project_variables (id, project_id, device_id, key, unit, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, projectId, key, input.unit ?? null, now, now)
+      .bind(id, projectId, deviceId, key, input.unit ?? null, now, now)
       .run();
   } catch {
     throw new ServiceError('conflict', 'a variable with this key already exists', 'duplicate_key');
@@ -130,22 +151,24 @@ export async function setVariableControl(
   env: Env,
   actor: Actor,
   projectId: string,
-  input: { variable: string; value: unknown }
+  input: { variable: string; value: unknown; device?: string | null }
 ): Promise<{ id: string; variable: string; value: unknown }> {
   await assertProjectAccess(env, actor, projectId);
   const variable = (input.variable ?? '').trim();
   if (!variable) throw new ServiceError('bad_request', 'variable is required', 'missing_variable');
+  const deviceId = input.device ?? (await defaultDeviceId(env, projectId));
 
   // The variable must already exist in the project (mirrors the dashboard
   // control path, which refuses variable_not_in_project).
   const exists = await env.DB
-    .prepare(`SELECT 1 AS ok FROM project_variables WHERE project_id = ? AND key = ?`)
-    .bind(projectId, variable)
+    .prepare(`SELECT 1 AS ok FROM project_variables WHERE project_id = ? AND device_id = ? AND key = ?`)
+    .bind(projectId, deviceId, variable)
     .first<{ ok: number }>();
   if (!exists) throw new ServiceError('not_found', 'variable not in project', 'variable_not_in_project');
 
   const id = newId('control');
-  await projectStub(env, projectId).addControl(id, variable, input.value ?? null);
+  const storageId = await storageIdOf(env, projectId, deviceId!);
+  await projectStub(env, projectId).addControl(id, variable, input.value ?? null, storageId);
 
   await recordAudit(env, {
     projectId,

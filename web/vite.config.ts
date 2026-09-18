@@ -22,7 +22,7 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        // og.png is only for social scrapers — no need to precache it offline.
+        // og.png is for social scrapers, not for the app shell.
         globIgnores: ['**/og.png'],
         navigateFallback: '/index.html',
         // Never hijack worker-rendered routes with the SPA fallback.
