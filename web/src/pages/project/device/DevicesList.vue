@@ -1,27 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import { useProjectStore } from '../../../stores/project';
 import { confirm } from '../../../lib/confirm';
 import { toast } from '../../../lib/toast';
 import { relativeTime, formatAbsolute } from '../../../lib/time';
-import Spinner from '../../../components/Spinner.vue';
 import Dropdown from '../../../components/Dropdown.vue';
+import type { Device } from '../../../types';
 
 const project = useProjectStore();
-const loading = ref(true);
-
-onMounted(async () => {
-  try {
-    await Promise.all([project.loadDevices(), project.loadFirmware()]);
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    loading.value = false;
-  }
-});
 
 const editingId = ref<string | null>(null);
 const draftName = ref('');
+
+const firmwareTab = computed(() => `/p/${project.currentProjectId ?? ''}/device/firmware`);
 
 function startEdit(id: string, name: string) {
   editingId.value = id;
@@ -54,13 +46,12 @@ async function saveName(id: string) {
   }
 }
 
-// Build ids are the version, so a saved build needs a human-sized handle.
-function buildLabel(f: { version: string; created_at: number }): string {
-  return `${f.version.replace(/^bld_/, '').slice(0, 6)} · ${relativeTime(f.created_at)}`;
-}
-
 const firmwareOptions = computed(() =>
-  project.firmware.map((f) => ({ value: f.id, label: buildLabel(f) }))
+  project.firmware.map((f) => ({
+    value: f.id,
+    label: f.version,
+    hint: relativeTime(f.created_at),
+  }))
 );
 
 async function assign(deviceId: string, firmwareId: string) {
@@ -71,9 +62,28 @@ async function assign(deviceId: string, firmwareId: string) {
   }
 }
 
-function otaState(d: { desired_firmware_id: string | null; ota_status: string | null }): string {
-  if (!d.desired_firmware_id) return '';
-  return d.ota_status === 'ok' ? '' : 'waiting for the board';
+// 'failed' is the board pulling without ever reporting the version, so it is not waiting.
+function otaState(d: Device): { text: string; failed: boolean } | null {
+  if (!d.desired_firmware_id || d.ota_status === 'ok') return null;
+  if (d.ota_status === 'failed') {
+    return { text: 'gave up — the board never reported this version', failed: true };
+  }
+  return { text: online(d.last_seen) ? 'waiting for the board' : 'queued until it reports', failed: false };
+}
+
+const otaStates = computed<Record<string, { text: string; failed: boolean } | null>>(() =>
+  Object.fromEntries(project.devices.map((d) => [d.id, otaState(d)]))
+);
+
+// Assigning the same image again is the retry: the server clears the attempt count.
+async function retry(d: Device) {
+  if (!d.desired_firmware_id) return;
+  try {
+    await project.assignFirmware(d.id, d.desired_firmware_id);
+    toast.success('Offering the update again.');
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
 }
 
 async function forget(id: string, name: string) {
@@ -96,15 +106,11 @@ async function forget(id: string, name: string) {
 </script>
 
 <template>
-  <div v-if="loading" class="flex justify-center py-10">
-    <Spinner size="sm" label="Loading devices…" />
-  </div>
-
-  <div v-else class="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+  <div class="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
     <table class="w-full text-sm">
       <thead class="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
         <tr>
-          <th class="px-4 py-2.5 font-medium">Name</th>
+          <th class="px-4 py-2.5 font-medium">Device</th>
           <th class="px-4 py-2.5 font-medium">Chip</th>
           <th class="px-4 py-2.5 font-medium">Running</th>
           <th class="px-4 py-2.5 font-medium">Update to</th>
@@ -113,8 +119,8 @@ async function forget(id: string, name: string) {
         </tr>
       </thead>
       <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
-        <tr v-for="d in project.devices" :key="d.id">
-          <td class="px-4 py-2.5">
+        <tr v-for="d in project.devices" :key="d.id" class="align-top">
+          <td class="px-4 py-3">
             <input
               v-if="editingId === d.id"
               :ref="(el) => focusName(el as Element | null)"
@@ -124,38 +130,59 @@ async function forget(id: string, name: string) {
               @keyup.esc="editingId = null"
               @blur="saveName(d.id)"
             />
-            <span v-else class="inline-flex items-center gap-2 font-medium">
-              <span
-                class="h-1.5 w-1.5 shrink-0 rounded-full"
-                :class="online(d.last_seen) ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600'"
-                :title="online(d.last_seen) ? 'Reporting' : 'Not reporting'"
+            <template v-else>
+              <span class="inline-flex items-center gap-2 font-medium">
+                <span
+                  class="h-1.5 w-1.5 shrink-0 rounded-full"
+                  :class="online(d.last_seen) ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600'"
+                  :title="online(d.last_seen) ? 'Reporting' : 'Not reporting'"
+                />
+                {{ d.name }}
+                <span
+                  v-if="d.is_default"
+                  class="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-normal text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                >default</span>
+              </span>
+            </template>
+          </td>
+          <td class="px-4 py-3 text-neutral-600 dark:text-neutral-400">{{ d.chip ?? '—' }}</td>
+          <td class="px-4 py-3 font-mono text-xs text-neutral-600 dark:text-neutral-400">
+            {{ d.firmware_version ?? '—' }}
+          </td>
+          <td class="px-4 py-3">
+            <RouterLink
+              v-if="!project.firmware.length"
+              :to="firmwareTab"
+              class="text-xs font-medium text-accent-700 hover:underline dark:text-accent-400"
+            >Upload firmware first</RouterLink>
+            <template v-else>
+              <Dropdown
+                :model-value="d.desired_firmware_id ?? ''"
+                :options="firmwareOptions"
+                placeholder="Nothing pending"
+                size="sm"
+                class="max-w-[13rem]"
+                @update:model-value="(v) => assign(d.id, String(v))"
               />
-              {{ d.name }}
-            </span>
-            <span
-              v-if="d.is_default && editingId !== d.id"
-              class="ml-2 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
-            >default</span>
+              <p
+                v-if="otaStates[d.id]"
+                class="mt-1 text-[11px]"
+                :class="otaStates[d.id]?.failed ? 'text-amber-700 dark:text-amber-500' : 'text-neutral-500'"
+              >
+                {{ otaStates[d.id]?.text }}
+                <button
+                  v-if="otaStates[d.id]?.failed"
+                  type="button"
+                  class="ml-1 font-medium underline hover:no-underline"
+                  @click="retry(d)"
+                >Try again</button>
+              </p>
+            </template>
           </td>
-          <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400">{{ d.chip ?? '—' }}</td>
-          <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400">
-            {{ d.firmware_version ? d.firmware_version.replace(/^bld_/, '').slice(0, 6) : '—' }}
-          </td>
-          <td class="px-4 py-2.5">
-            <Dropdown
-              :model-value="d.desired_firmware_id ?? ''"
-              :options="firmwareOptions"
-              placeholder="Nothing pending"
-              size="sm"
-              class="max-w-[13rem]"
-              @update:model-value="(v) => assign(d.id, String(v))"
-            />
-            <span v-if="otaState(d)" class="mt-1 block text-[10px] text-neutral-500">{{ otaState(d) }}</span>
-          </td>
-          <td class="px-4 py-2.5 text-neutral-600 dark:text-neutral-400" :title="d.last_seen ? formatAbsolute(d.last_seen) : ''">
+          <td class="px-4 py-3 text-neutral-600 dark:text-neutral-400" :title="d.last_seen ? formatAbsolute(d.last_seen) : ''">
             {{ d.last_seen ? relativeTime(d.last_seen) : 'Never' }}
           </td>
-          <td class="px-4 py-2.5 text-right">
+          <td class="whitespace-nowrap px-4 py-3 text-right">
             <button
               type="button"
               class="text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
@@ -170,7 +197,7 @@ async function forget(id: string, name: string) {
           </td>
         </tr>
         <tr v-if="!project.devices.length">
-          <td colspan="6" class="px-4 py-8 text-center text-sm text-neutral-500">
+          <td colspan="6" class="px-4 py-10 text-center text-sm text-neutral-500">
             No devices yet. A board appears here the first time it reports.
           </td>
         </tr>
