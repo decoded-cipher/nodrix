@@ -62,7 +62,6 @@ async function assign(deviceId: string, firmwareId: string) {
   }
 }
 
-// 'failed' is the board pulling without ever reporting the version, so it is not waiting.
 function otaState(d: Device): { text: string; failed: boolean } | null {
   if (!d.desired_firmware_id || d.ota_status === 'ok') return null;
   if (d.ota_status === 'failed') {
@@ -92,7 +91,8 @@ async function forget(id: string, name: string) {
     message: 'Its variables and recent history go with it.',
     details: [
       'Telemetry already archived is kept.',
-      'The board reappears here if it reports again.',
+      'A dashboard reading this device needs one picked again.',
+      'The board reappears here if it reports again, as a new device.',
     ],
     confirmLabel: 'Forget',
   });
@@ -119,7 +119,11 @@ async function forget(id: string, name: string) {
         </tr>
       </thead>
       <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
-        <tr v-for="d in project.devices" :key="d.id" class="align-top">
+        <tr
+          v-for="d in project.devices"
+          :key="d.id"
+          class="group align-top hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+        >
           <td class="px-4 py-3">
             <input
               v-if="editingId === d.id"
@@ -182,18 +186,29 @@ async function forget(id: string, name: string) {
           <td class="px-4 py-3 text-neutral-600 dark:text-neutral-400" :title="d.last_seen ? formatAbsolute(d.last_seen) : ''">
             {{ d.last_seen ? relativeTime(d.last_seen) : 'Never' }}
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-right">
-            <button
-              type="button"
-              class="text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
-              @click="startEdit(d.id, d.name)"
-            >Rename</button>
-            <button
-              v-if="!d.is_default"
-              type="button"
-              class="ml-3 text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400"
-              @click="forget(d.id, d.name)"
-            >Forget</button>
+          <td class="whitespace-nowrap px-4 py-3">
+            <div class="flex items-center justify-end gap-1">
+              <button
+                type="button"
+                aria-label="Rename device"
+                title="Rename device"
+                class="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                @click="startEdit(d.id, d.name)"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+              <button
+                v-if="!d.is_default"
+                type="button"
+                aria-label="Forget device"
+                title="Forget device"
+                class="rounded-md p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                @click="forget(d.id, d.name)"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              </button>
+              <span v-else class="h-7 w-7" aria-hidden="true" />
+            </div>
           </td>
         </tr>
         <tr v-if="!project.devices.length">

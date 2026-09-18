@@ -9,7 +9,6 @@ const project = useProjectStore();
 const route = useRoute();
 const loading = ref(true);
 
-// Both halves load up front: each tab's count, and the firmware a device row names.
 onMounted(async () => {
   try {
     await Promise.all([project.loadDevices(), project.loadFirmware()]);

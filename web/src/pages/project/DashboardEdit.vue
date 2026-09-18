@@ -123,9 +123,12 @@ function setDevice(id: string) {
 }
 
 // The default device is '' here, matching how the DO keys its rows.
-const deviceOptions = computed(() =>
-  project.devices.map((d) => ({ value: d.is_default ? '' : d.id, label: d.name }))
-);
+const deviceOptions = computed(() => {
+  const opts = project.devices.map((d) => ({ value: d.is_default ? '' : d.id, label: d.name }));
+  const pinned = layout.value.device;
+  if (pinned && !opts.some((o) => o.value === pinned)) opts.push({ value: pinned, label: 'Deleted device' });
+  return opts;
+});
 
 function resetMobileLayout() {
   if (!layout.value.mobile) return;
@@ -371,7 +374,7 @@ function exitToView() {
           <span class="hidden lg:inline">Reset layout</span>
         </button>
         <Dropdown
-          v-if="project.devices.length > 1"
+          v-if="project.devices.length > 1 || layout.device"
           :model-value="layout.device ?? ''"
           :options="deviceOptions"
           size="sm"

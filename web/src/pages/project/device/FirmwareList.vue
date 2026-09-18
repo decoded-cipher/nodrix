@@ -13,7 +13,6 @@ const session = useSessionStore();
 
 const showUpload = ref(false);
 
-// Upload and delete are owner/admin on the API.
 const isManager = computed(() => session.user?.role === 'owner' || session.user?.role === 'admin');
 
 function sizeLabel(bytes: number): string {
