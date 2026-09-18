@@ -1,0 +1,44 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "live.nodrix/nodrix",
+  "title": "nodrix",
+  "description": "Read live and historical IoT telemetry and actuate ESP32/Arduino hardware from a backend you host.",
+  "version": "1.0.1",
+  "websiteUrl": "https://nodrix.live",
+  "repository": {
+    "url": "https://github.com/decoded-cipher/nodrix",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://{host}/v1/mcp/oauth",
+      "variables": {
+        "host": {
+          "description": "Hostname of your nodrix deployment, without the scheme. Sign-in happens over OAuth.",
+          "placeholder": "nodrix.your-subdomain.workers.dev",
+          "isRequired": true
+        }
+      }
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://{host}/v1/mcp",
+      "variables": {
+        "host": {
+          "description": "Hostname of your nodrix deployment, without the scheme. Authenticates with a bearer token.",
+          "placeholder": "nodrix.your-subdomain.workers.dev",
+          "isRequired": true
+        }
+      },
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "A nodrix API token, prefixed with 'Bearer '. Mint one in Settings, and enable MCP under Settings > More.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
