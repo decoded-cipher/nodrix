@@ -41,13 +41,14 @@
 
 Compile with the toolchain you already use, upload the image, and any board in the project can take it on its next check — no USB, no cable, no physical access.
 
-1. **Version the sketch.** `Nodrix.setFirmwareVersion("1.2.0")` — the board reports this back, and it is how nodrix knows the update landed.
+1. **Version the sketch.** `Nodrix.setFirmwareVersion("1.2.0")` — the board reports this back, and it is how nodrix knows the update landed. Needs the [Nodrix library](https://github.com/decoded-cipher/nodrix-sdk) at 0.2.0 or newer.
 2. **Compile.** Arduino IDE: **Sketch → Export Compiled Binary**, then take `<sketch>.ino.bin` from `build/<board>/`. `arduino-cli compile --output-dir build` and PlatformIO's `.pio/build/<env>/firmware.bin` work the same way. Upload the app image, not `.ino.merged.bin` or `.ino.bootloader.bin` — nodrix rejects those, since a board flashed with one over the air would not boot.
-3. **Upload** it on **Devices → Upload firmware** with the same version string, and **assign** it to a device.
+3. **Upload** it on **Devices → Firmware** with the same version string, then **assign** it to a board on **Devices**.
 
 A board on the control socket is told immediately; one on HTTP finds it at its next check or on reboot. The board reports the new version when it comes back up, which is what marks the update done. If it keeps pulling the image without ever reporting the new version — nearly always the version in the sketch not matching the one on the upload — nodrix stops offering it after a few attempts and says so, instead of leaving the board reinstalling forever. Assigning the firmware again clears that and retries.
 
 The first flash of a board is still over USB, with the Arduino IDE or `esptool`, and it needs a partition scheme with OTA slots (the ESP32 default has them). Every image you ship over the air has to include the nodrix SDK, or the board will have no way to receive the next one.
+
 ## AI assistants (MCP)
 
 nodrix ships a native [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant can read a project's telemetry and — once you allow it — act on the hardware. Because devices report to your deployment rather than to your laptop, the board does not need to be plugged into the machine running the assistant; it can be in another building.
