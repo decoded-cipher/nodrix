@@ -77,15 +77,19 @@ async function submit() {
           <div class="space-y-1.5">
             <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-300">Image</label>
             <input ref="fileEl" type="file" accept=".bin" class="sr-only" @change="pick" />
-            <button
-              type="button"
-              class="w-full truncate rounded-md border border-neutral-300 bg-white px-3 py-2 text-left text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
-              :class="file ? '' : 'text-neutral-400 dark:text-neutral-500'"
-              @click="fileEl?.click()"
-            >{{ file ? file.name : 'Choose a .bin file' }}</button>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                class="shrink-0 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                @click="fileEl?.click()"
+              >{{ file ? 'Change file' : 'Choose file' }}</button>
+              <span
+                class="min-w-0 truncate text-xs"
+                :class="file ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-500'"
+              >{{ file ? `${file.name} · ${sizeLabel}` : 'No file chosen' }}</span>
+            </div>
             <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
-              <template v-if="file">{{ sizeLabel }}</template>
-              <template v-else>The app image — <span class="font-mono">.ino.bin</span>, not the merged one. Up to 8 MB.</template>
+              The app image — <span class="font-mono">.ino.bin</span>, not the merged one. Up to 8 MB.
             </p>
           </div>
 

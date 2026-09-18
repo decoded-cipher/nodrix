@@ -74,7 +74,6 @@ const otaStates = computed<Record<string, { text: string; failed: boolean } | nu
   Object.fromEntries(project.devices.map((d) => [d.id, otaState(d)]))
 );
 
-// Assigning the same image again is the retry: the server clears the attempt count.
 async function retry(d: Device) {
   if (!d.desired_firmware_id) return;
   try {

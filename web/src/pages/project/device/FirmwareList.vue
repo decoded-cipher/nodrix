@@ -21,7 +21,6 @@ function sizeLabel(bytes: number): string {
     : `${Math.round(bytes / 1024)} kB`;
 }
 
-// A board reports a version, not an id, so running matches on version.
 function adoption(f: Firmware): string {
   const running = project.devices.filter((d) => d.firmware_version === f.version).length;
   const pending = project.devices.filter(

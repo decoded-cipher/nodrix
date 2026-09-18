@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { useProjectStore } from '../../../stores/project';
 import { toast } from '../../../lib/toast';
@@ -9,15 +9,20 @@ const project = useProjectStore();
 const route = useRoute();
 const loading = ref(true);
 
-onMounted(async () => {
-  try {
-    await Promise.all([project.loadDevices(), project.loadFirmware()]);
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    loading.value = false;
-  }
-});
+watch(
+  () => project.currentProjectId,
+  async (id) => {
+    if (!id) return;
+    try {
+      await Promise.all([project.loadDevices(), project.loadFirmware()]);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      loading.value = false;
+    }
+  },
+  { immediate: true }
+);
 
 const proj = computed(() => project.currentProjectId ?? '');
 
