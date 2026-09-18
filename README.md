@@ -11,7 +11,7 @@
 - 🤖 **Visual automations** — variable, schedule, sunrise/sunset, and event triggers run conditions and actions: webhooks, code snippets, and service integrations.
 - 🔌 **Integrations** — fan out to HTTP, email, and chat (Slack, Telegram, Discord, and more).
 - 📖 **Clean read API** — latest state, time-series, and variable listings behind one token.
-- 🧠 **Native MCP server** — an owner-gated Model Context Protocol endpoint with a Claude connector for AI clients (off by default).
+- 🧠 **Native MCP server** — read telemetry and control hardware from an AI assistant, on devices you are not physically next to. Owner-gated and off by default; see [AI assistants (MCP)](#ai-assistants-mcp).
 - 👥 **Multi-user** — owner / admin / member roles, email invites, and social sign-in (Google, GitHub).
 - 📝 **Audit log** — every privileged action recorded and paginated in the UI.
 
@@ -35,6 +35,28 @@
    curl https://<your-worker>/v1/projects/<project>/state \
      -H "Authorization: Bearer $NODRIX_TOKEN"
    ```
+
+## AI assistants (MCP)
+
+nodrix ships a native [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant can read a project's telemetry and — once you allow it — act on the hardware. Because devices report to your deployment rather than to your laptop, the board does not need to be plugged into the machine running the assistant; it can be in another building.
+
+Two endpoints, both Streamable HTTP:
+
+| Endpoint | Auth | For |
+|---|---|---|
+| `/v1/mcp` | Bearer token | CLI and IDE clients |
+| `/v1/mcp/oauth` | OAuth | claude.ai-style connectors |
+
+**Both are off by default.** The owner flips them in **Settings → More**:
+
+- `mcp_enabled` — the master switch. While it is off, `/v1/mcp` returns **404**, so a disabled server looks absent rather than merely forbidden.
+- `mcp_write_enabled` — gates the management and control tools. Until it is on, even an admin-scope token gets read-only tools, so an assistant cannot command hardware by default.
+
+**12 read tools** — `list_projects`, `list_variables`, `get_state`, `get_series`, `list_dashboards`, `get_dashboard`, `list_widget_types`, `list_widgets`, `list_block_types`, `list_integration_kinds`, `list_automations`, `list_integrations`.
+
+**16 write tools** — creating and updating projects, variables, dashboards, widgets, automations, and integrations, plus `set_variable` (how an assistant turns a relay on), `run_automation`, `emit_event`, and `test_integration`.
+
+**There are no delete tools, by design.** Every tool resolves its target project through the token's scope before it runs, so it cannot reach a project the token cannot.
 
 ## Architecture
 
