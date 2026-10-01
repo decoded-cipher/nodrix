@@ -11,7 +11,7 @@ import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
 import { defaultDeviceId, forgetCachedDevice, normaliseDeviceKey, resolveDevice, recordDeviceSeen, touchDevice } from '../../domains/devices/service';
-import { reconcile } from '../../domains/firmware/ota';
+import { offerFor, reconcile } from '../../domains/firmware/ota';
 import { migrateSchema } from './schema';
 import { PROJECT_SCHEMA } from './project-schema';
 
@@ -549,9 +549,15 @@ export class ProjectDO extends DurableObject<Env> {
         const device = key ? await resolveDevice(this.env, pid, key, Math.floor(Date.now() / 1000)) : null;
         if (!device || !device.storageId) return;
         ws.serializeAttachment({ device: device.storageId });
+        // Boards don't check for updates on connect; they wait for this nudge.
         this.ctx.waitUntil(
           recordDeviceSeen(this.env, device.id, msg.chip, msg.firmware)
             .then(() => reconcile(this.env, device.id, msg.firmware ?? null))
+            .then(() => offerFor(this.env, pid, device.id, msg.firmware ?? null))
+            .then((offer) => {
+              if (offer) ws.send(JSON.stringify({ type: 'ota' }));
+            })
+            .catch(() => {})
         );
         this.sendPending(ws, `device_id = ?`, device.storageId);
         return;

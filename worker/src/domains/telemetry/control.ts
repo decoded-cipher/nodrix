@@ -3,14 +3,15 @@ import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { lookupProjectToken, touchTokenLastUsed } from '../../platform/lib/tokens';
 import { projectStub } from '../../platform/durable-objects/stubs';
-import { normaliseDeviceKey, resolveDevice, touchDevice } from '../devices/service';
+import { normaliseDeviceKey, recordDeviceSeen, resolveDevice, touchDevice } from '../devices/service';
+import { offerFor, reconcile } from '../firmware/ota';
 
 const control = new Hono<{ Bindings: Env; Variables: ProjectTokenContextVars }>();
 
 control.use('*', requireProjectToken);
 
-// GET /v1/control  -> { control: [{ id, variable, value }, ...] }
-// Pending cloud->hardware variable writes for the authenticated project.
+// GET /v1/control  -> { control: [{ id, variable, value }, ...], ota: boolean }
+// HTTP boards have no hello, so they report their version and learn of updates here.
 control.get('/', async (c) => {
   const { project_id } = c.get('projectToken');
   const device = await resolveDevice(
@@ -19,10 +20,21 @@ control.get('/', async (c) => {
     normaliseDeviceKey(c.req.header('x-nodrix-device')),
     Math.floor(Date.now() / 1000)
   );
-  if (device) c.executionCtx.waitUntil(touchDevice(c.env, device.id));
+  const firmware = c.req.header('x-nodrix-firmware') ?? null;
+  if (device && firmware) {
+    c.executionCtx.waitUntil(
+      recordDeviceSeen(c.env, device.id, c.req.header('x-nodrix-chip'), firmware)
+        .then(() => reconcile(c.env, device.id, firmware))
+    );
+  } else if (device) {
+    c.executionCtx.waitUntil(touchDevice(c.env, device.id));
+  }
   const stub = projectStub(c.env, project_id);
-  const pending = await stub.listPendingControl(device?.storageId ?? '');
-  return c.json({ control: pending });
+  const [pending, offer] = await Promise.all([
+    stub.listPendingControl(device?.storageId ?? ''),
+    device && firmware ? offerFor(c.env, project_id, device.id, firmware) : null,
+  ]);
+  return c.json({ control: pending, ota: offer !== null });
 });
 
 // POST /v1/control/ack  body: { ids: string[] }  -> { acked: number }

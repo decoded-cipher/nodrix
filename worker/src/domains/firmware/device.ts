@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import type { Env } from '../../env';
 import { requireProjectToken, type ProjectTokenContextVars } from '../../platform/middleware/require-project-token';
 import { normaliseDeviceKey, recordDeviceSeen, resolveDevice, touchDevice } from '../devices/service';
-import { offerFor, openImage, reconcile, recordOtaAttempt } from './ota';
+import { offerFor, openImage, reconcile, recordOtaAttempt, recordOtaReport } from './ota';
 import { projectStub } from '../../platform/durable-objects/stubs';
 import { storageIdOf } from '../devices/service';
 
@@ -50,15 +50,32 @@ ota.get('/image', async (c) => {
     return c.json({ error: 'too_many_requests' }, 429, { 'retry-after': '3600' });
   }
 
-  const object = await openImage(c.env, project_id, deviceId);
-  if (!object) return c.json({ error: 'not_found' }, 404);
+  const image = await openImage(c.env, project_id, deviceId);
+  if (!image) return c.json({ error: 'not_found' }, 404);
   c.executionCtx.waitUntil(recordOtaAttempt(c.env, deviceId));
-  return new Response(object.body, {
-    headers: {
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': String(object.size),
-    },
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/octet-stream',
+    'Content-Length': String(image.object.size),
+    'x-SHA256': image.sha256,
+  };
+  if (image.md5) headers['x-MD5'] = image.md5;
+  return new Response(image.object.body, { headers });
+});
+
+// POST /v1/ota/status  body: { state: 'failed' | 'rolled_back', version?, code? }
+ota.post('/status', async (c) => {
+  const { project_id } = c.get('projectToken');
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const state = body.state;
+  if (state !== 'failed' && state !== 'rolled_back') return c.json({ error: 'bad_state' }, 400);
+  const deviceId = await deviceIdFor(c, project_id);
+  if (!deviceId) return c.json({ error: 'not_found' }, 404);
+  await recordOtaReport(c.env, deviceId, {
+    state,
+    version: typeof body.version === 'string' ? body.version : undefined,
+    code: typeof body.code === 'number' ? body.code : undefined,
   });
+  return c.body(null, 204);
 });
 
 export default ota;
