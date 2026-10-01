@@ -100,7 +100,7 @@ export async function resolveDevice(
     .prepare(
       `INSERT INTO devices (id, project_id, name, device_key, first_seen, last_seen, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(project_id, device_key) DO NOTHING`
+       ON CONFLICT(project_id, device_key) WHERE device_key IS NOT NULL DO NOTHING`
     )
     .bind(id, projectId, deviceKey, deviceKey, now, now, now)
     .run();

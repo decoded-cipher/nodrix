@@ -10,7 +10,7 @@ import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
 import { upsertVariables } from '../../domains/telemetry/variables';
-import { defaultDeviceId, normaliseDeviceKey, resolveDevice, recordDeviceSeen, touchDevice } from '../../domains/devices/service';
+import { defaultDeviceId, forgetCachedDevice, normaliseDeviceKey, resolveDevice, recordDeviceSeen, touchDevice } from '../../domains/devices/service';
 import { reconcile } from '../../domains/firmware/ota';
 import { migrateSchema } from './schema';
 import { PROJECT_SCHEMA } from './project-schema';
@@ -505,6 +505,12 @@ export class ProjectDO extends DurableObject<Env> {
     this.sql.exec(`DELETE FROM latest_state WHERE device_id = ?`, deviceId);
     this.sql.exec(`DELETE FROM ring_buffer WHERE device_id = ?`, deviceId);
     this.sql.exec(`DELETE FROM pending_control WHERE device_id = ?`, deviceId);
+    // The cache and the socket still hold the deleted id; reconnecting re-registers it.
+    forgetCachedDevice(this.projectId());
+    for (const ws of this.ctx.getWebSockets()) {
+      if (this.deviceOf(ws) !== deviceId) continue;
+      try { ws.close(1012, 'device removed'); } catch { /* already closed */ }
+    }
   }
 
   async flushNow(): Promise<FlushResult> {
