@@ -124,7 +124,7 @@ function setDevice(id: string) {
 
 // The default device is '' here, matching how the DO keys its rows.
 const deviceOptions = computed(() => {
-  const opts = project.devices.map((d) => ({ value: d.is_default ? '' : d.id, label: d.name }));
+  const opts = project.listedDevices.map((d) => ({ value: d.is_default ? '' : d.id, label: d.name }));
   const pinned = layout.value.device;
   if (pinned && !opts.some((o) => o.value === pinned)) opts.push({ value: pinned, label: 'Deleted device' });
   return opts;

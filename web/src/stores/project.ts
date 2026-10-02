@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { api } from '../api';
 import { GRID_COLUMNS } from '../builder/grid';
 import type {
@@ -19,6 +19,7 @@ import type {
   Layout,
   ShareState,
   UserToken,
+  DeviceState,
 } from '../types';
 
 export const useProjectStore = defineStore('project', () => {
@@ -27,6 +28,9 @@ export const useProjectStore = defineStore('project', () => {
   const projectTokens = ref<ProjectToken[]>([]);
   const devices = ref<Device[]>([]);
   const firmware = ref<Firmware[]>([]);
+  // The default device only catches keyless traffic; list it once something lands there.
+  const deviceState = ref<Record<string, DeviceState['variables']>>({});
+  const listedDevices = computed(() => devices.value.filter((d) => !d.is_default || d.variables > 0));
   const dashboards = ref<DashboardMeta[]>([]);
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
@@ -76,6 +80,14 @@ export const useProjectStore = defineStore('project', () => {
       `/v1/admin/projects/${currentProjectId.value}/devices`
     );
     devices.value = data.devices;
+  }
+
+  async function loadDeviceState(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ state: DeviceState[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/devices/state`
+    );
+    deviceState.value = Object.fromEntries(data.state.map((d) => [d.id, d.variables]));
   }
 
   async function loadFirmware(): Promise<void> {
@@ -429,6 +441,8 @@ export const useProjectStore = defineStore('project', () => {
     currentProjectId,
     variables,
     devices,
+    listedDevices,
+    deviceState,
     firmware,
     projectTokens,
     dashboards,
@@ -444,6 +458,7 @@ export const useProjectStore = defineStore('project', () => {
     assignFirmware,
     renameDevice,
     forgetDevice,
+    loadDeviceState,
     loadVariables,
     createVariable,
     updateVariable,

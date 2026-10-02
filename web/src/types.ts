@@ -80,7 +80,13 @@ export type Device = {
   last_seen: number | null;
   desired_firmware_id: string | null;
   ota_status: string | null;
+  ota_updated_at: number | null;
+  ota_attempts: number;
+  variables: number;
 };
+
+export type DeviceReading = { value: unknown; received_at: number };
+export type DeviceState = { id: string; name: string; variables: Record<string, DeviceReading> };
 
 export type Firmware = {
   id: string;
