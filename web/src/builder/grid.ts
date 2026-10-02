@@ -20,5 +20,6 @@ export function normalizeLayout(layout: Layout): Layout {
     }),
     ...(layout.mobile !== undefined ? { mobile: layout.mobile } : {}),
     ...(layout.refresh !== undefined ? { refresh: layout.refresh } : {}),
+    ...(layout.device !== undefined ? { device: layout.device } : {}),
   };
 }

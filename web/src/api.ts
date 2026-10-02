@@ -47,6 +47,36 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
 }
 
+async function requestBytes(path: string): Promise<ArrayBuffer> {
+  progress.start();
+  try {
+    const res = await fetch(path, { credentials: 'include' });
+    if (res.status === 401) unauthorizedHandler?.();
+    if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null));
+    return await res.arrayBuffer();
+  } finally {
+    progress.done();
+  }
+}
+
+// The browser sets content-type (with the boundary) itself, so this can't go
+// through request(), which always sends JSON.
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  progress.start();
+  try {
+    const res = await fetch(path, { method: 'POST', body: form, credentials: 'include' });
+
+    if (res.status === 401) unauthorizedHandler?.();
+    if (res.status === 204) return undefined as T;
+
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, payload);
+    return payload as T;
+  } finally {
+    progress.done();
+  }
+}
+
 // Collapse concurrent identical GETs into one network request — e.g. two
 // components mounting at once both calling the same loader. The promise is shared
 // while in flight and dropped as soon as it settles, so this is a dedup of
@@ -63,7 +93,9 @@ function getDeduped<T>(path: string): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => getDeduped<T>(path),
+  bytes: (path: string) => requestBytes(path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  upload: <T>(path: string, form: FormData) => upload<T>(path, form),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),

@@ -107,6 +107,7 @@ async function init() {
   if (!project.currentProjectId) return;
   await Promise.all([
     project.variables.length ? Promise.resolve() : project.loadVariables(),
+    project.devices.length ? Promise.resolve() : project.loadDevices(),
     project.loadIntegrations(),
   ]);
 

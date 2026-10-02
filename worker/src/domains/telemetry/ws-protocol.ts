@@ -5,6 +5,7 @@ import { parseTelemetryBody } from './validate';
 import type { IngestPoint } from '../../platform/durable-objects/project-do';
 
 export type DeviceMessage =
+  | { kind: 'hello'; device: string; chip?: string; firmware?: string }
   | { kind: 'ack'; ids: string[] }
   | { kind: 'telemetry'; points: IngestPoint[] }
   | { kind: 'event'; event: string; payload?: Record<string, unknown> }
@@ -24,6 +25,13 @@ export function parseDeviceMessage(raw: string): DeviceMessage {
   const m = msg as Record<string, unknown>;
 
   switch (m.type) {
+    case 'hello': {
+      const device = typeof m.device === 'string' ? m.device.trim() : '';
+      if (!device) return { kind: 'ignore' };
+      const chip = typeof m.chip === 'string' ? m.chip.slice(0, 32) : undefined;
+      const firmware = typeof m.firmware === 'string' ? m.firmware.slice(0, 32) : undefined;
+      return { kind: 'hello', device, ...(chip ? { chip } : {}), ...(firmware ? { firmware } : {}) };
+    }
     case 'ack': {
       const ids = Array.isArray(m.ids) ? m.ids.filter((x): x is string => typeof x === 'string') : [];
       return { kind: 'ack', ids };

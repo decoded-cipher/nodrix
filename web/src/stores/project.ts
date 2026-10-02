@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { api } from '../api';
 import { GRID_COLUMNS } from '../builder/grid';
 import type {
@@ -8,6 +8,8 @@ import type {
   AutomationGraph,
   Dashboard,
   DashboardMeta,
+  Device,
+  Firmware,
   Variable,
   ProjectToken,
   ProjectTokenWithSecret,
@@ -17,12 +19,18 @@ import type {
   Layout,
   ShareState,
   UserToken,
+  DeviceState,
 } from '../types';
 
 export const useProjectStore = defineStore('project', () => {
   const currentProjectId = ref<string | null>(null);
   const variables = ref<Variable[]>([]);
   const projectTokens = ref<ProjectToken[]>([]);
+  const devices = ref<Device[]>([]);
+  const firmware = ref<Firmware[]>([]);
+  // The default device only catches keyless traffic; list it once something lands there.
+  const deviceState = ref<Record<string, DeviceState['variables']>>({});
+  const listedDevices = computed(() => devices.value.filter((d) => !d.is_default || d.variables > 0));
   const dashboards = ref<DashboardMeta[]>([]);
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
@@ -42,6 +50,8 @@ export const useProjectStore = defineStore('project', () => {
       automations.value = [];
       integrations.value = [];
       projectTokens.value = [];
+      devices.value = [];
+      firmware.value = [];
     }
     currentProjectId.value = projectId;
     await Promise.all([loadVariables(), loadDashboards()]);
@@ -62,6 +72,66 @@ export const useProjectStore = defineStore('project', () => {
       `/v1/admin/projects/${currentProjectId.value}/variables`
     );
     variables.value = data.variables;
+  }
+
+  async function loadDevices(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ devices: Device[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/devices`
+    );
+    devices.value = data.devices;
+  }
+
+  async function loadDeviceState(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ state: DeviceState[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/devices/state`
+    );
+    deviceState.value = Object.fromEntries(data.state.map((d) => [d.id, d.variables]));
+  }
+
+  async function loadFirmware(): Promise<void> {
+    if (!currentProjectId.value) return;
+    const data = await api.get<{ firmware: Firmware[] }>(
+      `/v1/admin/projects/${currentProjectId.value}/firmware`
+    );
+    firmware.value = data.firmware;
+  }
+
+  async function uploadFirmware(form: FormData): Promise<void> {
+    const pid = requireProjectId();
+    await api.upload(`/v1/admin/projects/${pid}/firmware`, form);
+    await loadFirmware();
+  }
+
+  async function deleteFirmware(id: string): Promise<void> {
+    const pid = requireProjectId();
+    await api.del(`/v1/admin/projects/${pid}/firmware/${id}`);
+    firmware.value = firmware.value.filter((f) => f.id !== id);
+    await loadDevices();
+  }
+
+  async function assignFirmware(deviceId: string, firmwareId: string | null): Promise<void> {
+    const pid = requireProjectId();
+    await api.put(`/v1/admin/projects/${pid}/firmware/assign/${deviceId}`, { firmware_id: firmwareId });
+    await loadDevices();
+  }
+
+  async function renameDevice(id: string, name: string): Promise<void> {
+    const pid = requireProjectId();
+    const { device } = await api.patch<{ device: Device }>(
+      `/v1/admin/projects/${pid}/devices/${id}`,
+      { name }
+    );
+    devices.value = devices.value.map((d) => (d.id === id ? device : d));
+  }
+
+  async function forgetDevice(id: string): Promise<void> {
+    const pid = requireProjectId();
+    await api.del(`/v1/admin/projects/${pid}/devices/${id}`);
+    devices.value = devices.value.filter((d) => d.id !== id);
+    // Its variables went with it.
+    await loadVariables();
   }
 
   async function createVariable(input: { key: string; unit?: string | null }): Promise<Variable> {
@@ -370,6 +440,10 @@ export const useProjectStore = defineStore('project', () => {
   return {
     currentProjectId,
     variables,
+    devices,
+    listedDevices,
+    deviceState,
+    firmware,
     projectTokens,
     dashboards,
     tokens,
@@ -377,6 +451,14 @@ export const useProjectStore = defineStore('project', () => {
     integrations,
     pendingAutomation,
     switchTo,
+    loadDevices,
+    loadFirmware,
+    uploadFirmware,
+    deleteFirmware,
+    assignFirmware,
+    renameDevice,
+    forgetDevice,
+    loadDeviceState,
     loadVariables,
     createVariable,
     updateVariable,

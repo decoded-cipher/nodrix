@@ -14,6 +14,12 @@ export const TRIGGER_CATALOG = [
     fields: [
       { key: 'variable', label: 'Variable', type: 'variable', required: true },
       {
+        key: 'device',
+        label: 'Device',
+        type: 'device',
+        hint: 'Leave as any device to fire whichever board reports it.',
+      },
+      {
         key: 'operator',
         label: 'Condition',
         type: 'select',

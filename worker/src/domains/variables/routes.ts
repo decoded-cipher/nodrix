@@ -6,6 +6,7 @@ import { newId } from '../../platform/lib/ids';
 import { generateToken } from '../../platform/lib/tokens';
 import { recordAudit } from '../../platform/lib/audit';
 import { projectStub } from '../../platform/durable-objects/stubs';
+import { storageIdOf } from '../devices/service';
 import { createVariable, updateVariable, listVariables } from './service';
 import { actorFromSession, serviceErrorResponse } from '../../platform/lib/service';
 
@@ -59,13 +60,15 @@ variables.delete('/:id', async (c) => {
   const id = c.req.param('id');
 
   const v = await c.env.DB
-    .prepare(`SELECT key FROM project_variables WHERE id = ? AND project_id = ?`)
+    .prepare(`SELECT key, device_id FROM project_variables WHERE id = ? AND project_id = ?`)
     .bind(id, project.id)
-    .first<{ key: string }>();
+    .first<{ key: string; device_id: string }>();
   if (!v) return c.json({ error: 'not_found' }, 404);
 
   try {
-    await projectStub(c.env, project.id).deleteVariable(v.key);
+    // Scoped, or deleting one device's copy would clear the key on all of them.
+    const storageId = await storageIdOf(c.env, project.id, v.device_id);
+    await projectStub(c.env, project.id).deleteVariable(v.key, storageId);
   } catch (e) {
     console.error('variable hot-state delete failed', id, e);
   }
