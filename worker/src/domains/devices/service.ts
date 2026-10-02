@@ -17,6 +17,9 @@ export type DeviceSummary = {
   last_seen: number | null;
   desired_firmware_id: string | null;
   ota_status: string | null;
+  ota_updated_at: number | null;
+  ota_attempts: number;
+  variables: number;
 };
 
 const MAX_DEVICES_PER_PROJECT = 100;
@@ -129,7 +132,8 @@ export async function listDevices(env: Env, projectId: string): Promise<DeviceSu
   const rows = await env.DB
     .prepare(
       `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen,
-              desired_firmware_id, ota_status
+              desired_firmware_id, ota_status, ota_updated_at, ota_attempts,
+              (SELECT COUNT(*) FROM project_variables v WHERE v.device_id = devices.id) AS variables
          FROM devices WHERE project_id = ? ORDER BY is_default DESC, name ASC`
     )
     .bind(projectId)
@@ -155,7 +159,8 @@ export async function renameDevice(
   const row = await env.DB
     .prepare(
       `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen,
-              desired_firmware_id, ota_status
+              desired_firmware_id, ota_status, ota_updated_at, ota_attempts,
+              (SELECT COUNT(*) FROM project_variables v WHERE v.device_id = devices.id) AS variables
          FROM devices WHERE id = ?`
     )
     .bind(id)

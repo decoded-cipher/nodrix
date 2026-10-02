@@ -4,6 +4,7 @@ import { requireSession } from '../../platform/middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../../platform/middleware/resolve-project';
 import { recordAudit } from '../../platform/lib/audit';
 import { listDevices, renameDevice, forgetDevice } from './service';
+import { getState } from '../variables/service';
 import { actorFromSession, serviceErrorResponse } from '../../platform/lib/service';
 
 const devices = new Hono<{ Bindings: Env; Variables: ProjectContextVars }>();
@@ -14,6 +15,11 @@ devices.use('*', resolveProject);
 devices.get('/', async (c) => {
   const project = c.get('project');
   return c.json({ devices: await listDevices(c.env, project.id) });
+});
+
+devices.get('/state', async (c) => {
+  const project = c.get('project');
+  return c.json({ state: await getState(c.env, project.id) });
 });
 
 devices.patch('/:id', async (c) => {
