@@ -6,7 +6,7 @@ import { newId } from '../../platform/lib/ids';
 import { chunk, MAX_BOUND_PARAMS } from '../../platform/lib/sql';
 
 // Bounds variable growth from a device that spams fresh keys.
-const MAX_VARIABLES_PER_PROJECT = 250;
+export const MAX_VARIABLES_PER_PROJECT = 250;
 
 // In-isolate throttle so a chatty device doesn't rewrite last_seen on every ingest.
 const LAST_SEEN_THROTTLE_MS = 60_000;
