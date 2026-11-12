@@ -11,16 +11,21 @@ export const MAX_VARIABLES_PER_PROJECT = 250;
 // In-isolate throttle so a chatty device doesn't rewrite last_seen on every ingest.
 const LAST_SEEN_THROTTLE_MS = 60_000;
 const lastSeenWrites = new Map<string, number>();
+let lastPruneMs = 0;
 
 function dueForLastSeen(projectId: string, key: string, nowMs: number): boolean {
   const k = `${projectId}:${key}`;
   const prev = lastSeenWrites.get(k);
   if (prev !== undefined && nowMs - prev < LAST_SEEN_THROTTLE_MS) return false;
   lastSeenWrites.set(k, nowMs);
-  if (lastSeenWrites.size > 10_000) {
+  // Prune at most every 10s, and drop the whole map if it still grows past the
+  // hard cap (worst case is one extra last_seen write per key).
+  if (lastSeenWrites.size > 10_000 && nowMs - lastPruneMs > 10_000) {
+    lastPruneMs = nowMs;
     const cutoff = nowMs - LAST_SEEN_THROTTLE_MS;
     for (const [mk, t] of lastSeenWrites) if (t < cutoff) lastSeenWrites.delete(mk);
   }
+  if (lastSeenWrites.size > 50_000) lastSeenWrites.clear();
   return true;
 }
 
