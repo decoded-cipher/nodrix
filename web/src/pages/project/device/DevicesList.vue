@@ -140,16 +140,41 @@ async function forget(d: Device) {
   const ok = await confirm({
     title: `Forget ${d.name}?`,
     message: 'Its variables and recent history go with it.',
-    details: [
-      'Telemetry already archived is kept.',
-      'A dashboard reading this device needs one picked again.',
-      'The board reappears here if it reports again, as a new device.',
-    ],
+    details: d.is_default
+      ? [
+          'Telemetry already archived is kept.',
+          'Dashboards and automations stay, waiting for the next board.',
+          'The next board to connect takes its place.',
+        ]
+      : [
+          'Telemetry already archived is kept.',
+          'A dashboard reading this device needs one picked again.',
+          'The board reappears here if it reports again, as a new device.',
+        ],
     confirmLabel: 'Forget',
   });
   if (!ok) return;
   try {
     await project.forgetDevice(d.id);
+  } catch (e) {
+    toast.error((e as Error).message);
+  }
+}
+
+async function makeMain(d: Device) {
+  const main = project.devices.find((x) => x.is_default);
+  const ok = await confirm({
+    title: `Use ${d.name} as the main board?`,
+    message: `It takes over from ${main?.name ?? 'the main board'}: its variables, dashboards and automations.`,
+    details: [
+      `${d.name}'s own variables and recent history are dropped.`,
+      'For replacing a board: flash the new one, then do this.',
+    ],
+    confirmLabel: 'Use as main board',
+  });
+  if (!ok) return;
+  try {
+    await project.useAsMainBoard(d.id);
   } catch (e) {
     toast.error((e as Error).message);
   }
@@ -194,7 +219,7 @@ async function forget(d: Device) {
                     :title="d.chip ?? ''"
                   >{{ family(d.chip) }}</span>
                   <span
-                    v-if="d.is_default"
+                    v-if="d.is_default && !d.claimed"
                     class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
                     title="Requests that don't name a device land here"
                   >Default</span>
@@ -275,6 +300,16 @@ async function forget(d: Device) {
               <button
                 v-if="!d.is_default"
                 type="button"
+                aria-label="Use as main board"
+                title="Use as main board"
+                class="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                @click="makeMain(d)"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+              </button>
+              <span v-else class="h-7 w-7" aria-hidden="true" />
+              <button
+                type="button"
                 aria-label="Forget device"
                 title="Forget device"
                 class="rounded-md p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
@@ -282,7 +317,6 @@ async function forget(d: Device) {
               >
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
               </button>
-              <span v-else class="h-7 w-7" aria-hidden="true" />
               </template>
             </div>
           </td>

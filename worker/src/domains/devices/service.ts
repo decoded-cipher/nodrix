@@ -4,8 +4,9 @@ import { ServiceError } from '../../platform/lib/service';
 import { projectStub } from '../../platform/durable-objects/stubs';
 
 // storageId is '' for the default device — the DO keys rows by it, so pre-devices
-// rows need no backfill.
-export type ResolvedDevice = { id: string; storageId: string };
+// rows need no backfill. keyed: the request named this device, rather than falling
+// back to the default.
+export type ResolvedDevice = { id: string; storageId: string; keyed: boolean };
 
 export type DeviceSummary = {
   id: string;
@@ -19,13 +20,14 @@ export type DeviceSummary = {
   ota_status: string | null;
   ota_updated_at: number | null;
   ota_attempts: number;
+  claimed: number;
   variables: number;
 };
 
 const MAX_DEVICES_PER_PROJECT = 100;
 const MAX_DEVICE_KEY_LEN = 64;
 
-const resolved = new Map<string, string>();
+const resolved = new Map<string, ResolvedDevice>();
 
 export function forgetCachedDevice(projectId: string, deviceKey?: string | null) {
   resolved.delete(cacheKey(projectId, deviceKey ?? null));
@@ -46,13 +48,21 @@ export function normaliseDeviceKey(raw: string | null | undefined): string | nul
 
 export async function defaultDeviceId(env: Env, projectId: string): Promise<string | null> {
   const cached = resolved.get(cacheKey(projectId, null));
-  if (cached) return cached;
+  if (cached) return cached.id;
   const row = await env.DB
     .prepare(`SELECT id FROM devices WHERE project_id = ? AND is_default = 1`)
     .bind(projectId)
     .first<{ id: string }>();
-  if (row) resolved.set(cacheKey(projectId, null), row.id);
+  if (row) resolved.set(cacheKey(projectId, null), { id: row.id, storageId: '', keyed: false });
   return row?.id ?? null;
+}
+
+async function deviceByKey(env: Env, projectId: string, deviceKey: string): Promise<ResolvedDevice | null> {
+  const row = await env.DB
+    .prepare(`SELECT id, is_default FROM devices WHERE project_id = ? AND device_key = ?`)
+    .bind(projectId, deviceKey)
+    .first<{ id: string; is_default: number }>();
+  return row ? { id: row.id, storageId: row.is_default ? '' : row.id, keyed: true } : null;
 }
 
 // The migration only covers projects that already existed.
@@ -66,6 +76,7 @@ export function createDefaultDevice(env: Env, projectId: string, now: number) {
 }
 
 // Created on first sight; a board that names nothing lands on the default device.
+// The first board of a project takes over the default device instead of a new row.
 export async function resolveDevice(
   env: Env,
   projectId: string,
@@ -74,19 +85,32 @@ export async function resolveDevice(
 ): Promise<ResolvedDevice | null> {
   if (!deviceKey) {
     const id = await defaultDeviceId(env, projectId);
-    return id ? { id, storageId: '' } : null;
+    return id ? { id, storageId: '', keyed: false } : null;
   }
 
   const cached = resolved.get(cacheKey(projectId, deviceKey));
-  if (cached) return { id: cached, storageId: cached };
+  if (cached) return cached;
 
-  const existing = await env.DB
-    .prepare(`SELECT id FROM devices WHERE project_id = ? AND device_key = ?`)
-    .bind(projectId, deviceKey)
-    .first<{ id: string }>();
+  const existing = await deviceByKey(env, projectId, deviceKey);
   if (existing) {
-    resolved.set(cacheKey(projectId, deviceKey), existing.id);
-    return { id: existing.id, storageId: existing.id };
+    resolved.set(cacheKey(projectId, deviceKey), existing);
+    return existing;
+  }
+
+  const claim = await env.DB
+    .prepare(
+      `UPDATE devices
+          SET device_key = ?, name = CASE WHEN name = 'Default' THEN ? ELSE name END,
+              first_seen = COALESCE(first_seen, ?), last_seen = ?
+        WHERE project_id = ? AND is_default = 1 AND device_key IS NULL
+          AND NOT EXISTS (SELECT 1 FROM devices WHERE project_id = ? AND is_default = 0)`
+    )
+    .bind(deviceKey, deviceKey, now, now, projectId, projectId)
+    .run();
+  if (claim.meta.changes > 0) {
+    const mine = await deviceByKey(env, projectId, deviceKey);
+    if (mine) resolved.set(cacheKey(projectId, deviceKey), mine);
+    return mine;
   }
 
   const count = await env.DB
@@ -95,7 +119,7 @@ export async function resolveDevice(
     .first<{ n: number }>();
   if ((count?.n ?? 0) >= MAX_DEVICES_PER_PROJECT) {
     const id = await defaultDeviceId(env, projectId);
-    return id ? { id, storageId: '' } : null;
+    return id ? { id, storageId: '', keyed: false } : null;
   }
 
   const id = newId('device');
@@ -109,13 +133,9 @@ export async function resolveDevice(
     .run();
 
   // A concurrent isolate may have won the insert, so read back the id that stuck.
-  const settled = await env.DB
-    .prepare(`SELECT id FROM devices WHERE project_id = ? AND device_key = ?`)
-    .bind(projectId, deviceKey)
-    .first<{ id: string }>();
-  if (!settled) return null;
-  resolved.set(cacheKey(projectId, deviceKey), settled.id);
-  return { id: settled.id, storageId: settled.id };
+  const settled = await deviceByKey(env, projectId, deviceKey);
+  if (settled) resolved.set(cacheKey(projectId, deviceKey), settled);
+  return settled;
 }
 
 // DO storage calls the default device '', so a D1 id passed straight through
@@ -133,6 +153,7 @@ export async function listDevices(env: Env, projectId: string): Promise<DeviceSu
     .prepare(
       `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen,
               desired_firmware_id, ota_status, ota_updated_at, ota_attempts,
+              device_key IS NOT NULL AS claimed,
               (SELECT COUNT(*) FROM project_variables v WHERE v.device_id = devices.id) AS variables
          FROM devices WHERE project_id = ? ORDER BY is_default DESC, name ASC`
     )
@@ -160,6 +181,7 @@ export async function renameDevice(
     .prepare(
       `SELECT id, name, chip, firmware_version, is_default, first_seen, last_seen,
               desired_firmware_id, ota_status, ota_updated_at, ota_attempts,
+              device_key IS NOT NULL AS claimed,
               (SELECT COUNT(*) FROM project_variables v WHERE v.device_id = devices.id) AS variables
          FROM devices WHERE id = ?`
     )
@@ -168,22 +190,55 @@ export async function renameDevice(
   return row!;
 }
 
+const RESET_DEFAULT = `UPDATE devices
+   SET device_key = NULL, name = 'Default', chip = NULL, firmware_version = NULL,
+       first_seen = NULL, last_seen = NULL, desired_firmware_id = NULL,
+       ota_status = NULL, ota_updated_at = NULL, ota_attempts = 0
+ WHERE id = ?`;
+
 // R2 history stays readable without the row — the device is named in each row.
+// The default device can't go, so forgetting it resets it for the next board.
 export async function forgetDevice(env: Env, projectId: string, id: string): Promise<void> {
   const row = await env.DB
     .prepare(`SELECT is_default, device_key FROM devices WHERE id = ? AND project_id = ?`)
     .bind(id, projectId)
     .first<{ is_default: number; device_key: string | null }>();
   if (!row) throw new ServiceError('not_found', 'no such device', 'unknown_device');
-  if (row.is_default) {
-    throw new ServiceError('conflict', 'the default device cannot be forgotten', 'default_device');
-  }
 
   await env.DB.batch([
     env.DB.prepare(`DELETE FROM project_variables WHERE device_id = ?`).bind(id),
-    env.DB.prepare(`DELETE FROM devices WHERE id = ? AND project_id = ?`).bind(id, projectId),
+    row.is_default
+      ? env.DB.prepare(RESET_DEFAULT).bind(id)
+      : env.DB.prepare(`DELETE FROM devices WHERE id = ? AND project_id = ?`).bind(id, projectId),
   ]);
-  forgetCachedDevice(projectId, row.device_key);
+  forgetCachedDevice(projectId);
+  await projectStub(env, projectId).deleteDevice(row.is_default ? '' : id);
+}
+
+// Replacement hardware: the board takes over the default device, so everything
+// bound to it carries on. The board's own row and data go.
+export async function useAsMainBoard(env: Env, projectId: string, id: string): Promise<void> {
+  const board = await env.DB
+    .prepare(
+      `SELECT device_key, chip, firmware_version, last_seen FROM devices
+        WHERE id = ? AND project_id = ? AND is_default = 0 AND device_key IS NOT NULL`
+    )
+    .bind(id, projectId)
+    .first<{ device_key: string; chip: string | null; firmware_version: string | null; last_seen: number | null }>();
+  if (!board) throw new ServiceError('not_found', 'no such board', 'unknown_device');
+
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM project_variables WHERE device_id = ?`).bind(id),
+    env.DB.prepare(`DELETE FROM devices WHERE id = ?`).bind(id),
+    env.DB
+      .prepare(
+        `UPDATE devices SET device_key = ?, chip = ?, firmware_version = ?, last_seen = ?,
+                first_seen = COALESCE(first_seen, ?)
+          WHERE project_id = ? AND is_default = 1`
+      )
+      .bind(board.device_key, board.chip, board.firmware_version, board.last_seen, board.last_seen, projectId),
+  ]);
+  forgetCachedDevice(projectId);
   await projectStub(env, projectId).deleteDevice(id);
 }
 

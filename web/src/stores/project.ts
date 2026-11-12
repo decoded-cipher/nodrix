@@ -28,9 +28,11 @@ export const useProjectStore = defineStore('project', () => {
   const projectTokens = ref<ProjectToken[]>([]);
   const devices = ref<Device[]>([]);
   const firmware = ref<Firmware[]>([]);
-  // The default device only catches keyless traffic; list it once something lands there.
   const deviceState = ref<Record<string, DeviceState['variables']>>({});
-  const listedDevices = computed(() => devices.value.filter((d) => !d.is_default || d.variables > 0));
+  // An unclaimed default device only catches keyless traffic; list it once something lands there.
+  const listedDevices = computed(() =>
+    devices.value.filter((d) => !d.is_default || d.claimed || d.variables > 0)
+  );
   const dashboards = ref<DashboardMeta[]>([]);
   const tokens = ref<UserToken[]>([]);
   const automations = ref<Automation[]>([]);
@@ -129,9 +131,14 @@ export const useProjectStore = defineStore('project', () => {
   async function forgetDevice(id: string): Promise<void> {
     const pid = requireProjectId();
     await api.del(`/v1/admin/projects/${pid}/devices/${id}`);
-    devices.value = devices.value.filter((d) => d.id !== id);
-    // Its variables went with it.
-    await loadVariables();
+    // Its variables went with it; the default device stays, reset.
+    await Promise.all([loadDevices(), loadVariables()]);
+  }
+
+  async function useAsMainBoard(id: string): Promise<void> {
+    const pid = requireProjectId();
+    await api.post(`/v1/admin/projects/${pid}/devices/${id}/main`, {});
+    await Promise.all([loadDevices(), loadVariables(), loadDeviceState()]);
   }
 
   async function createVariable(input: { key: string; unit?: string | null }): Promise<Variable> {
@@ -458,6 +465,7 @@ export const useProjectStore = defineStore('project', () => {
     assignFirmware,
     renameDevice,
     forgetDevice,
+    useAsMainBoard,
     loadDeviceState,
     loadVariables,
     createVariable,

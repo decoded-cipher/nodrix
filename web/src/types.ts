@@ -82,6 +82,7 @@ export type Device = {
   ota_status: string | null;
   ota_updated_at: number | null;
   ota_attempts: number;
+  claimed: number;
   variables: number;
 };
 

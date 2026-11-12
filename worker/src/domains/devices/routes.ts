@@ -3,7 +3,7 @@ import type { Env } from '../../env';
 import { requireSession } from '../../platform/middleware/require-session';
 import { resolveProject, type ProjectContextVars } from '../../platform/middleware/resolve-project';
 import { recordAudit } from '../../platform/lib/audit';
-import { listDevices, renameDevice, forgetDevice } from './service';
+import { listDevices, renameDevice, forgetDevice, useAsMainBoard } from './service';
 import { getState } from '../variables/service';
 import { actorFromSession, serviceErrorResponse } from '../../platform/lib/service';
 
@@ -37,6 +37,25 @@ devices.patch('/:id', async (c) => {
       metadata: { name: device.name },
     });
     return c.json({ device });
+  } catch (e) {
+    return serviceErrorResponse(c, e);
+  }
+});
+
+devices.post('/:id/main', async (c) => {
+  const project = c.get('project');
+  const id = c.req.param('id');
+  try {
+    await useAsMainBoard(c.env, project.id, id);
+    await recordAudit(c.env, {
+      projectId: project.id,
+      userId: c.get('user').id,
+      action: 'device.main',
+      targetType: 'device',
+      targetId: id,
+      metadata: { source: actorFromSession(c.get('user')).source },
+    });
+    return c.body(null, 204);
   } catch (e) {
     return serviceErrorResponse(c, e);
   }

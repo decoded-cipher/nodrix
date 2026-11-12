@@ -547,7 +547,7 @@ export class ProjectDO extends DurableObject<Env> {
         const pid = this.projectId();
         const key = normaliseDeviceKey(msg.device);
         const device = key ? await resolveDevice(this.env, pid, key, Math.floor(Date.now() / 1000)) : null;
-        if (!device || !device.storageId) return;
+        if (!device || !device.keyed) return;
         ws.serializeAttachment({ device: device.storageId });
         // Boards don't check for updates on connect; they wait for this nudge.
         this.ctx.waitUntil(
