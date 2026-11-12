@@ -1,5 +1,5 @@
 import type { IntegrationResult } from '../index';
-import { interpolate } from '../index';
+import { interpolate, jsonEscape } from '../index';
 import { doFetch, hmacHex, str, strRecord } from '../lib';
 
 export async function runHttpService(
@@ -14,11 +14,14 @@ export async function runHttpService(
   const init: RequestInit = { method, headers };
 
   if (method !== 'GET' && method !== 'HEAD') {
-    const template = str(config.body_template);
-    init.body = template ? interpolate(template, body) : JSON.stringify(body);
     if (!Object.keys(headers).some((k) => k.toLowerCase() === 'content-type')) {
       headers['content-type'] = 'application/json';
     }
+    const contentType = Object.entries(headers).find(([k]) => k.toLowerCase() === 'content-type')?.[1] ?? '';
+    const template = str(config.body_template);
+    init.body = template
+      ? interpolate(template, body, contentType.includes('json') ? jsonEscape : undefined)
+      : JSON.stringify(body);
   }
 
   // Optional HMAC signing so the receiver can verify the payload came from Nodrix.
