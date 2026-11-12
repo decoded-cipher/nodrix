@@ -11,11 +11,17 @@ const router = useRouter();
 const route = useRoute();
 
 // Post-login destination. Used by the OAuth consent flow (/authorize bounces
-// here when no session). Same-origin relative paths only — guards open redirect.
+// here when no session). Resolved with the browser's URL parser so only
+// same-origin targets are followed.
 const redirectTarget = computed(() => {
   const r = route.query['redirect'];
-  const path = typeof r === 'string' ? r : '';
-  return path.startsWith('/') && !path.startsWith('//') ? path : '';
+  if (typeof r !== 'string' || !r.startsWith('/')) return '';
+  try {
+    const u = new URL(r, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : '';
+  } catch {
+    return '';
+  }
 });
 
 // Bootstrap detection: ask the worker how many users exist so we can show
