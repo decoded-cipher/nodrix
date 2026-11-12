@@ -203,13 +203,10 @@ export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionCont
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
-      // Auto-link OAuth signins to an existing user with the same email.
-      // requireLocalEmailVerified:false is REQUIRED: nodrix has no email-
-      // verification flow, and without it account-linking 401s an existing
-      // email/password user signing in via Google.
+      // Auto-link OAuth sign-ins to an existing user with the same email, but
+      // only when the provider reports that email as verified.
       accountLinking: {
         enabled: true,
-        trustedProviders: ['google', 'github'],
         requireLocalEmailVerified: false,
       },
     },
