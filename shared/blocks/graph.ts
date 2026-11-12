@@ -90,7 +90,12 @@ export function serializeTriggerKinds(graph: AutomationGraph): string {
 // Enforces known node kinds, edges referencing real nodes, and DAG (no cycles) —
 // the executor relies on acyclicity for its bounded traversal. An empty/triggerless
 // graph is allowed (a draft that simply never fires).
+const MAX_NODES = 200;
+const MAX_GRAPH_BYTES = 64 * 1024;
+
 export function graphError(graph: AutomationGraph): string | null {
+  if (graph.nodes.length > MAX_NODES) return `Too many blocks (max ${MAX_NODES})`;
+  if (JSON.stringify(graph).length > MAX_GRAPH_BYTES) return 'Automation is too large';
   const ids = new Set(graph.nodes.map((n) => n.id));
   for (const n of graph.nodes) {
     if (!VALID_TRIGGER_KINDS.has(n.kind) && !VALID_ACTION_KINDS.has(n.kind) && !VALID_CONDITION_KINDS.has(n.kind)) {

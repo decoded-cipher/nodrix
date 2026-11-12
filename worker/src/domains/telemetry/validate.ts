@@ -63,3 +63,12 @@ export function parseTelemetryBody(body: unknown): TelemetryParseResult {
   }
   return { ok: true, points };
 }
+
+// Event names and payloads are stored with delayed automations and sent to
+// integrations, so they are bounded too.
+export const MAX_EVENT_NAME = 128;
+export const MAX_EVENT_PAYLOAD_BYTES = 16 * 1024;
+
+export function eventPayloadTooLarge(payload: unknown): boolean {
+  return payload !== undefined && JSON.stringify(payload).length > MAX_EVENT_PAYLOAD_BYTES;
+}
