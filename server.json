@@ -3,7 +3,7 @@
   "name": "live.nodrix/nodrix",
   "title": "nodrix",
   "description": "Read live and historical IoT telemetry and actuate ESP32/Arduino hardware from a backend you host.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "websiteUrl": "https://nodrix.live",
   "repository": {
     "url": "https://github.com/decoded-cipher/nodrix",
