@@ -2,12 +2,11 @@ import { Hono } from 'hono';
 import type { Env } from '../../env';
 import { findOpenInviteByToken } from '../../platform/lib/invites';
 import { buildAuth } from '../../platform/auth';
+import { clientKey, overLimit } from '../../platform/middleware/rate-limit';
 
 // Public invite endpoints (no session) — used by the /invite/<token> accept page.
-// Account creation goes through Better Auth's signUpEmail; the create-gate finds
-// the invite by email, authorizes it, and applies its instance role; the
-// after-hook then deletes the consumed invite. Projects are assigned later from
-// the Users page.
+// The token is verified here and the invite id is handed to the create-gate,
+// which applies the invite's role; the after-hook consumes the invite.
 
 const invite = new Hono<{ Bindings: Env }>();
 
@@ -33,6 +32,9 @@ invite.get('/:token', async (c) => {
 // On success, returns the Better Auth sign-up response WITH the session cookie,
 // so the invitee is signed in immediately.
 invite.post('/accept', async (c) => {
+  if (await overLimit(c.env, `invite:${clientKey(c.req.raw)}`, 10, 60)) {
+    return c.json({ error: 'too_many_requests' }, 429);
+  }
   const body = await c.req.json<{ token?: string; password?: string; name?: string | null }>();
   const token = (body.token ?? '').trim();
   const password = body.password ?? '';
@@ -43,14 +45,15 @@ invite.post('/accept', async (c) => {
 
   const name = (body.name ?? '').trim() || row.email.split('@')[0]!;
   try {
-    const auth = await buildAuth(c.env, c.req.raw);
+    const auth = await buildAuth(c.env, c.req.raw, c.executionCtx, { inviteId: row.id });
     // asResponse → carries the Set-Cookie session so the SPA is logged in.
     return await auth.api.signUpEmail({
       body: { email: row.email, password, name },
       asResponse: true,
     });
   } catch (e) {
-    return c.json({ error: 'signup_failed', reason: (e as Error).message }, 400);
+    console.error(`[invite] accept failed: ${(e as Error).message}`);
+    return c.json({ error: 'signup_failed' }, 400);
   }
 });
 

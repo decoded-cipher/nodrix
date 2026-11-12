@@ -13,7 +13,7 @@ import * as schema from './schema';
 import { recordAudit } from '../lib/audit';
 import { decryptSecret } from '../lib/crypto';
 import { getOrCreateSigningSecret } from '../lib/auth-secret';
-import { findOpenInviteByEmail, consumeInvite } from '../lib/invites';
+import { findOpenInviteByEmail, findOpenInviteById, consumeInvite } from '../lib/invites';
 import { hashPassword as pbkdf2Hash, verifyPassword as pbkdf2Verify } from '../lib/password';
 import { authRateLimit } from '../middleware/rate-limit';
 import { sendInstall } from '../lib/usage-stats';
@@ -96,7 +96,12 @@ async function loadProviders(env: Env, signingSecret: string): Promise<SocialPro
 // localhost, *.workers.dev, and custom domains with no env var to set.
 // The signing secret is generated on first boot and persisted in
 // deployment_settings — see lib/auth-secret.ts.
-export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionContext) {
+export async function buildAuth(
+  env: Env,
+  request?: Request,
+  ctx?: ExecutionContext,
+  opts: { inviteId?: string } = {},
+) {
   const signingSecret = await getOrCreateSigningSecret(env);
   const socialProviders = await loadProviders(env, signingSecret);
   const db = drizzle(env.DB, { schema });
@@ -227,11 +232,9 @@ export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionCont
     databaseHooks: {
       user: {
         create: {
-          // Account creation is gated here for ALL paths (email/password,
-          // OAuth first sign-in, and server-side direct-create) — OAuth's
-          // createOAuthUser runs these hooks too. After bootstrap, creation is
-          // invite-only: an open invite must exist for the email. Role + verified
-          // status are assigned from the invite (or owner on bootstrap).
+          // Account creation is gated here for ALL paths. After bootstrap it is
+          // invite-only: either the token-verified accept route passes the
+          // invite id, or an OAuth provider vouches for the invited email.
           before: async (user) => {
             const existing = await env.DB
               .prepare(`SELECT 1 AS one FROM users LIMIT 1`)
@@ -241,15 +244,19 @@ export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionCont
               return { data: { ...user, role: 'owner', emailVerified: true } };
             }
             const email = String((user as { email?: string }).email ?? '').toLowerCase();
-            const invite = email ? await findOpenInviteByEmail(env, email) : null;
-            if (!invite) {
+            const invite = !email
+              ? null
+              : opts.inviteId
+                ? await findOpenInviteById(env, opts.inviteId)
+                : (user as { emailVerified?: boolean }).emailVerified === true
+                  ? await findOpenInviteByEmail(env, email)
+                  : null;
+            if (!invite || invite.email !== email) {
               throw new APIError('FORBIDDEN', {
                 message: 'Registration is invite-only on this deployment.',
                 code: 'REGISTRATION_CLOSED',
               });
             }
-            // Invites only carry the instance role; project assignment happens
-            // later from the Users page.
             return { data: { ...user, role: invite.instance_role, emailVerified: true } };
           },
           after: async (user) => {
@@ -268,7 +275,9 @@ export async function buildAuth(env: Env, request?: Request, ctx?: ExecutionCont
             // the before-hook. Bootstrap owner has no invite → no-op.
             const email = (user.email ?? '').toLowerCase();
             if (email) {
-              const invite = await findOpenInviteByEmail(env, email);
+              const invite = opts.inviteId
+                ? await findOpenInviteById(env, opts.inviteId)
+                : await findOpenInviteByEmail(env, email);
               if (invite) await consumeInvite(env, invite, user.id);
             }
             await recordAudit(env, {
