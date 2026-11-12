@@ -37,6 +37,7 @@ readSeries.get('/', async (c) =>
       const { window, points } = await getSeries(c.env, proj, key, c.req.query('window') ?? '1h');
       return c.json({ project: proj, variable: key, window, points });
     },
-    5
+    5,
+    { window: c.req.query('window') ?? '1h' }
   )
 );

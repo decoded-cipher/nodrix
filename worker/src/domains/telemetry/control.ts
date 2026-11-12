@@ -45,7 +45,10 @@ export async function controlWsHandler(c: Context<{ Bindings: Env }>): Promise<R
   // telemetry/events work even if this device never uses the HTTP ingest path.
   const stub = projectStub(c.env, row.project_id);
   await stub.setProjectId(row.project_id);
-  return stub.fetch(c.req.raw);
+  // Tag the socket with its token so revoking the token can close it.
+  const headers = new Headers(c.req.raw.headers);
+  headers.set('x-nodrix-token-id', row.id);
+  return stub.fetch(new Request(c.req.raw.url, { method: c.req.raw.method, headers }));
 }
 
 export default control;

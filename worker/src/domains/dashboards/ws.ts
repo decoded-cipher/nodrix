@@ -32,6 +32,7 @@ ws.get('/:dashboard', async (c) => {
   // DO can re-check project access per control frame (handles live removal).
   const headers = new Headers(c.req.raw.headers);
   headers.set('x-nodrix-uid', user.id);
+  headers.set('x-nodrix-sid', c.get('session').id);
   const fwd = new Request(c.req.raw.url, {
     method: c.req.raw.method,
     headers,

@@ -12,8 +12,8 @@ export class SchedulerDO extends DurableObject<Env> {
   // Recompute the soonest fire across schedule/sunset triggers and pending delay
   // resumes, and (re)arm the alarm — disarming when nothing is pending. Called on
   // automation create/update/delete, on each new delay, and after the alarm fires.
-  async reschedule(): Promise<void> {
-    const plan = await computeNextScheduled(this.env);
+  async reschedule(fromMs = Date.now()): Promise<void> {
+    const plan = await computeNextScheduled(this.env, fromMs);
     const delayAt = await nextDelayFireAt(this.env);
     await this.ctx.storage.put('plan', plan);
 
@@ -58,7 +58,9 @@ export class SchedulerDO extends DurableObject<Env> {
     } catch (e) {
       console.error('[scheduler] delay resume failed', e);
     }
-    await this.reschedule();
+    // Plan from when this alarm started, so instants that came due while the
+    // runs above were in flight still fire (late) instead of being skipped.
+    await this.reschedule(now);
   }
 }
 

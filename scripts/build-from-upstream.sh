@@ -117,6 +117,13 @@ done
 # 4. Restore user's wrangler.toml in case upstream had its own (which it does).
 cp "${WRANGLER_BACKUP}" wrangler.toml
 
+# 4a. Older carriers predate global_fetch_strictly_public; add it so Worker
+#     fetches to the deployment's own zone can't bypass Cloudflare's front door.
+if ! grep -q 'global_fetch_strictly_public' wrangler.toml; then
+  sed -i.bak 's/^compatibility_flags *= *\[\(.*\)\]/compatibility_flags = [\1, "global_fetch_strictly_public"]/' wrangler.toml
+  rm -f wrangler.toml.bak
+fi
+
 # 4b. Drop the nested deploy/ that the overlay just brought in. The clone root
 #     IS the deploy carrier; upstream's own deploy/ dir is dead weight here and
 #     would otherwise sit one level deep in the deployed tree. Safe to rm — it's
@@ -126,7 +133,8 @@ rm -rf ./deploy
 # 5. Run the standard build chain on the now-upstream source. Invoke the
 #    gen scripts directly (not via `bun run --filter nodrix`) — bun's filter
 #    only matches workspace members, and "nodrix" is the workspace root.
-bun install
+#    Releases that ship a bun.lock install exactly those versions.
+if [ -f bun.lock ]; then bun install --frozen-lockfile; else bun install; fi
 bun scripts/gen-version.ts
 bun scripts/gen-migrations.ts
 bun run --filter @nodrix/web build

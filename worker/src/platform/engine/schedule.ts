@@ -26,7 +26,7 @@ export type SchedulePlan = { fireAt: number | null; due: ScheduleDue[] };
 
 // Soonest upcoming fire across every schedule/solar trigger node of all enabled
 // automations, plus the (automation, node) pairs that share that instant.
-export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
+export async function computeNextScheduled(env: Env, now = Date.now()): Promise<SchedulePlan> {
   const rows = await env.DB
     .prepare(
       `SELECT ${AUTOMATION_COLS} FROM automations
@@ -34,7 +34,6 @@ export async function computeNextScheduled(env: Env): Promise<SchedulePlan> {
     )
     .all<AutomationRow>();
 
-  const now = Date.now();
   let best: number | null = null;
   const entries: { id: string; nodeId: string; fireAt: number }[] = [];
 
@@ -65,13 +64,16 @@ export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: n
   if (due.length === 0) return 0;
   const automations = await loadAutomationsByIds(env, due.map((d) => d.id));
 
-  let ran = 0;
+  // Runs are independent, so they go concurrently: one slow project can't hold
+  // up the others.
   const firedIds = new Set<string>();
+  const runs: Promise<void>[] = [];
   for (const { id, nodeId } of due) {
     const a = automations.get(id);
     if (!a) continue;                                            // deleted or disabled
     if (firedIds.has(id)) continue;                              // already fired this instant
     if (a.last_run_at != null && a.last_run_at >= fireAtSec) continue;
+    firedIds.add(id);
 
     const node = nodesById(toGraph(a)).get(nodeId);
     const ctx: AutomationContext = {
@@ -81,15 +83,15 @@ export async function runScheduledDue(env: Env, due: ScheduleDue[], fireAtSec: n
       depth: 0,
       entryNodeId: nodeId,
     };
-    try {
-      await runAutomation(env, a, ctx);
-      firedIds.add(id);
-      ran++;
-    } catch (e) {
-      console.error('[scheduler] run failed', id, e);
-    }
+    runs.push(
+      runAutomation(env, a, ctx).then(
+        () => undefined,
+        (e) => console.error('[scheduler] run failed', id, e),
+      ),
+    );
   }
-  return ran;
+  await Promise.all(runs);
+  return runs.length;
 }
 
 // One indexed read for a batch of automation ids (PK IN-list), chunked under the
@@ -116,25 +118,29 @@ export async function nextDelayFireAt(env: Env): Promise<number | null> {
   return row?.m ?? null;
 }
 
-// Resume every delay whose fire_at has passed. Each row is deleted before its run
-// so it can't double-fire; re-entry at resume_node_id makes the delay pass through.
+// Resume delays whose fire_at has passed, a bounded batch per alarm (the next
+// alarm picks up the rest). Rows are deleted before running so they can't
+// double-fire; re-entry at resume_node_id makes the delay pass through.
+const DELAY_BATCH = 50;
+
 export async function runDueDelays(env: Env, nowMs: number): Promise<number> {
   const rows = await env.DB
     .prepare(
       `SELECT id, automation_id, resume_node_id, ctx
-         FROM automation_delays WHERE fire_at <= ? ORDER BY fire_at`
+         FROM automation_delays WHERE fire_at <= ? ORDER BY fire_at LIMIT ?`
     )
-    .bind(nowMs)
+    .bind(nowMs, DELAY_BATCH)
     .all<{ id: string; automation_id: string; resume_node_id: string; ctx: string }>();
 
   if (rows.results.length === 0) return 0;
+  await env.DB.batch(
+    rows.results.map((r) => env.DB.prepare(`DELETE FROM automation_delays WHERE id = ?`).bind(r.id))
+  );
   // One batched read for all referenced automations instead of one per delay row.
   const automations = await loadAutomationsByIds(env, rows.results.map((r) => r.automation_id));
 
-  let ran = 0;
+  const runs: Promise<void>[] = [];
   for (const row of rows.results) {
-    await env.DB.prepare(`DELETE FROM automation_delays WHERE id = ?`).bind(row.id).run();
-
     const a = automations.get(row.automation_id);
     if (!a) continue; // automation deleted or disabled
 
@@ -148,14 +154,15 @@ export async function runDueDelays(env: Env, nowMs: number): Promise<number> {
     ctx.resumeNodeId = row.resume_node_id;
     ctx.ts = Math.floor(Date.now() / 1000);
 
-    try {
-      await runAutomation(env, a, ctx);
-      ran++;
-    } catch (e) {
-      console.error('[scheduler] delay resume failed', row.id, e);
-    }
+    runs.push(
+      runAutomation(env, a, ctx).then(
+        () => undefined,
+        (e) => console.error('[scheduler] delay resume failed', row.id, e),
+      ),
+    );
   }
-  return ran;
+  await Promise.all(runs);
+  return runs.length;
 }
 
 // Next 'HH:MM' (tz-local, optional weekdays) strictly after `from` (ms epoch).

@@ -41,6 +41,10 @@ type AckMsg = { type: 'ack'; req: string; ok: boolean; reason?: string };
 type ClientMsg =
   | { type: 'control'; req?: string; variable: string; value?: unknown };
 
+
+type ViewerAttachment = { userId: string; sessionId: string; checkedAt: number };
+const REAUTH_INTERVAL_MS = 60_000;
+
 export class DashboardDO extends DurableObject<Env> {
   private sql: SqlStorage;
 
@@ -63,11 +67,11 @@ export class DashboardDO extends DurableObject<Env> {
     // Hibernation: this is the line that makes idle tabs cheap.
     this.ctx.acceptWebSocket(server);
 
-    // Stash the authenticated user id (set by the WS route after auth) so control
-    // frames can be re-authorized against the user's current project role — this
-    // makes a live demotion take effect on an already-open socket.
+    // Stash the authenticated user + session (set by the WS route after auth) so
+    // the socket can be re-authorized against current access while it stays open.
     const uid = request.headers.get('x-nodrix-uid');
-    if (uid) server.serializeAttachment({ userId: uid });
+    const sid = request.headers.get('x-nodrix-sid');
+    if (uid && sid) server.serializeAttachment({ userId: uid, sessionId: sid, checkedAt: Date.now() } satisfies ViewerAttachment);
 
     // Reconnecting clients pass ?since=<last applied ts> to resume with a delta.
     const rawSince = new URL(request.url).searchParams.get('since');
@@ -89,17 +93,40 @@ export class DashboardDO extends DurableObject<Env> {
   }
 
   // One `updates` frame per socket carries the whole batch (not one frame per point).
+  // Viewers are re-authorized at most once a minute; revoked ones are closed.
   async notifyBatch(points: Array<{ variable: string; value: unknown }>, ts: number): Promise<void> {
     const sockets = this.ctx.getWebSockets();
     if (sockets.length === 0 || points.length === 0) return;
     const json = JSON.stringify({ type: 'updates', ts, points } satisfies UpdatesMsg);
-    for (const ws of sockets) {
+    const allowed = await Promise.all(sockets.map((ws) => this.viewerAllowed(ws, REAUTH_INTERVAL_MS)));
+    sockets.forEach((ws, i) => {
       try {
-        ws.send(json);
+        if (allowed[i]) ws.send(json);
+        else ws.close(1008, 'access revoked');
       } catch {
         // Dead socket; will be cleaned up on webSocketClose.
       }
-    }
+    });
+  }
+
+  // True while the socket's user still reaches the dashboard's project through
+  // a live session. Cached per socket for maxAgeMs.
+  private async viewerAllowed(ws: WebSocket, maxAgeMs: number): Promise<boolean> {
+    const att = ws.deserializeAttachment() as ViewerAttachment | null;
+    if (!att?.userId || !att.sessionId) return false;
+    if (Date.now() - att.checkedAt < maxAgeMs) return true;
+    const row = await this.env.DB
+      .prepare(
+        `SELECT d.project_id, s.id AS session_id
+           FROM dashboards d
+           LEFT JOIN sessions s ON s.id = ? AND s.user_id = ?
+          WHERE d.id = ?`
+      )
+      .bind(att.sessionId, att.userId, this.dashboardId())
+      .first<{ project_id: string; session_id: string | null }>();
+    const ok = !!row?.session_id && (await userCanAccessProject(this.env, att.userId, row.project_id));
+    if (ok) ws.serializeAttachment({ ...att, checkedAt: Date.now() });
+    return ok;
   }
 
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -236,10 +263,7 @@ export class DashboardDO extends DurableObject<Env> {
     // Re-authorize the control write against the user's CURRENT access. Re-read
     // per frame so a removal from the project mid-session takes effect on this
     // already-open socket.
-    const att = ws.deserializeAttachment() as { userId?: string } | null;
-    const uid = att?.userId;
-    if (!uid) return ack(false, 'forbidden');
-    if (!(await userCanAccessProject(this.env, uid, row.project_id))) return ack(false, 'forbidden');
+    if (!(await this.viewerAllowed(ws, 0))) return ack(false, 'forbidden');
 
     const cmdId = newId('control');
     const stub = projectStub(this.env, row.project_id);

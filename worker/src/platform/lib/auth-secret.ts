@@ -10,7 +10,7 @@
 // hot path is at most one KV hit per cache window.
 
 import type { Env } from '../../env';
-import { getSetting, setSetting } from './deployment-settings';
+import { getSetting } from './deployment-settings';
 
 const KEY = 'auth.signing_secret';
 const BYTES = 32;
@@ -33,8 +33,22 @@ export async function getOrCreateSigningSecret(env: Env): Promise<string> {
     cachedSecret = existing;
     return existing;
   }
-  const seed = generate();
-  await setSetting(env, KEY, seed);
-  cachedSecret = seed;
-  return seed;
+  // A null above can also be a transient D1 error or a stale cache tombstone,
+  // so never overwrite: insert only if absent, then use whatever is stored.
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB
+    .prepare(
+      `INSERT INTO deployment_settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO NOTHING`
+    )
+    .bind(KEY, generate(), now)
+    .run();
+  const row = await env.DB
+    .prepare(`SELECT value FROM deployment_settings WHERE key = ?`)
+    .bind(KEY)
+    .first<{ value: string }>();
+  if (!row?.value) throw new Error('signing secret unavailable');
+  try { await env.KV.delete(`settings:${KEY}`); } catch { /* best-effort */ }
+  cachedSecret = row.value;
+  return row.value;
 }

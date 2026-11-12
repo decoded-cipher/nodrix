@@ -7,15 +7,21 @@
 
 const DEFAULT_TTL_SECONDS = 1;
 
+// The cache key keeps only the listed query params, so callers can't dodge the
+// cache with junk params.
 export async function withEdgeCache(
   request: Request,
   produce: () => Promise<Response>,
-  ttlSeconds: number = DEFAULT_TTL_SECONDS
+  ttlSeconds: number = DEFAULT_TTL_SECONDS,
+  keyParams: Record<string, string | number | undefined> = {}
 ): Promise<Response> {
   if (request.method !== 'GET') return produce();
 
   const cache = caches.default;
-  const cacheKey = new Request(request.url, request);
+  const url = new URL(request.url);
+  const keyUrl = new URL(url.origin + url.pathname);
+  for (const [k, v] of Object.entries(keyParams)) if (v !== undefined) keyUrl.searchParams.set(k, String(v));
+  const cacheKey = new Request(keyUrl.toString(), request);
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 

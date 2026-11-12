@@ -81,6 +81,8 @@ users.patch('/:id', async (c) => {
   const stmts = [c.env.DB.prepare(`UPDATE users SET role = ?, updated_at = ? WHERE id = ?`).bind(role, now, id)];
   // Admins reach all projects implicitly — drop any explicit memberships.
   if (role === 'admin') stmts.push(c.env.DB.prepare(`DELETE FROM project_members WHERE user_id = ?`).bind(id));
+  // A demoted admin's pending invites must not outlive their authority.
+  if (role === 'member') stmts.push(c.env.DB.prepare(`DELETE FROM invites WHERE created_by = ?`).bind(id));
   await c.env.DB.batch(stmts);
 
   c.executionCtx.waitUntil(
@@ -137,7 +139,8 @@ users.put('/:id/projects', async (c) => {
   return c.json({ id, project_ids: projectIds });
 });
 
-// DELETE /v1/admin/users/:id — cascades sessions/accounts/memberships.
+// DELETE /v1/admin/users/:id — cascades sessions/accounts/memberships, deletes
+// the user's API tokens and pending invites, and detaches authored records.
 users.delete('/:id', async (c) => {
   const actor = c.get('user');
   const id = c.req.param('id');
@@ -151,7 +154,18 @@ users.delete('/:id', async (c) => {
     return c.json({ error: 'forbidden', reason: 'admin_can_remove_members_only' }, 403);
   }
 
-  await c.env.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
+  const db = c.env.DB;
+  await db.batch([
+    db.prepare(`DELETE FROM user_tokens WHERE created_by = ?`).bind(id),
+    db.prepare(`DELETE FROM invites WHERE created_by = ?`).bind(id),
+    db.prepare(`UPDATE projects SET created_by = NULL WHERE created_by = ?`).bind(id),
+    db.prepare(`UPDATE project_members SET added_by = NULL WHERE added_by = ?`).bind(id),
+    db.prepare(`UPDATE project_tokens SET created_by = NULL WHERE created_by = ?`).bind(id),
+    db.prepare(`UPDATE dashboards SET created_by = NULL WHERE created_by = ?`).bind(id),
+    db.prepare(`UPDATE automations SET created_by = NULL WHERE created_by = ?`).bind(id),
+    db.prepare(`UPDATE integrations SET created_by = NULL WHERE created_by = ?`).bind(id),
+    db.prepare(`DELETE FROM users WHERE id = ?`).bind(id),
+  ]);
 
   c.executionCtx.waitUntil(
     recordAudit(c.env, {

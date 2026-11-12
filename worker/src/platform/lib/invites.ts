@@ -30,6 +30,14 @@ export async function findOpenInviteByEmail(env: Env, email: string): Promise<In
     .first<InviteRow>();
 }
 
+export async function findOpenInviteById(env: Env, id: string): Promise<InviteRow | null> {
+  const now = Math.floor(Date.now() / 1000);
+  return env.DB
+    .prepare(`SELECT * FROM invites WHERE id = ? AND ${OPEN} LIMIT 1`)
+    .bind(id, now)
+    .first<InviteRow>();
+}
+
 export async function findOpenInviteByToken(env: Env, token: string): Promise<InviteRow | null> {
   const now = Math.floor(Date.now() / 1000);
   const hash = await sha256Hex(token);

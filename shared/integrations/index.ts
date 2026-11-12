@@ -154,11 +154,21 @@ export const VALID_KINDS: ReadonlySet<IntegrationKind> = new Set(INTEGRATION_KIN
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Used by the run handlers for user-facing templates ({{variable}}, {{value}}, …).
-export function interpolate(tpl: string, vars: Record<string, unknown>): string {
+// `escape` encodes each substituted value for the template's format.
+export function interpolate(
+  tpl: string,
+  vars: Record<string, unknown>,
+  escape: (s: string) => string = (s) => s,
+): string {
   return tpl.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k: string) => {
-    const v = vars[k];
-    return v === undefined || v === null ? '' : String(v);
+    const v = Object.hasOwn(vars, k) ? vars[k] : undefined;
+    return v === undefined || v === null ? '' : escape(String(v));
   });
+}
+
+// Escapes a value for use inside a JSON string literal.
+export function jsonEscape(s: string): string {
+  return JSON.stringify(s).slice(1, -1);
 }
 
 export function summarize(spec: Pick<ConnSpec, 'summary'>, config: Record<string, unknown>): string {

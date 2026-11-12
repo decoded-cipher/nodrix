@@ -47,17 +47,14 @@ tokens.post('/', async (c) => {
 
   const user = c.get('user');
 
-  // If a project_id is given, the user must have access to it: owner/admin reach
-  // every project; a member must be assigned to it.
+  // API tokens are an owner/admin feature (the SPA hides the page from members).
+  if (user.role !== 'owner' && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
   if (body.project_id) {
-    const instanceAdmin = user.role === 'owner' || user.role === 'admin';
-    if (!instanceAdmin) {
-      const m = await c.env.DB
-        .prepare(`SELECT 1 AS ok FROM project_members WHERE user_id = ? AND project_id = ?`)
-        .bind(user.id, body.project_id)
-        .first<{ ok: number }>();
-      if (!m) return c.json({ error: 'forbidden' }, 403);
-    }
+    const p = await c.env.DB
+      .prepare(`SELECT 1 AS ok FROM projects WHERE id = ?`)
+      .bind(body.project_id)
+      .first<{ ok: number }>();
+    if (!p) return c.json({ error: 'not_found' }, 404);
   }
 
   const id = newId('token');

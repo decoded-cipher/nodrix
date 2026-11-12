@@ -151,6 +151,7 @@ variables.post('/tokens/:id/revoke', async (c) => {
     .bind(now, id, project.id)
     .run();
   if (res.meta.changes === 0) return c.json({ error: 'not_found' }, 404);
+  await projectStub(c.env, project.id).closeTokenSockets(id);
 
   c.executionCtx.waitUntil(
     recordAudit(c.env, {

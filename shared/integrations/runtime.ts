@@ -72,14 +72,16 @@ function resolveParams(
   return out;
 }
 
+// Server-set fields come last so a device payload can't override them.
 function buildPayload(ctx: IntegrationContext): Record<string, unknown> {
+  const payload = ctx.payload ?? {};
   return {
+    ...payload,
     source: ctx.source,
     project_id: ctx.projectId,
     ts: ctx.ts,
-    variable: ctx.variable ?? null,
-    value: ctx.value ?? null,
+    variable: ctx.variable ?? payload.variable ?? null,
+    value: ctx.value ?? payload.value ?? null,
     event: ctx.event ?? null,
-    ...(ctx.payload ?? {}),
   };
 }

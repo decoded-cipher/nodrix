@@ -27,6 +27,7 @@ const SERIES_WINDOW_SECONDS = 60 * 60;
 // Cap on points per chart series in a full snapshot. Dense ingest is stride-
 // sampled down to this; deltas are never capped (they carry only new points).
 const SERIES_MAX_POINTS = 300;
+const SINCE_BUCKET_SECONDS = 10;
 
 type DashRow = {
   id: string;
@@ -87,6 +88,13 @@ pub.get('/:token', async (c) => {
 // delta poll. Clients send a `since` quantized to the refresh cadence so all
 // viewers share one edge-cache entry per bucket.
 pub.get('/:token/state', async (c) => {
+  // Bucket `since` server-side and keep it within the live window, so the cache
+  // key space stays small whatever the client sends.
+  const rawSince = Number(c.req.query('since'));
+  const nowSec = Math.floor(Date.now() / 1000);
+  const since = Number.isFinite(rawSince)
+    ? Math.max(nowSec - SERIES_WINDOW_SECONDS, Math.floor(rawSince / SINCE_BUCKET_SECONDS) * SINCE_BUCKET_SECONDS)
+    : undefined;
   return withEdgeCache(
     c.req.raw,
     async () => {
@@ -98,10 +106,8 @@ pub.get('/:token/state', async (c) => {
       const shownVars = new Set(variablesFromLayout(layout));
       const chartVars = chartVariablesFromLayout(layout);
 
-      const sinceParam = c.req.query('since');
-      const sinceTs = sinceParam !== undefined ? Number(sinceParam) : NaN;
-      const isDelta = Number.isFinite(sinceTs);
-      const seriesSince = isDelta ? sinceTs : Math.floor(Date.now() / 1000) - SERIES_WINDOW_SECONDS;
+      const isDelta = since !== undefined;
+      const seriesSince = isDelta ? since : nowSec - SERIES_WINDOW_SECONDS;
       const seriesCap = isDelta ? undefined : SERIES_MAX_POINTS;
 
       const stub = projectStub(c.env, row.project_id);
@@ -121,7 +127,8 @@ pub.get('/:token/state', async (c) => {
 
       return c.json({ variables, series });
     },
-    5
+    5,
+    { since }
   );
 });
 

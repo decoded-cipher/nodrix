@@ -14,6 +14,7 @@ import app from './app';
 import { NodrixMcpAgent } from './mcp/agent';
 import { mcpEnabled } from './mcp/flags';
 import { sendHeartbeat } from './platform/lib/usage-stats';
+import { clientKey, overLimit } from './platform/middleware/rate-limit';
 
 export { ProjectDO } from './platform/durable-objects/project-do';
 export { DashboardDO } from './platform/durable-objects/dashboard-do';
@@ -41,14 +42,38 @@ const oauthProvider = new OAuthProvider({
   authorizeEndpoint: '/authorize',
   tokenEndpoint: '/v1/oauth/token',
   clientRegistrationEndpoint: '/v1/oauth/register',
+  clientRegistrationTTL: 30 * 24 * 60 * 60,
   scopesSupported: ['mcp:read', 'mcp:manage'],
 });
+
+const REGISTER_MAX_BYTES = 16 * 1024;
+
+function jsonError(status: number, error: string): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+// The provider answers client registration before the app (and its middleware)
+// runs, so gate it here: MCP must be on, bodies small, and registrations
+// throttled per client.
+async function guardRegistration(req: Request, env: Env): Promise<Response | null> {
+  if (new URL(req.url).pathname !== '/v1/oauth/register') return null;
+  if (!(await mcpEnabled(env))) return jsonError(404, 'not_found');
+  const len = Number(req.headers.get('content-length'));
+  if (!Number.isFinite(len) || len > REGISTER_MAX_BYTES) return jsonError(413, 'payload_too_large');
+  if (await overLimit(env, `oauth-register:${clientKey(req)}`, 10, 3600)) return jsonError(429, 'too_many_requests');
+  return null;
+}
 
 // OAuth provider hardcodes env.OAUTH_KV with no custom-storage option; alias
 // it to the single KV binding so wrangler.toml only declares one namespace.
 export default {
-  fetch(req: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     (env as { OAUTH_KV: KVNamespace }).OAUTH_KV = env.KV;
+    const blocked = await guardRegistration(req, env);
+    if (blocked) return blocked;
     return oauthProvider.fetch(req, env, ctx);
   },
   // Daily cron → anonymous usage heartbeat (refresh version/counts/last_seen).

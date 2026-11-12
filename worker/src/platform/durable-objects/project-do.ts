@@ -9,7 +9,7 @@ import type { AutomationContext, AutomationRow, VariableTriggerConfig } from '..
 import { toCompactSeries, type CompactSeries } from '../lib/series';
 import { chunk, MAX_BOUND_PARAMS } from '../lib/sql';
 import { parseDeviceMessage } from '../../domains/telemetry/ws-protocol';
-import { upsertVariables } from '../../domains/telemetry/variables';
+import { upsertVariables, MAX_VARIABLES_PER_PROJECT } from '../../domains/telemetry/variables';
 
 // Project Durable Object (one per project id, SQLite-backed): latest variable
 // state, recent ring buffer, pending control writes, and the R2 flush cursor.
@@ -80,7 +80,7 @@ export class ProjectDO extends DurableObject<Env> {
     );
   }
 
-  async ingest(projectId: string, points: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
+  async ingest(projectId: string, incoming: IngestPoint[], _deviceTs?: number): Promise<IngestResult> {
     const receivedAt = Math.floor(Date.now() / 1000);
 
     // Persist project_id once for the R2 key (idFromName doesn't round-trip cheaply).
@@ -93,8 +93,9 @@ export class ProjectDO extends DurableObject<Env> {
     // Snapshot prior values before the upsert so edge-triggered automations see
     // the transition; variables with no prior row map to undefined. Chunk the
     // IN(...) under the 100 bound-param limit, else a full batch 500s.
-    const uniqueVars = [...new Set(points.map((p) => p.variable))];
+    const uniqueVars = [...new Set(incoming.map((p) => p.variable))];
     const prev = new Map<string, unknown>();
+    const known = new Set<string>();
     for (const v of uniqueVars) prev.set(v, undefined);
     for (const part of chunk(uniqueVars, MAX_BOUND_PARAMS)) {
       const placeholders = part.map(() => '?').join(',');
@@ -104,7 +105,22 @@ export class ProjectDO extends DurableObject<Env> {
           ...part
         )
         .toArray();
-      for (const r of rows) prev.set(r.variable, safeParse(r.value));
+      for (const r of rows) {
+        prev.set(r.variable, safeParse(r.value));
+        known.add(r.variable);
+      }
+    }
+
+    // Same per-project variable cap as D1: new keys past it are dropped.
+    let points = incoming;
+    const fresh = uniqueVars.filter((v) => !known.has(v));
+    if (fresh.length > 0) {
+      const { n } = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM latest_state`).one();
+      const room = Math.max(0, MAX_VARIABLES_PER_PROJECT - n);
+      if (fresh.length > room) {
+        const dropped = new Set(fresh.slice(room));
+        points = incoming.filter((p) => !dropped.has(p.variable));
+      }
     }
 
     // latest_state: multi-row UPSERT, deduped by variable (a multi-row UPSERT
@@ -425,7 +441,8 @@ export class ProjectDO extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0] as WebSocket;
     const server = pair[1] as WebSocket;
-    this.ctx.acceptWebSocket(server);
+    const tokenId = request.headers.get('x-nodrix-token-id');
+    this.ctx.acceptWebSocket(server, tokenId ? [tokenId] : []);
 
     // Flush any pending (undelivered) control writes on connect so a device
     // that missed messages while offline catches up immediately. The device
@@ -489,9 +506,19 @@ export class ProjectDO extends DurableObject<Env> {
     // Same as close: nothing to do.
   }
 
+  // Called when a device token is revoked: drop the sockets opened with it.
+  async closeTokenSockets(tokenId: string): Promise<void> {
+    for (const ws of this.ctx.getWebSockets(tokenId)) {
+      try { ws.close(1008, 'token revoked'); } catch { /* already closed */ }
+    }
+  }
+
   // Wipes all data owned by this project — DO SQLite + R2 telemetry history.
   async destroy(): Promise<void> {
     const projectId = this.projectId();
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.close(1008, 'project deleted'); } catch { /* already closed */ }
+    }
 
     // Delete every R2 object under telemetry/{projectId}/ (paginated).
     let cursor: string | undefined;

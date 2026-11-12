@@ -264,7 +264,8 @@ export class IotChartElement extends HTMLElement {
       type === 'stepline' ? 'stepline' : 'smooth';
 
     const seriesData = this.#series.map((s, i) => ({
-      name: s.label ?? s.key,
+      // ApexCharts writes series names into the tooltip as HTML.
+      name: escapeHtml(s.label ?? s.key),
       color: s.color ?? PALETTE[i % PALETTE.length]!,
       data: s.points.map((p) => ({ x: p.ts * 1000, y: p.value })),
     }));
@@ -385,4 +386,8 @@ function formatNumber(v: number): string {
 
 function isDark(): boolean {
   return typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+}
+
+function escapeHtml(s: string): string {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
 }

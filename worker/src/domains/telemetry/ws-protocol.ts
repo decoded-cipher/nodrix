@@ -1,7 +1,7 @@
 // Pure classifier for device→cloud WebSocket frames. Reuses parseTelemetryBody so HTTP
 // and WS validate telemetry identically; staying pure keeps it unit-testable.
 
-import { parseTelemetryBody } from './validate';
+import { eventPayloadTooLarge, MAX_EVENT_NAME, parseTelemetryBody } from './validate';
 import type { IngestPoint } from '../../platform/durable-objects/project-do';
 
 export type DeviceMessage =
@@ -39,10 +39,12 @@ export function parseDeviceMessage(raw: string): DeviceMessage {
     case 'event': {
       const event = typeof m.event === 'string' ? m.event.trim() : '';
       if (!event) return { kind: 'error', code: 'missing_event' };
+      if (event.length > MAX_EVENT_NAME) return { kind: 'error', code: 'event_too_long' };
       const payload =
         m.payload && typeof m.payload === 'object' && !Array.isArray(m.payload)
           ? (m.payload as Record<string, unknown>)
           : undefined;
+      if (eventPayloadTooLarge(payload)) return { kind: 'error', code: 'payload_too_large' };
       return { kind: 'event', event, payload };
     }
     default:
