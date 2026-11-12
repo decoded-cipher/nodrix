@@ -133,8 +133,15 @@ rm -rf ./deploy
 # 5. Run the standard build chain on the now-upstream source. Invoke the
 #    gen scripts directly (not via `bun run --filter nodrix`) — bun's filter
 #    only matches workspace members, and "nodrix" is the workspace root.
-#    Releases that ship a bun.lock install exactly those versions.
-if [ -f bun.lock ]; then bun install --frozen-lockfile; else bun install; fi
+#    Install exactly the release's bun.lock when this bun can read it. Older
+#    carriers pin bun 1.1.x, which can't parse the current lockfile format, so
+#    they fall back to a plain install.
+if [ -f bun.lock ] && bun install --frozen-lockfile; then
+  :
+else
+  rm -f bun.lock
+  bun install
+fi
 bun scripts/gen-version.ts
 bun scripts/gen-migrations.ts
 bun run --filter @nodrix/web build
