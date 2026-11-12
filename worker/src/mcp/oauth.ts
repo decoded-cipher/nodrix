@@ -93,6 +93,11 @@ oauth.get('/', async (c) => {
 oauth.post('/consent', async (c) => {
   if (!(await mcpEnabled(c.env))) return errorResponse(c, 404, 'MCP server is off', 'The owner disabled MCP between when you started and when you submitted.');
 
+  // Only accept the consent form from this origin (no cross-site/sibling posts).
+  if (c.req.header('origin') !== new URL(c.req.url).origin) {
+    return errorResponse(c, 403, 'Invalid request', 'Start the connection again from the MCP client.');
+  }
+
   const user = await currentUser(c.env, c.req.raw);
   if (!user) return errorResponse(c, 401, 'Session expired', 'Sign in again and retry the connection.');
 
@@ -105,8 +110,11 @@ oauth.post('/consent', async (c) => {
     return errorResponse(c, 400, 'Invalid request', 'The submitted form was malformed. Start over from the MCP client.');
   }
 
-  // The form (incl. redirectUri) is attacker-controllable, so re-validate the
-  // redirect here too — the deny branch trusts it directly.
+  // The form is attacker-controllable: only the authorization-code flow is
+  // allowed, and the redirect is re-validated (the deny branch trusts it).
+  if (authReq.responseType !== 'code' || !authReq.codeChallenge) {
+    return errorResponse(c, 400, 'Invalid request', 'Start over from the MCP client.');
+  }
   const client = await c.env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   if (!clientRedirectAllowed(client, authReq.redirectUri)) {
     return errorResponse(c, 400, 'Invalid request', "The redirect target isn't registered for this client. Start over from the MCP client.");
@@ -295,7 +303,7 @@ function consentPage(o: {
 
   ${scopeBlock}
 
-  <div class="revoke-hint">You can revoke this connection anytime from your account settings.</div>
+  <div class="revoke-hint">The owner can turn off MCP connections anytime in Settings.</div>
 
   <div class="row">
     <button class="btn btn-ghost" type="submit" name="decision" value="deny">Deny</button>
