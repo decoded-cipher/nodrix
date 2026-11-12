@@ -1,7 +1,7 @@
 name = "nodrix"
 main = "worker/src/index.ts"
 compatibility_date = "2025-05-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 # This is the LOCAL-DEV config. Production deploys use deploy/wrangler.toml —
 # the Deploy to Cloudflare button clones only the deploy/ subdir as the user's

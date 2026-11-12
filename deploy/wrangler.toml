@@ -5,7 +5,7 @@
 name = "nodrix"
 main = "worker/src/index.ts"
 compatibility_date = "2025-05-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 # Pulls the latest nodrix release and builds it over this clone.
 # Set NODRIX_DEPLOY_CHANNEL=edge in build vars to track the default branch.
