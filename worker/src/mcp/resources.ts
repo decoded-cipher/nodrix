@@ -6,12 +6,13 @@
 import { ResourceTemplate, type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Env } from '../env';
 import type { McpProps } from './gate';
-import { actorOf, resolveProjectId } from './scope';
+import { actorOf, refreshProps, resolveProjectId } from './scope';
 import { listAccessibleProjects, getProject, type ProjectSummary } from '../domains/projects/service';
 import { getState, listVariables } from '../domains/variables/service';
 
 export function registerResources(server: McpServer, env: Env, props: McpProps): void {
   const accessibleProjects = async (): Promise<ProjectSummary[]> => {
+    await refreshProps(env, props);
     if (props.projectId) {
       const p = await getProject(env, props.projectId);
       return p ? [p] : [];
@@ -33,6 +34,7 @@ export function registerResources(server: McpServer, env: Env, props: McpProps):
     }),
     { description: 'Latest value of every variable in a project.', mimeType: 'application/json' },
     async (uri, variables) => {
+      await refreshProps(env, props);
       const pid = await resolveProjectId(env, props, String(variables.project));
       const state = await getState(env, pid);
       return {
@@ -56,6 +58,7 @@ export function registerResources(server: McpServer, env: Env, props: McpProps):
     }),
     { description: 'Declared variables in a project.', mimeType: 'application/json' },
     async (uri, variables) => {
+      await refreshProps(env, props);
       const pid = await resolveProjectId(env, props, String(variables.project));
       const vars = await listVariables(env, pid);
       return {

@@ -7,7 +7,8 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Env } from '../env';
 import type { McpProps } from './gate';
-import { actorOf, scopeProjectId } from './scope';
+import { actorOf, resolveProjectId, scopeProjectId } from './scope';
+import { ServiceError } from '../platform/lib/service';
 import { run } from './result';
 import { parseStructured, parseStructuredArray } from './coerce';
 import { redactIntegration } from './redact';
@@ -32,7 +33,11 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
   server.registerTool(
     'create_project',
     { description: 'Create a project. Requires an owner/admin token.', inputSchema: { name: z.string() } },
-    (args) => run(() => createProject(env, actor(), { name: args.name }))
+    (args) =>
+      run(async () => {
+        if (props.projectId) throw new ServiceError('forbidden', 'token is scoped to a single project');
+        return createProject(env, actor(), { name: args.name });
+      })
   );
 
   server.registerTool(
@@ -286,7 +291,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     },
     (args) =>
       run(async () => {
-        const pid = scopeProjectId(props, args.project);
+        const pid = await resolveProjectId(env, props, args.project);
         const automations_run = await dispatchEvent(env, pid, args.event, args.payload);
         return { project: pid, event: args.event, automations_run };
       })
