@@ -425,7 +425,8 @@ export class ProjectDO extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0] as WebSocket;
     const server = pair[1] as WebSocket;
-    this.ctx.acceptWebSocket(server);
+    const tokenId = request.headers.get('x-nodrix-token-id');
+    this.ctx.acceptWebSocket(server, tokenId ? [tokenId] : []);
 
     // Flush any pending (undelivered) control writes on connect so a device
     // that missed messages while offline catches up immediately. The device
@@ -505,9 +506,19 @@ export class ProjectDO extends DurableObject<Env> {
       }
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
+  // Called when a device token is revoked: drop the sockets opened with it.
+  async closeTokenSockets(tokenId: string): Promise<void> {
+    for (const ws of this.ctx.getWebSockets(tokenId)) {
+      try { ws.close(1008, 'token revoked'); } catch { /* already closed */ }
+    }
+  }
+
 
     // Cancel any scheduled flush + wipe SQLite storage entirely.
     await this.ctx.storage.deleteAlarm();
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.close(1008, 'project deleted'); } catch { /* already closed */ }
+    }
     await this.ctx.storage.deleteAll();
   }
 
