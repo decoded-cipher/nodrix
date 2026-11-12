@@ -51,10 +51,19 @@ export async function runAutomation(
   // Trigger cooldown: suppress re-fires within the window, measured from the last
   // real run. Skipped silently (no last_run_at write) so the window isn't reset,
   // never applied to manual runs, and never to a delay resume (it must complete).
+  // The window is claimed atomically in D1 before any action runs, so concurrent
+  // or stale-cached triggers can't fire twice inside it.
   const cooldown = Number((start?.config as { cooldown_seconds?: unknown })?.cooldown_seconds ?? 0);
-  if (ctx.source !== 'manual' && ctx.resumeNodeId == null && cooldown > 0 && automation.last_run_at != null
-      && ctx.ts - automation.last_run_at < cooldown) {
-    return { status: 'skipped', actionsRun: 0 };
+  if (ctx.source !== 'manual' && ctx.resumeNodeId == null && cooldown > 0) {
+    if (automation.last_run_at != null && ctx.ts - automation.last_run_at < cooldown) {
+      return { status: 'skipped', actionsRun: 0 };
+    }
+    const claim = await env.DB
+      .prepare(`UPDATE automations SET last_run_at = ? WHERE id = ? AND (last_run_at IS NULL OR last_run_at <= ?)`)
+      .bind(ctx.ts, automation.id, ctx.ts - cooldown)
+      .run();
+    if (claim.meta.changes === 0) return { status: 'skipped', actionsRun: 0 };
+    automation.last_run_at = ctx.ts;
   }
 
   const actionDeps: ActionDeps = {
