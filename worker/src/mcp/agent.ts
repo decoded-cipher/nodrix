@@ -16,6 +16,9 @@ import { refreshProps } from './scope';
 import { run } from './result';
 import { ServiceError } from '../platform/lib/service';
 
+// Sessions are hard-expired so abandoned or junk session objects don't pile up.
+const SESSION_TTL_SECONDS = 24 * 60 * 60;
+
 export class NodrixMcpAgent extends McpAgent<Env, unknown, McpProps> {
   server = new McpServer(
     { name: 'nodrix', version: VERSION },
@@ -23,6 +26,8 @@ export class NodrixMcpAgent extends McpAgent<Env, unknown, McpProps> {
   );
 
   async init(): Promise<void> {
+    await this.schedule(SESSION_TTL_SECONDS, 'expire', undefined, { idempotent: true });
+
     const props = this.props;
     if (!props) return; // no auth context resolved — expose nothing
 
@@ -34,6 +39,10 @@ export class NodrixMcpAgent extends McpAgent<Env, unknown, McpProps> {
     if (props.scope === 'admin' && (await mcpWriteEnabled(this.env))) {
       registerWriteTools(guarded(this.server, this.env, props, true), this.env, props);
     }
+  }
+
+  async expire(): Promise<void> {
+    await this.destroy();
   }
 }
 
