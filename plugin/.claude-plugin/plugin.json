@@ -1,0 +1,32 @@
+{
+  "name": "nodrix",
+  "version": "1.0.0",
+  "description": "Connect Claude Code to your self-hosted nodrix instance to read live device telemetry and manage projects, dashboards, automations, and integrations.",
+  "author": {
+    "name": "Arjun Krishna",
+    "url": "https://github.com/decoded-cipher"
+  },
+  "homepage": "https://nodrix.live",
+  "repository": "https://github.com/decoded-cipher/nodrix",
+  "license": "MIT",
+  "keywords": ["iot", "esp32", "arduino", "telemetry", "mcp", "cloudflare"],
+  "icon": "./icon.png",
+  "documentationUrl": "https://nodrix.live/docs#mcp",
+  "supportUrl": "https://github.com/decoded-cipher/nodrix/issues",
+  "privacyPolicyUrl": "https://nodrix.live/privacy",
+  "termsOfServiceUrl": "https://nodrix.live/terms",
+  "userConfig": {
+    "mcp_url": {
+      "type": "string",
+      "title": "nodrix MCP endpoint",
+      "description": "Your instance's MCP endpoint, e.g. https://nodrix.example.workers.dev/v1/mcp. Copy it from the MCP server card in nodrix Settings.",
+      "required": true
+    }
+  },
+  "mcpServers": {
+    "nodrix": {
+      "type": "http",
+      "url": "${user_config.mcp_url}"
+    }
+  }
+}

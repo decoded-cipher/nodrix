@@ -157,12 +157,31 @@ function safeHost(uri: string): string {
   try { return new URL(uri).host; } catch { return uri; }
 }
 
-// A redirect is allowed only if it exactly matches one the client registered.
+// A redirect must match one the client registered. Loopback redirects (native
+// apps like Claude Code) may use any port, per RFC 8252 and the provider's own check.
 function clientRedirectAllowed(
   client: { redirectUris?: string[] } | null | undefined,
   uri: string
 ): boolean {
-  return !!client && Array.isArray(client.redirectUris) && client.redirectUris.includes(uri);
+  if (!client || !Array.isArray(client.redirectUris)) return false;
+  return client.redirectUris.some((registered) => redirectMatches(registered, uri));
+}
+
+function redirectMatches(registered: string, uri: string): boolean {
+  if (registered === uri) return true;
+  try {
+    const a = new URL(registered);
+    const b = new URL(uri);
+    return isLoopback(a.hostname) && isLoopback(b.hostname) &&
+      a.protocol === b.protocol && a.hostname === b.hostname &&
+      a.pathname === b.pathname && a.search === b.search;
+  } catch {
+    return false;
+  }
+}
+
+function isLoopback(host: string): boolean {
+  return host === 'localhost' || host === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
 }
 
 function errorResponse(

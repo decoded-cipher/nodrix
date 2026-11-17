@@ -1,26 +1,48 @@
 # nodrix
 
-**The IoT platform Cloudflare didn't build.** Point your hardware at one endpoint over HTTPS or WebSocket, watch variables appear on their own, build realtime drag-and-drop dashboards, automate, and read it all back through a clean API — entirely on infrastructure you own. nodrix is single-tenant and open source: it deploys into _your_ Cloudflare account on Workers, Durable Objects, D1, and R2.
+**The IoT platform Cloudflare didn't build.**
+
+nodrix is a self-hosted, open-source IoT platform that runs in your own Cloudflare account on Workers, Durable Objects, D1, and R2. Devices send telemetry over HTTPS or WebSocket, and you get realtime dashboards, two-way control, automations, a read API, and an MCP server for AI assistants. It is single-tenant: your data never leaves your account.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://nodrix.live/go/deploy)
+
+[Website](https://nodrix.live) · [Docs](https://nodrix.live/docs) · [Changelog](https://nodrix.live/changelog) · [Roadmap](https://nodrix.live/roadmap)
+
+## Contents
+
+- [Features](#features)
+- [Getting started](#getting-started)
+- [Connecting hardware](#connecting-hardware)
+- [AI assistants (MCP)](#ai-assistants-mcp)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Security](#security)
+- [License](#license)
 
 ## Features
 
-- 📡 **Telemetry over HTTPS or WebSocket** — hardware POSTs JSON to a project; variables auto-create on first sight. No schema to define, no MQTT broker to run.
-- 📊 **Realtime dashboards** — a drag-and-drop widget grid streams updates over hibernating WebSockets; share any dashboard read-only by public link.
-- 🧩 **Embeddable widgets** — every widget is a framework-agnostic Web Component you can lift straight into your own app.
-- 🎮 **Two-way control** — toggles, sliders, color pickers, and buttons write values back to hardware via short polls or a control socket.
-- 🤖 **Visual automations** — variable, schedule, sunrise/sunset, and event triggers run conditions and actions: webhooks, code snippets, and service integrations.
-- 🔌 **Integrations** — fan out to HTTP, email, and chat (Slack, Telegram, Discord, and more).
-- 📖 **Clean read API** — latest state, time-series, and variable listings behind one token.
-- 🧠 **Native MCP server** — read telemetry and control hardware from an AI assistant, on devices you are not physically next to. Owner-gated and off by default; see [AI assistants (MCP)](#ai-assistants-mcp).
-- 👥 **Multi-user** — owner / admin / member roles, email invites, and social sign-in (Google, GitHub).
-- 📝 **Audit log** — every privileged action recorded and paginated in the UI.
+- **Telemetry over HTTPS or WebSocket.** Devices POST JSON to a project, and variables are created the first time they appear. No schema to define and no MQTT broker to run.
+- **Realtime dashboards.** A drag-and-drop widget grid streams updates over hibernating WebSockets. Any dashboard can be shared read-only by public link.
+- **Embeddable widgets.** Every widget is a framework-agnostic Web Component you can use in your own app.
+- **Two-way control.** Toggles, sliders, color pickers, and buttons write values back to hardware through short polls or a control socket.
+- **Visual automations.** Variable, schedule, sunrise/sunset, and event triggers run conditions and actions, including webhooks, code snippets, and integrations.
+- **Integrations.** HTTP, email, and chat (Slack, Telegram, Discord, and more).
+- **Read API.** Latest state, time-series, and variable listings behind one token.
+- **MCP server.** Read telemetry and control hardware from an AI assistant. Owner-gated and off by default.
+- **Multi-user.** Owner, admin, and member roles with email invites. Email and password sign-in is on by default, and Google or GitHub sign-in can be turned on in **Settings → Sign-in providers**.
+- **Audit log.** Every privileged action is recorded and browsable in the UI.
 
-## Quick start
+## Getting started
 
-1. **Deploy** to your Cloudflare account — [one click](https://nodrix.live), or `bun run deploy:platform` from a clone.
-2. **Create the owner account** — the first visit prompts a "Create owner account" page; the first signup becomes `owner`.
-3. **Create a project** and mint a project token from the dashboard.
-4. **Send telemetry** — variables are created the moment data arrives:
+### Deploy
+
+Click **Deploy to Cloudflare** above to create nodrix and its storage in your Cloudflare account. To deploy from a clone instead, see [Development](#development).
+
+### First steps
+
+1. Open your Worker's URL and create the owner account. The first sign-up becomes the owner; after that, people join by invite from **Users**.
+2. Create a project and a project token.
+3. Send telemetry. Variables are created as soon as data arrives:
 
    ```bash
    curl -X POST https://<your-worker>/v1/telemetry \
@@ -29,72 +51,64 @@
      -d '{"metrics":{"temperature":23.4,"humidity":61}}'
    ```
 
-5. **Read it back:**
+4. Read it back:
 
    ```bash
    curl https://<your-worker>/v1/projects/<project>/state \
      -H "Authorization: Bearer $NODRIX_TOKEN"
    ```
 
+## Connecting hardware
+
+For ESP32 and ESP8266, use the [Nodrix library](https://github.com/decoded-cipher/nodrix-sdk). It is available from the Arduino Library Manager, the PlatformIO Registry (`decoded-cipher/Nodrix`), and the ESP Component Registry.
+
+Any other device that can make an HTTPS request can use the telemetry API above.
+
 ## AI assistants (MCP)
 
-nodrix ships a native [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant can read a project's telemetry and — once you allow it — act on the hardware. Because devices report to your deployment rather than to your laptop, the board does not need to be plugged into the machine running the assistant; it can be in another building.
+nodrix includes a [Model Context Protocol](https://modelcontextprotocol.io) server at `/v1/mcp` (Streamable HTTP). An assistant can read your telemetry and, once you allow it, control your hardware. Devices report to your deployment, so the board does not need to be connected to the machine running the assistant.
 
-One endpoint, `/v1/mcp` (Streamable HTTP), accepts either credential:
-
-| Auth | For |
+| Client | How to connect |
 |---|---|
-| API token (`Authorization: Bearer …`) | CLI and IDE clients |
-| OAuth sign-in (dynamic registration or Client ID Metadata Documents) | claude.ai-style connectors |
+| Claude Code | `/plugin install nodrix --marketplace decoded-cipher/nodrix`, then enter your endpoint. See [plugin/](plugin). |
+| claude.ai, ChatGPT | Add `https://<your-worker>/v1/mcp` as a custom connector and sign in on your instance. |
+| Codex | `codex mcp add nodrix --url https://<your-worker>/v1/mcp`, then `codex mcp login nodrix`. |
+| Other clients | Send an API token from **Settings → Tokens** as `Authorization: Bearer <token>`. |
 
-`/v1/mcp/oauth` still works as an alias for connectors added before the endpoints were merged.
+The server is off by default. The owner turns it on from the **MCP server** card in **Settings**, which has two switches:
 
-**It is off by default.** The owner flips it in **Settings → More**:
+- **MCP server** (`mcp_enabled`). While it is off, `/v1/mcp` returns 404.
+- **Allow control writes** (`mcp_write_enabled`). Until it is on, every client gets read-only tools, even with an admin token.
 
-- `mcp_enabled` — the master switch. While it is off, `/v1/mcp` returns **404**, so a disabled server looks absent rather than merely forbidden.
-- `mcp_write_enabled` — gates the management and control tools. Until it is on, even an admin-scope token gets read-only tools, so an assistant cannot command hardware by default.
+There are 12 read tools and 16 write tools, and no delete tools. Every tool is checked against the access of the person behind the token or sign-in. See the [MCP server reference](https://nodrix.live/products/mcp) for the full tool list.
 
-**12 read tools** — `list_projects`, `list_variables`, `get_state`, `get_series`, `list_dashboards`, `get_dashboard`, `list_widget_types`, `list_widgets`, `list_block_types`, `list_integration_kinds`, `list_automations`, `list_integrations`.
-
-**16 write tools** — creating and updating projects, variables, dashboards, widgets, automations, and integrations, plus `set_variable` (how an assistant turns a relay on), `run_automation`, `emit_event`, and `test_integration`.
-
-**There are no delete tools, by design.** Every tool resolves its target project through the token's scope before it runs, so it cannot reach a project the token cannot.
+`/v1/mcp/oauth` still works as an alias for connectors added before the two endpoints were merged.
 
 ## Architecture
 
-- **Worker** ([worker/](worker/)) — a single Hono app. Durable Objects for Project, Dashboard, Scheduler, and the MCP agent; one Workflow for provisioning; D1 (metadata), R2 (telemetry history), KV (read cache + JWKS).
-- **Web** ([web/](web/)) — Vue 3 + Tailwind + Reka UI admin panel and drag-and-drop dashboard builder, built and served as Worker static assets.
-- **Shared** ([shared/](shared/)) — framework-agnostic Web Component widgets, the integration catalog, and automation blocks, consumed by both web and worker so there is a single source of truth.
-- **Deploy** ([deploy/](deploy/)) — the small config carrier behind the one-click Deploy to Cloudflare.
+| Component | Description |
+|---|---|
+| [worker/](worker/) | A Hono app on Cloudflare Workers, with Durable Objects for projects, dashboards, the scheduler, and MCP sessions, and a Workflow for provisioning. |
+| [web/](web/) | Vue 3, Tailwind, and Reka UI admin panel and dashboard builder, served as Worker static assets. |
+| [shared/](shared/) | Web Component widgets, the integration catalog, and automation blocks, used by both web and worker. |
+| [plugin/](plugin/) | The Claude Code plugin. |
+| [deploy/](deploy/) | The config behind the Deploy to Cloudflare button. |
+| [scripts/](scripts/) | Build, version, and migration generators. |
 
-```
-worker/   Cloudflare Worker — API, Durable Objects, Workflow
-web/      Vue 3 admin panel + dashboard builder
-shared/   Web Component widgets, integration catalog, automation blocks
-deploy/   One-click Deploy to Cloudflare config
-scripts/  Build, version, and migration generators
-```
-
-## Storage
+### Storage
 
 | Store | Holds |
 |---|---|
-| Project DO (SQLite) | Latest variable state, recent ring buffer, pending control writes, flush cursor |
-| R2 | Cold telemetry history (NDJSON, partitioned by project + hour) |
-| D1 | Users, sessions, accounts, projects, variables, dashboards, tokens, automations, integrations, audit log, OAuth provider config (metadata only — never any telemetry point) |
-| KV | Cached `/state` responses and JWKS |
-| Dashboard DO | Per-dashboard subscriptions + hibernated WebSockets |
-| Scheduler DO | One alarm at the next schedule/sunset automation fire time |
-
-## Authentication
-
-[Better Auth](https://www.better-auth.com) handles sign-in. Email + password is on by default; Google and GitHub OAuth can be enabled at runtime from **Settings → Sign-in providers** (the owner enters a client ID + secret per provider, and the login page shows the matching buttons immediately).
-
-The first signup on a fresh deployment becomes `owner`. After that, registration is closed: the owner invites people from **Users**, each with an owner / admin / member role. Sessions are cookie-based and persist 30 days; each device is a separate session, listed and revokable from **Users**.
+| Project Durable Object (SQLite) | Latest variable state, a recent ring buffer, pending control writes, and the flush cursor |
+| R2 | Telemetry history as NDJSON, partitioned by project and hour |
+| D1 | Users, sessions, accounts, projects, variables, dashboards, tokens, automations, integrations, the audit log, and sign-in provider settings. Metadata only, never telemetry points |
+| KV | Cached `/state` responses, JWKS, and OAuth clients and grants |
+| Dashboard Durable Object | Per-dashboard subscriptions and hibernated WebSockets |
+| Scheduler Durable Object | One alarm for the next schedule or sunset automation |
 
 ## Development
 
-nodrix uses [Bun](https://bun.sh).
+Prerequisites: [Bun](https://bun.sh) and, to deploy, a Cloudflare account.
 
 ```bash
 bun install
@@ -102,14 +116,14 @@ bun run dev              # worker (wrangler dev)
 bun run dev:web          # web (vite)
 bun run typecheck
 bun run build
-bun run deploy:platform  # build + deploy the worker
+bun run deploy:platform  # build and deploy the worker
 ```
 
-## Links
+The root `wrangler.toml` is for local development. Deploys from the Deploy to Cloudflare button use [deploy/wrangler.toml](deploy/wrangler.toml).
 
-- **Site** — https://nodrix.live
-- **Changelog** — https://nodrix.live/changelog
-- **Roadmap** — https://nodrix.live/roadmap
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## License
 

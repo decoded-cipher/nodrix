@@ -27,12 +27,19 @@ const project = z
   .describe('Project id. Optional for a project-scoped token; required for an all-projects token.')
   .optional();
 
+// Every write changes data or hardware state, so clients confirm before running it.
+const writes = (title: string) => ({ title, readOnlyHint: false, destructiveHint: true });
+
 export function registerWriteTools(server: McpServer, env: Env, props: McpProps): void {
   const actor = () => actorOf(props);
 
   server.registerTool(
     'create_project',
-    { description: 'Create a project. Requires an owner/admin token.', inputSchema: { name: z.string() } },
+    {
+      description: 'Create a project. Requires an owner/admin token.',
+      inputSchema: { name: z.string() },
+      annotations: writes('Create project'),
+    },
     (args) =>
       run(async () => {
         if (props.projectId) throw new ServiceError('forbidden', 'token is scoped to a single project');
@@ -45,6 +52,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     {
       description: 'Rename or re-describe a project.',
       inputSchema: { project, name: z.string().optional(), description: z.string().nullable().optional() },
+      annotations: writes('Update project'),
     },
     (args) =>
       run(() => updateProject(env, actor(), scopeProjectId(props, args.project), { name: args.name, description: args.description }))
@@ -55,6 +63,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     {
       description: 'Declare a variable (optionally with a unit). Telemetry also auto-creates variables.',
       inputSchema: { project, key: z.string(), unit: z.string().nullable().optional() },
+      annotations: writes('Create variable'),
     },
     (args) => run(() => createVariable(env, actor(), scopeProjectId(props, args.project), { key: args.key, unit: args.unit }))
   );
@@ -64,6 +73,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     {
       description: "Update a variable's unit.",
       inputSchema: { project, variable_id: z.string(), unit: z.string().nullable() },
+      annotations: writes('Update variable'),
     },
     (args) => run(() => updateVariable(env, actor(), scopeProjectId(props, args.project), args.variable_id, { unit: args.unit }))
   );
@@ -78,6 +88,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         variable: z.string().describe('Variable key.'),
         value: z.any().describe('Value to send (number, boolean, string, or JSON).'),
       },
+      annotations: writes('Set variable value'),
     },
     (args) => run(() => setVariableControl(env, actor(), scopeProjectId(props, args.project), { variable: args.variable, value: args.value }))
   );
@@ -87,6 +98,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     {
       description: 'Create a dashboard. Layout is the widget-grid object; omit for an empty grid.',
       inputSchema: { project, name: z.string(), layout: z.any().optional() },
+      annotations: writes('Create dashboard'),
     },
     (args) => run(() => createDashboard(env, actor(), scopeProjectId(props, args.project), { name: args.name, layout: parseStructured(args.layout) }))
   );
@@ -103,6 +115,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         layout: z.any().optional(),
         if_updated_at: z.number().optional(),
       },
+      annotations: writes('Update dashboard'),
     },
     (args) =>
       run(() =>
@@ -136,6 +149,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         props: z.record(z.string(), z.unknown()).optional(),
         widget_id: z.string().optional(),
       },
+      annotations: writes('Add widget'),
     },
     (args) =>
       run(async () => {
@@ -173,6 +187,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         h: z.number().optional(),
         props: z.record(z.string(), z.unknown()).optional(),
       },
+      annotations: writes('Update widget'),
     },
     (args) =>
       run(async () => {
@@ -224,6 +239,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         actions: z.array(z.any()).optional(),
         enabled: z.boolean().optional(),
       },
+      annotations: writes('Create automation'),
     },
     (args) =>
       run(() =>
@@ -255,6 +271,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         trigger_config: z.any().optional(),
         actions: z.array(z.any()).optional(),
       },
+      annotations: writes('Update automation'),
     },
     (args) =>
       run(() =>
@@ -275,6 +292,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     {
       description: 'Run an automation now (drives manual automations; also a test harness).',
       inputSchema: { project, automation_id: z.string() },
+      annotations: writes('Run automation'),
     },
     (args) => run(() => runAutomationNow(env, actor(), scopeProjectId(props, args.project), args.automation_id))
   );
@@ -288,6 +306,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         event: z.string().describe('Event name, matched against event-trigger automations.'),
         payload: z.record(z.string(), z.unknown()).optional(),
       },
+      annotations: writes('Emit event'),
     },
     (args) =>
       run(async () => {
@@ -308,6 +327,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         config: z.any().optional(),
         enabled: z.boolean().optional(),
       },
+      annotations: writes('Create integration'),
     },
     (args) =>
       run(async () =>
@@ -333,6 +353,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
         config: z.any().optional(),
         enabled: z.boolean().optional(),
       },
+      annotations: writes('Update integration'),
     },
     (args) =>
       run(async () =>
@@ -351,6 +372,7 @@ export function registerWriteTools(server: McpServer, env: Env, props: McpProps)
     {
       description: 'Fire an integration once with a synthetic context to verify delivery.',
       inputSchema: { project, integration_id: z.string() },
+      annotations: writes('Test integration'),
     },
     (args) => run(() => testIntegration(env, actor(), scopeProjectId(props, args.project), args.integration_id))
   );
