@@ -40,14 +40,16 @@
 
 nodrix ships a native [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant can read a project's telemetry and — once you allow it — act on the hardware. Because devices report to your deployment rather than to your laptop, the board does not need to be plugged into the machine running the assistant; it can be in another building.
 
-Two endpoints, both Streamable HTTP:
+One endpoint, `/v1/mcp` (Streamable HTTP), accepts either credential:
 
-| Endpoint | Auth | For |
-|---|---|---|
-| `/v1/mcp` | Bearer token | CLI and IDE clients |
-| `/v1/mcp/oauth` | OAuth | claude.ai-style connectors |
+| Auth | For |
+|---|---|
+| API token (`Authorization: Bearer …`) | CLI and IDE clients |
+| OAuth sign-in (dynamic registration or Client ID Metadata Documents) | claude.ai-style connectors |
 
-**Both are off by default.** The owner flips them in **Settings → More**:
+`/v1/mcp/oauth` still works as an alias for connectors added before the endpoints were merged.
+
+**It is off by default.** The owner flips it in **Settings → More**:
 
 - `mcp_enabled` — the master switch. While it is off, `/v1/mcp` returns **404**, so a disabled server looks absent rather than merely forbidden.
 - `mcp_write_enabled` — gates the management and control tools. Until it is on, even an admin-scope token gets read-only tools, so an assistant cannot command hardware by default.
