@@ -38,21 +38,35 @@ const apiHandler = {
   },
 };
 
-const oauthProvider = new OAuthProvider({
-  apiRoute: MCP_ROUTE,
-  apiHandler,
-  defaultHandler: app as unknown as ExportedHandler<Env>,
-  authorizeEndpoint: '/authorize',
-  tokenEndpoint: '/v1/oauth/token',
-  clientRegistrationEndpoint: '/v1/oauth/register',
-  clientRegistrationTTL: 30 * 24 * 60 * 60,
-  clientIdMetadataDocumentEnabled: true,
-  scopesSupported: ['mcp:read', 'mcp:manage'],
-  resolveExternalToken: async ({ token, env }) => {
-    const props = await authenticateApiToken(env as Env, token);
-    return props ? { props } : null;
-  },
-});
+// Every token is bound to the MCP URL it was issued for, and an instance can be
+// served on more than one hostname, so there is one provider per origin.
+const providers = new Map<string, OAuthProvider<Env>>();
+
+function providerFor(req: Request): OAuthProvider<Env> {
+  const origin = new URL(req.url).origin;
+  let provider = providers.get(origin);
+  if (!provider) {
+    const resource = `${origin}${MCP_ROUTE}`;
+    provider = new OAuthProvider<Env>({
+      apiRoute: MCP_ROUTE,
+      apiHandler,
+      defaultHandler: app as unknown as ExportedHandler<Env>,
+      authorizeEndpoint: '/authorize',
+      tokenEndpoint: '/v1/oauth/token',
+      clientRegistrationEndpoint: '/v1/oauth/register',
+      clientRegistrationTTL: 30 * 24 * 60 * 60,
+      clientIdMetadataDocumentEnabled: true,
+      scopesSupported: ['mcp:read', 'mcp:manage'],
+      resourceMetadata: { resource },
+      resolveExternalToken: async ({ token, env }) => {
+        const props = await authenticateApiToken(env, token);
+        return props ? { props, audience: resource } : null;
+      },
+    });
+    providers.set(origin, provider);
+  }
+  return provider;
+}
 
 const REGISTER_MAX_BYTES = 16 * 1024;
 
@@ -69,7 +83,8 @@ function jsonError(status: number, error: string): Response {
 async function guardMcp(req: Request, env: Env): Promise<Response | null> {
   const path = new URL(req.url).pathname;
   const isRegister = path === '/v1/oauth/register';
-  if (!isRegister && path !== '/v1/oauth/token' && !path.startsWith(MCP_ROUTE)) return null;
+  const isMcp = path === MCP_ROUTE || path.startsWith(`${MCP_ROUTE}/`);
+  if (!isRegister && !isMcp && path !== '/v1/oauth/token') return null;
   if (!(await mcpEnabled(env))) return jsonError(404, 'not_found');
   if (!isRegister) return null;
   const len = Number(req.headers.get('content-length'));
@@ -78,14 +93,15 @@ async function guardMcp(req: Request, env: Env): Promise<Response | null> {
   return null;
 }
 
-// OAuth provider hardcodes env.OAUTH_KV with no custom-storage option; alias
-// it to the single KV binding so wrangler.toml only declares one namespace.
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
-    (env as { OAUTH_KV: KVNamespace }).OAUTH_KV = env.KV;
-    const blocked = await guardMcp(req, env);
+    // A copy per request: the provider attaches its per-origin helpers
+    // (OAUTH_PROVIDER) to env, and env is shared across requests. OAUTH_KV is
+    // aliased to the one KV binding, since the provider has no storage option.
+    const reqEnv: Env = { ...env, OAUTH_KV: env.KV };
+    const blocked = await guardMcp(req, reqEnv);
     if (blocked) return blocked;
-    return oauthProvider.fetch(req, env, ctx);
+    return providerFor(req).fetch(req, reqEnv, ctx);
   },
   // Daily cron → anonymous usage heartbeat (refresh version/counts/last_seen).
   scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
