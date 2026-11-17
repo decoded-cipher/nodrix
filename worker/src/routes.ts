@@ -37,7 +37,6 @@ import versionInfo from './domains/settings/version';
 import auditLog from './domains/settings/audit-log';
 
 // mcp
-import { mcpBearerHandler } from './mcp/gate';
 import oauthRoutes from './mcp/oauth';
 
 type App = Hono<{ Bindings: Env }>;
@@ -85,8 +84,7 @@ export function registerRoutes(app: App): void {
   app.route('/v1/projects/:proj/state', readState);
   app.route('/v1/projects/:proj/variables/:key/series', readSeries);
 
-  // MCP (bearer on /v1/mcp; OAuth consent on /authorize)
-  app.all('/v1/mcp', mcpBearerHandler);
+  // MCP OAuth consent (the /v1/mcp endpoint itself is served in index.ts)
   app.route('/authorize', oauthRoutes);
 
   // WebSocket feed, public dashboard SEO, SPA fallback (last)
