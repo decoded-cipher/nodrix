@@ -789,7 +789,7 @@ const PROVIDER_META = {
             </div>
             <div class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
               Let AI clients (Claude, IDEs) read your projects over the Model Context
-              Protocol, authenticated with an API token.
+              Protocol, authenticated with an API token or by signing in.
             </div>
           </div>
         </div>
