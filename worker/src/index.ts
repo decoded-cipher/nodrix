@@ -46,6 +46,7 @@ const oauthProvider = new OAuthProvider({
   tokenEndpoint: '/v1/oauth/token',
   clientRegistrationEndpoint: '/v1/oauth/register',
   clientRegistrationTTL: 30 * 24 * 60 * 60,
+  clientIdMetadataDocumentEnabled: true,
   scopesSupported: ['mcp:read', 'mcp:manage'],
   resolveExternalToken: async ({ token, env }) => {
     const props = await authenticateApiToken(env as Env, token);
@@ -68,7 +69,7 @@ function jsonError(status: number, error: string): Response {
 async function guardMcp(req: Request, env: Env): Promise<Response | null> {
   const path = new URL(req.url).pathname;
   const isRegister = path === '/v1/oauth/register';
-  if (!isRegister && !path.startsWith(MCP_ROUTE)) return null;
+  if (!isRegister && path !== '/v1/oauth/token' && !path.startsWith(MCP_ROUTE)) return null;
   if (!(await mcpEnabled(env))) return jsonError(404, 'not_found');
   if (!isRegister) return null;
   const len = Number(req.headers.get('content-length'));
