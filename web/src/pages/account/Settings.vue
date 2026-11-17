@@ -121,7 +121,6 @@ async function toggleAuditLog(next: boolean) {
 const mcpEnabled = ref(false);
 const mcpSaving = ref(false);
 const mcpUrl = computed(() => `${window.location.origin}/v1/mcp`);
-const mcpOAuthUrl = computed(() => `${window.location.origin}/v1/mcp/oauth`);
 const mcpConnectSnippet = computed(
   () => `claude mcp add --transport http nodrix ${mcpUrl.value} \\\n  --header "Authorization: Bearer <your token>"`
 );
@@ -840,22 +839,11 @@ const PROVIDER_META = {
           </div>
         </div>
 
-        <!-- Connect (claude.ai — OAuth) -->
+        <!-- Connect (claude.ai) -->
         <div>
-          <label class="mb-1.5 block text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai — OAuth)</label>
-          <div class="flex items-stretch overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
-            <code class="min-w-0 flex-1 truncate bg-neutral-50 px-2.5 py-2 font-mono text-xs text-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-300">{{ mcpOAuthUrl }}</code>
-            <button
-              class="flex shrink-0 items-center gap-1 border-l border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
-              @click="copyText(mcpOAuthUrl, 'oauth')"
-            >
-              <svg v-if="copiedKey === 'oauth'" class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5" /></svg>
-              <svg v-else class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-              {{ copiedKey === 'oauth' ? 'Copied' : 'Copy' }}
-            </button>
-          </div>
-          <div class="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-            Add as a custom connector in claude.ai — you'll sign in here and approve access. No token needed.
+          <label class="mb-1.5 block text-xs font-medium text-neutral-500 dark:text-neutral-400">Connect (claude.ai)</label>
+          <div class="text-xs text-neutral-500 dark:text-neutral-400">
+            Add the endpoint above as a custom connector in claude.ai — you'll sign in here and approve access. No token needed.
           </div>
         </div>
 
