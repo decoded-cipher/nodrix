@@ -49,7 +49,9 @@ One endpoint, `/v1/mcp` (Streamable HTTP), accepts either credential:
 
 `/v1/mcp/oauth` still works as an alias for connectors added before the endpoints were merged.
 
-**It is off by default.** The owner flips it in **Settings → More**:
+In Claude Code, the [nodrix plugin](plugin) asks for your endpoint and handles sign-in: `/plugin install nodrix --marketplace decoded-cipher/nodrix`.
+
+**It is off by default.** The owner flips it on the **MCP server** card in **Settings**:
 
 - `mcp_enabled` — the master switch. While it is off, `/v1/mcp` returns **404**, so a disabled server looks absent rather than merely forbidden.
 - `mcp_write_enabled` — gates the management and control tools. Until it is on, even an admin-scope token gets read-only tools, so an assistant cannot command hardware by default.
