@@ -36,7 +36,7 @@ const blockSpec = (b: BlockManifest) => ({
   fields: b.fields,
 });
 
-const READ_ONLY = { readOnlyHint: true } as const;
+const readOnly = (title: string) => ({ title, readOnlyHint: true });
 const project = z.string().describe('Project id. Optional for a project-scoped token; required for an all-projects token.');
 
 export function registerReadTools(server: McpServer, env: Env, props: McpProps): void {
@@ -45,7 +45,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'List the projects this token can access.',
       inputSchema: {},
-      annotations: READ_ONLY,
+      annotations: readOnly('List projects'),
     },
     () =>
       run(async () => {
@@ -63,7 +63,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'List declared variables (key, unit, last seen) for a project.',
       inputSchema: { project: project.optional() },
-      annotations: READ_ONLY,
+      annotations: readOnly('List variables'),
     },
     (args) =>
       run(async () => {
@@ -77,7 +77,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'Get the latest value of every variable in a project.',
       inputSchema: { project: project.optional() },
-      annotations: READ_ONLY,
+      annotations: readOnly('Get current state'),
     },
     (args) =>
       run(async () => {
@@ -99,7 +99,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
           .optional()
           .describe('Lookback window like 30s, 15m, 1h. Defaults to 1h.'),
       },
-      annotations: READ_ONLY,
+      annotations: readOnly('Get variable history'),
     },
     (args) =>
       run(async () => {
@@ -114,7 +114,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'List dashboards in a project.',
       inputSchema: { project: project.optional() },
-      annotations: READ_ONLY,
+      annotations: readOnly('List dashboards'),
     },
     (args) =>
       run(async () => {
@@ -128,7 +128,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'Get one dashboard including its widget layout.',
       inputSchema: { project: project.optional(), dashboard_id: z.string() },
-      annotations: READ_ONLY,
+      annotations: readOnly('Get dashboard'),
     },
     (args) =>
       run(async () => {
@@ -143,7 +143,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
       description:
         'List the available widget types and their canonical prop shapes. Call before add_widget / update_widget to know what `props` each type expects.',
       inputSchema: {},
-      annotations: READ_ONLY,
+      annotations: readOnly('List widget types'),
     },
     () => run(async () => ({ widget_types: WIDGET_SPECS }))
   );
@@ -154,7 +154,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
       description:
         'List widgets in a dashboard (id, type, position, props). Mutating tools take the whole layout — read this, edit items, write back via update_dashboard.',
       inputSchema: { project: project.optional(), dashboard_id: z.string() },
-      annotations: READ_ONLY,
+      annotations: readOnly('List widgets'),
     },
     (args) =>
       run(async () => {
@@ -179,7 +179,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
         '{ id, kind, config } joined by edges { from, to, port }, where `kind` is one of these and `config` ' +
         'keys are each block’s field `key`s. Condition nodes branch via "true"/"false" output ports.',
       inputSchema: {},
-      annotations: READ_ONLY,
+      annotations: readOnly('List automation block types'),
     },
     () =>
       run(async () => ({
@@ -199,7 +199,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
         '`{ operation, params }` — a field shared by several operations appears in each. A kind with ' +
         'no operations has a single implicit operation and no call-site params.',
       inputSchema: {},
-      annotations: READ_ONLY,
+      annotations: readOnly('List integration kinds'),
     },
     () =>
       run(async () => ({
@@ -224,7 +224,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'List automations (flow graph + last run status) in a project.',
       inputSchema: { project: project.optional() },
-      annotations: READ_ONLY,
+      annotations: readOnly('List automations'),
     },
     (args) =>
       run(async () => {
@@ -238,7 +238,7 @@ export function registerReadTools(server: McpServer, env: Env, props: McpProps):
     {
       description: 'List integrations in a project. Secret config values are redacted.',
       inputSchema: { project: project.optional() },
-      annotations: READ_ONLY,
+      annotations: readOnly('List integrations'),
     },
     (args) =>
       run(async () => {
