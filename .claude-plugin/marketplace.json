@@ -1,0 +1,14 @@
+{
+  "name": "nodrix",
+  "description": "Claude Code plugin for self-hosted nodrix instances.",
+  "owner": {
+    "name": "Arjun Krishna",
+    "url": "https://github.com/decoded-cipher"
+  },
+  "plugins": [
+    {
+      "name": "nodrix",
+      "source": "./plugin"
+    }
+  ]
+}
