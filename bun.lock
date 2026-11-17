@@ -59,7 +59,7 @@
       "name": "@nodrix/worker",
       "version": "0.0.0",
       "dependencies": {
-        "@cloudflare/workers-oauth-provider": "^0.7.0",
+        "@cloudflare/workers-oauth-provider": "^1.2.4",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@nodrix/blocks-shared": "*",
         "@nodrix/integrations-shared": "*",
@@ -313,7 +313,7 @@
 
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20260526.1", "", { "os": "win32", "cpu": "x64" }, "sha512-R+tqpFFdcfZIljx8fIW9rj9fRTtDgfoA2yonsfAGa6e8snrmr+38mdFHtkRC0D3UyZpn/hOtmXiUBfdX2gMR7Q=="],
 
-    "@cloudflare/workers-oauth-provider": ["@cloudflare/workers-oauth-provider@0.7.0", "", {}, "sha512-w0s740/aV76mOkCgTcAQ31Lcju38Bt2BN3gbWPfhF9TvN6ED8nv08TSkNPARJa7X2AZzWhxqRlMrbWzEDPcY+Q=="],
+    "@cloudflare/workers-oauth-provider": ["@cloudflare/workers-oauth-provider@1.2.4", "", {}, "sha512-ayo6Z8DBHdAxwDpplFU8BrEoxoSn6wNo+E7ypTENRHUOc8R89A8/+nZ+a8pMZjjXzF0JXfpYXhw/7qqG+DC18Q=="],
 
     "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20260531.1", "", {}, "sha512-7DybhbX12n+mVgJEDvm9W/jjqpaUIczg+RWj1Hua9nGEG+pNJnT+yZj1JKENrbdyuGWx3OFEgUCNFcGJN86Dvg=="],
 
